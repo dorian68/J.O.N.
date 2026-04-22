@@ -1,0 +1,36 @@
+{
+  "prompt_id": "task.evaluation_support",
+  "family": "task",
+  "purpose": "Evaluate the bounded quality and risk profile of a draft note de decision.",
+  "owner": "runtime",
+  "status": "released",
+  "environment": "prototype",
+  "version": "1.0.0",
+  "compatible_model_aliases": ["primary_reasoning", "mock_offline"],
+  "input_contract": {
+    "mission": "string",
+    "draft": "object",
+    "records": "array",
+    "sourceReferences": "array",
+    "reasoningContextJson": "string"
+  },
+  "output_contract": {
+    "type": "structured",
+    "schema": "evaluation_support_v1"
+  },
+  "benchmark_links": [
+    "artifact-quality-rubrics-v1",
+    "benchmark-review-protocol-v1"
+  ],
+  "change_notes": "Initial released evaluation-support prompt.",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Evaluate a draft decision note conservatively. You may critique, qualify, and surface ambiguity. You do not validate the product outcome as final truth."
+    },
+    {
+      "role": "user",
+      "content": "Mission: {{mission}}\nDraft: {{draft}}\nStructured records: {{records}}\nSource references: {{sourceReferences}}\nReasoning context: {{reasoningContextJson}}\nReturn qualityVerdict, riskFlags, missingProof, recommendedValidationState, ambiguityDetected and ambiguitySummary."
+    }
+  ]
+}

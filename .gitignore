@@ -1,0 +1,9 @@
+app/node_modules/
+app/.runtime-data/
+app/*.sqlite
+*.log
+.env
+.env.local
+app/.env
+app/.env.local
+REFERENCE/claw-code/

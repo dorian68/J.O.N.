@@ -1,0 +1,34 @@
+{
+  "prompt_id": "task.plan_generation",
+  "family": "task",
+  "purpose": "Generate a bounded execution plan for an authorized prototype run.",
+  "owner": "runtime",
+  "status": "released",
+  "environment": "prototype",
+  "version": "1.0.0",
+  "compatible_model_aliases": ["primary_reasoning", "mock_offline"],
+  "input_contract": {
+    "mission": "string",
+    "scenarioType": "string",
+    "missionUnderstanding": "object",
+    "allowlistedDomains": "array"
+  },
+  "output_contract": {
+    "type": "structured",
+    "schema": "plan_generation_v1"
+  },
+  "benchmark_links": [
+    "browser-control-benchmark-pack-v1"
+  ],
+  "change_notes": "Initial released plan-generation prompt.",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Produce a bounded plan for an authorized prototype run. Keep it conservative, explicit, and aligned with browser-first, DOM-first execution."
+    },
+    {
+      "role": "user",
+      "content": "Mission: {{mission}}\nScenario type: {{scenarioType}}\nMission understanding: {{missionUnderstanding}}\nAllowlisted domains: {{allowlistedDomains}}\nReasoning context: {{reasoningContextJson}}\nReturn a structured plan with steps and assumptions only."
+    }
+  ]
+}

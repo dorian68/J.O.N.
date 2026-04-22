@@ -1,0 +1,34 @@
+{
+  "prompt_id": "task.decision_note_draft",
+  "family": "task",
+  "purpose": "Draft the bounded decision-note payload for the prototype.",
+  "owner": "runtime",
+  "status": "released",
+  "environment": "prototype",
+  "version": "1.0.0",
+  "compatible_model_aliases": ["primary_reasoning", "mock_offline"],
+  "input_contract": {
+    "mission": "string",
+    "records": "array",
+    "sourceReferences": "array"
+  },
+  "output_contract": {
+    "type": "structured",
+    "schema": "decision_note_draft_v1"
+  },
+  "benchmark_links": [
+    "browser-control-benchmark-pack-v1",
+    "artifact-quality-rubrics-v1"
+  ],
+  "change_notes": "Initial released decision-note drafting prompt.",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Draft a conservative, evidence-backed decision note payload. Do not invent confidence beyond the provided evidence."
+    },
+    {
+      "role": "user",
+      "content": "Mission: {{mission}}\nStructured records: {{records}}\nSource references: {{sourceReferences}}\nReasoning context: {{reasoningContextJson}}\nReturn recommendation, keyFindings, uncertainties, overallConfidence and validationState."
+    }
+  ]
+}

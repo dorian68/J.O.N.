@@ -1,0 +1,32 @@
+{
+  "name": "cowork-root",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "ui:build": "npm --prefix app run ui:build",
+    "test": "npm --prefix app run test",
+    "operator:server": "npm --prefix app run operator:server",
+    "fixtures:server": "npm --prefix app run fixtures:server",
+    "bench:browser": "npm --prefix app run bench:browser",
+    "bench:computer": "npm --prefix app run bench:computer",
+    "validation:advanced-desktop": "npm --prefix app run validation:advanced-desktop --",
+    "llm:smoke": "npm --prefix app run llm:smoke --",
+    "secret:llm": "npm --prefix app run secret:llm --",
+    "secret:llm:smoke": "npm --prefix app run secret:llm:smoke",
+    "validation:real:prepare": "npm --prefix app run validation:real:prepare --",
+    "validation:real:record": "npm --prefix app run validation:real:record --",
+    "validation:real:summary": "npm --prefix app run validation:real:summary --",
+    "pilot:prepare": "npm --prefix app run pilot:prepare",
+    "pilot:validate": "npm --prefix app run pilot:validate",
+    "pilot:summary": "npm --prefix app run pilot:summary",
+    "release:doctor": "npm --prefix app run release:doctor",
+    "readiness:report": "npm --prefix app run readiness:report",
+    "readiness:execute": "npm --prefix app run readiness:execute",
+    "operational:deep:report": "npm --prefix app run operational:deep:report",
+    "runtime:prune": "npm --prefix app run runtime:prune --",
+    "desktop:dev": "node desktop/launch-shell.mjs",
+    "desktop:dry-run": "node desktop/launch-shell.mjs --dry-run",
+    "desktop:bundle": "node desktop/build-shell-bundle.mjs",
+    "desktop:smoke": "node desktop/smoke-shell-bundle.mjs"
+  }
+}

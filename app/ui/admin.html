@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cowork Desktop | Admin console</title>
+    <link rel="icon" href="/assets/cowork-mark.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body data-surface="admin">
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand-block">
+          <p class="eyebrow">Admin console</p>
+          <h1>Cowork Desktop</h1>
+          <p class="lede">Review mission preflights, runs, approvals, diagnostics, validation shortcuts, and deeper technical evidence.</p>
+        </div>
+        <div class="topbar-actions">
+          <button type="button" class="ghost" data-action="open-user-home">User home</button>
+          <button type="button" data-action="refresh">Refresh</button>
+          <button type="button" class="secondary" data-action="open-live-run">Current run</button>
+          <button type="button" class="secondary" data-action="open-results">Results</button>
+          <button type="button" class="ghost" data-action="open-diagnostics">Diagnostics</button>
+        </div>
+      </header>
+
+      <div id="flash-banner"></div>
+
+      <main class="app-layout">
+        <section class="hero-grid">
+          <section class="panel hero-panel">
+            <div class="section-intro">
+              <p class="eyebrow">Mission entry</p>
+              <h2>Review and launch a bounded run</h2>
+              <p class="muted">Mission review remains available here, but this surface is primarily for supervision and audit.</p>
+            </div>
+            <div id="mission-entry"></div>
+          </section>
+
+          <aside class="hero-side">
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Project context</h2>
+                <p class="muted">Project selection and local bounded workspace</p>
+              </div>
+              <div id="projects-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Current run</h2>
+                <p class="muted">Live progress and next decision point</p>
+              </div>
+              <div id="status-banner"></div>
+              <div id="run-summary"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Recent runs</h2>
+                <p class="muted">Inspect or resume prior work</p>
+              </div>
+              <div id="runs-list"></div>
+            </section>
+          </aside>
+        </section>
+
+        <section class="panel workspace-header-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Admin workspace</p>
+              <h2>Run review, results, and diagnostics</h2>
+            </div>
+            <div id="workspace-tabs" class="tab-row"></div>
+          </div>
+          <p class="muted">This console exposes the deeper review and diagnostic surfaces that are intentionally kept out of the user home.</p>
+        </section>
+
+        <section id="run-workspace" class="workspace-section">
+          <div class="workspace-grid">
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Run progression</h2>
+                <p class="muted">Plan, stage changes, and lifecycle checkpoints</p>
+              </div>
+              <div id="run-lifecycle"></div>
+            </section>
+
+            <section class="panel approvals-panel">
+              <div class="panel-header">
+                <h2>Pending approvals</h2>
+                <p class="muted">Explicit operator decisions only</p>
+              </div>
+              <div id="approvals-list"></div>
+              <div class="section-divider"></div>
+              <div class="panel-header">
+                <h2>Approval history</h2>
+                <p class="muted">Run-level audit trail</p>
+              </div>
+              <div id="approval-history-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="outputs-workspace" class="workspace-section hidden">
+          <div class="workspace-grid">
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Results</h2>
+                <p class="muted">The run outputs you can review, reuse, or inspect</p>
+              </div>
+              <div id="artifacts-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Inspect item</h2>
+                <p class="muted">Open one result, proof item, or reasoning trace at a time</p>
+              </div>
+              <div id="preview-pane"></div>
+            </section>
+          </div>
+
+          <div class="workspace-grid">
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Proof captured</h2>
+                <p class="muted">What was captured during the run to justify outcomes</p>
+              </div>
+              <div id="evidence-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Sources</h2>
+                <p class="muted">What the system relied on</p>
+              </div>
+              <div id="sources-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="diagnostics-workspace" class="workspace-section hidden">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Agent Configuration</h2>
+              <p class="muted">Visible assistant prompt, internal orchestration boundary, and conversation style.</p>
+            </div>
+            <div id="agent-config-panel"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Safety & Guardrails</h2>
+              <p class="muted">User-visible settings for approvals and trace exposure. Hard safety floors remain non-bypassable.</p>
+            </div>
+            <div id="guardrails-panel"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Capability Graph</h2>
+              <p class="muted">Normalized skills, tools, surfaces, risk and evidence model used by the agent planner.</p>
+            </div>
+            <div id="capability-graph-panel"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Token and cost dashboard</h2>
+              <p class="muted">What the agent is consuming, reusing, suppressing, and degrading across recent runs</p>
+            </div>
+            <div id="llm-dashboard"></div>
+          </section>
+
+          <div class="workspace-grid">
+            <section class="panel">
+              <div class="panel-header">
+                <h2>AI call traces</h2>
+                <p class="muted">Gateway state, run-level traces, and structured call metadata</p>
+              </div>
+              <div id="llm-calls-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Run log</h2>
+                <p class="muted">Lower-level runtime audit stream</p>
+              </div>
+              <div id="events-list"></div>
+            </section>
+          </div>
+
+          <div class="workspace-grid">
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Advanced shortcuts</h2>
+                <p class="muted">Scenario shortcuts for bounded validation and smoke paths</p>
+              </div>
+              <div id="scenario-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2>Maintenance tools</h2>
+                <p class="muted">Secondary maintenance and benchmark tools</p>
+              </div>
+              <div class="card-actions">
+                <button type="button" class="secondary" data-action="run-benchmarks">Run benchmarks</button>
+                <button type="button" class="ghost" data-action="clear-temp-state">Clear temp state</button>
+              </div>
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Benchmark review</h2>
+              <p class="muted">Secondary release and gate evidence</p>
+            </div>
+            <div id="benchmarks-pane"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Outcome Status Fixture</title>
+    <script>
+      function promoteStatus() {
+        document.querySelector('[data-testid="status-value"]').textContent = 'ready';
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Outcome verification</h1>
+      <p>Current status: <strong data-testid="status-value">pending</strong></p>
+      <button data-testid="button-promote-status" onclick="promoteStatus()">Promote status</button>
+    </main>
+  </body>
+</html>

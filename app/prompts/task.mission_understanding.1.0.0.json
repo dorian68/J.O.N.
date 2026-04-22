@@ -1,0 +1,36 @@
+{
+  "prompt_id": "task.mission_understanding",
+  "family": "task",
+  "purpose": "Clarify a natural user mission into a bounded execution framing for the supervised cowork runtime.",
+  "owner": "runtime",
+  "status": "released",
+  "environment": "prototype",
+  "version": "1.0.0",
+  "compatible_model_aliases": ["utility_structuring", "mock_offline"],
+  "input_contract": {
+    "mission": "string",
+    "scenarioType": "string",
+    "missionSpec": "object|null",
+    "allowlistedDomains": "array",
+    "availableBrowsers": "array"
+  },
+  "output_contract": {
+    "type": "structured",
+    "schema": "mission_understanding_v1"
+  },
+  "benchmark_links": [
+    "prototype-slice-v1",
+    "mission-entry-contract-v1"
+  ],
+  "change_notes": "Mission-understanding now reasons over bounded desktop browser steps, structured next-step recommendations with parameters, and one targeted clarification when required.",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Clarify the mission conservatively for a supervised desktop coworker. Keep one bounded execution frame, surface out-of-scope or hybrid requests, state what can be covered now, define a short bounded run plan for the current run, recommend the best next bounded run when relevant, and ask for one targeted clarification only when execution would otherwise be too ambiguous."
+    },
+    {
+      "role": "user",
+      "content": "Mission: {{mission}}\nSelected scenario type: {{scenarioType}}\nStructured mission spec: {{missionSpec}}\nAllowlisted domains: {{allowlistedDomains}}\nAvailable local browsers: {{availableBrowsers}}\nReasoning context: {{reasoningContextJson}}\nReturn missionSummary, clarifiedObjective, chosenExecutionFrame, routingConfidence, whyThisFrame, coverageStatus, coveredNow, notCoveredNow, requestedOutcomes, verificationGoals, runNowPlan, nextRunSuggestion, nextRunRecommendation, maybeLaterSuggestion, maybeLaterRecommendation, unsupportedRequests, operatorBoundary, ambiguityNote, computerActionType, selectedBrowser, browserSearchQuery, browserLaunchUrl, clarificationOptions, requiresClarification and clarificationQuestion. coverageStatus must be one of full, partial, clarification_needed. chosenExecutionFrame must be one of research, form_preparation, computer_observation. computerActionType must be one of null, observe_window, launch_browser, launch_browser_search, capture_browser_window, capture_active_window, desktop_autonomy. selectedBrowser must be null or {id,label}. browserSearchQuery must be a short string or empty. browserLaunchUrl must be null or an http/https URL. clarificationOptions must be an array of {id,label} and should only be used for one short targeted clarification such as browser choice. runNowPlan must be a short ordered list for the current bounded run only. nextRunRecommendation and maybeLaterRecommendation must be either null or an object with objective, deliverable, preferredMode, rationale, and optional parameters. preferredMode must be one of research, form, computer. parameters may include browserLaunch {browserId, searchQuery, url} and computerAction {type}. If the mission explicitly asks to open a local browser, reason over the available local browsers on this machine. If the mission asks for a broader local app action that is not a browser-only launch/search/capture, choose computer_observation with computerActionType desktop_autonomy and explain that a governed desktop planner will discover apps/windows and use approvals before actuation. If more than one safe browser is available and the mission does not clearly choose one, ask one short clarification instead of guessing. If the mission asks for a browser search, use launch_browser_search and set browserSearchQuery/browserLaunchUrl when you can infer them conservatively. If the mission asks for a screenshot after a browser step, do not imply that the same run will do everything. Choose the best first bounded run now, then recommend the next bounded run honestly with parameters when useful. Set requiresClarification to true only when one short clarification is genuinely needed before a credible bounded run can start."
+    }
+  ]
+}

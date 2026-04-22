@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Modal Blocker Fixture</title>
+    <style>
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .dialog {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        max-width: 420px;
+      }
+      .hidden { display: none; }
+    </style>
+    <script>
+      function dismissModal() {
+        document.querySelector('[data-testid="modal-overlay"]').classList.add('hidden');
+        document.querySelector('[data-testid="modal-status"]').textContent = 'dismissed';
+      }
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Modal blocker</h1>
+      <p>Status: <strong data-testid="modal-status">blocked</strong></p>
+      <div class="overlay" data-testid="modal-overlay" data-blocking="true" role="dialog" aria-label="Consent dialog">
+        <div class="dialog">
+          <h2>Consent required</h2>
+          <p>Please review this controlled modal.</p>
+          <button data-testid="button-dismiss-modal" onclick="dismissModal()">Dismiss modal</button>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

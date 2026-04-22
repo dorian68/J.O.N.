@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Fixture Hub</title>
+    <style>
+      body { font-family: Segoe UI, sans-serif; margin: 32px; line-height: 1.4; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: 16px; }
+      .card { border: 1px solid #c7ced8; border-radius: 12px; padding: 16px; }
+      a { color: #1454d4; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 data-testid="page-title">Controlled Browser Fixture Hub</h1>
+      <p>This page links to the controlled surfaces used by the authorized prototype benchmarks.</p>
+      <section class="grid">
+        <article class="card">
+          <h2>Research list</h2>
+          <ul>
+            <li><a data-testid="link-alpha" href="/company-alpha.html" target="_blank">Alpha Analytics</a></li>
+            <li><a data-testid="link-beta" href="/company-beta.html" target="_blank">Beta Commerce</a></li>
+            <li><a data-testid="link-gamma" href="/company-gamma.html" target="_blank">Gamma Ops</a></li>
+          </ul>
+        </article>
+        <article class="card">
+          <h2>Interaction fixtures</h2>
+          <ul>
+            <li><a data-testid="link-form" href="/form-simple.html">Simple form</a></li>
+            <li><a data-testid="link-long" href="/long-scroll.html">Long page with deep target</a></li>
+            <li><a data-testid="link-modal" href="/modal-blocker.html">Blocking modal</a></li>
+            <li><a data-testid="link-ambiguous" href="/ambiguous-targets.html">Ambiguous targets</a></li>
+            <li><a data-testid="link-outcome" href="/outcome-status.html">Outcome verification</a></li>
+            <li><a data-testid="link-auth-expired" href="/auth-expired.html">Synthetic expired session</a></li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

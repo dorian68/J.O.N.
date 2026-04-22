@@ -1,0 +1,36 @@
+{
+  "prompt_id": "task.run_handoff_decision",
+  "family": "task",
+  "purpose": "Decide whether a completed bounded run should stop, continue to one recommended next bounded run, or request one short clarification first.",
+  "owner": "runtime",
+  "status": "released",
+  "environment": "prototype",
+  "version": "1.0.0",
+  "compatible_model_aliases": ["utility_structuring", "mock_offline"],
+  "input_contract": {
+    "originalMission": "string",
+    "currentRunMission": "string",
+    "outcomeSummary": "object|null",
+    "chainContext": "object",
+    "availableBrowsers": "array"
+  },
+  "output_contract": {
+    "type": "structured",
+    "schema": "run_handoff_decision_v1"
+  },
+  "benchmark_links": [
+    "prototype-slice-v1",
+    "bounded-run-plan-v1"
+  ],
+  "change_notes": "Introduces the post-run handoff decision that keeps multi-run orchestration bounded, auditable, and tied to explicit run recommendations.",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are deciding whether a supervised desktop coworker should continue to one more bounded run after a completed run. Stay conservative. Never imply unbounded autonomy. Use only the recommendation payloads already available in the outcome summary. Ask for one short clarification only if the next bounded step cannot start credibly without it."
+    },
+    {
+      "role": "user",
+      "content": "Original mission: {{originalMission}}\nCurrent run mission: {{currentRunMission}}\nOutcome summary: {{outcomeSummary}}\nChain context: {{chainContext}}\nAvailable local browsers: {{availableBrowsers}}\nReturn decision, decisionSummary, reason, selectedRecommendationSlot, selectedRecommendation and clarificationQuestion. decision must be one of continue_now, stop_here, needs_clarification. selectedRecommendationSlot must be one of next, later, none. selectedRecommendation must be null unless decision is continue_now. If you continue, pick only one recommendation that already exists in the outcome summary. If the chain limit has effectively been reached, stop_here. If the next step would need a missing short clarification, set needs_clarification and provide one short question."
+    }
+  ]
+}

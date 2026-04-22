@@ -1,0 +1,35 @@
+{
+  "prompt_id": "task.capability_description",
+  "family": "task",
+  "purpose": "Generate operator-editable capability descriptions for discovered governed tools, skills and surfaces.",
+  "environment": "prototype",
+  "compatible_model_aliases": ["utility_structuring", "primary_reasoning"],
+  "version": "1.0.0",
+  "scope": "task",
+  "status": "active",
+  "owner": "operator-runtime",
+  "description": "Generate operator-editable descriptions for discovered governed capabilities without broadening their actual authority.",
+  "input_contract": {
+    "capabilities": "array",
+    "guardrails": "object",
+    "schema": "capability_description_input_v1"
+  },
+  "output_contract": {
+    "schema": "capability_description_v1",
+    "required_fields": [
+      "descriptions"
+    ]
+  },
+  "benchmark_links": ["capability-graph-and-skills-v1", "token-consumption-governance"],
+  "messages": [
+    {
+      "role": "system",
+      "content": "You write concise operator-facing capability descriptions for a governed desktop cowork agent. Never invent new authority. Never imply a tool can bypass approvals, policy, rollback, evidence, or user confirmation. Use practical language that helps the planner and operator understand when the capability is useful."
+    },
+    {
+      "role": "user",
+      "content": "Capabilities to describe:\n{{capabilities}}\n\nGuardrails/settings summary:\n{{guardrails}}\n\nReturn JSON only with descriptions: [{ nodeId, label, description, affordances, knownLimits }]. The nodeId must exactly match an input capability id. description must be one sentence. affordances and knownLimits must be short string arrays. Do not include raw HTML."
+    }
+  ],
+  "change_notes": "Initial prompt for admin-triggered capability description generation."
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Simple Form Fixture</title>
+    <script>
+      function refreshState() {
+        const name = document.querySelector('[data-testid="input-name"]').value.trim();
+        const role = document.querySelector('[data-testid="select-role"]').value;
+        const submit = document.querySelector('[data-testid="button-submit"]');
+        const ready = name.length > 0 && role.length > 0;
+        submit.disabled = !ready;
+        document.querySelector('[data-testid="status"]').textContent = ready ? 'ready-for-review' : 'awaiting-fields';
+      }
+      window.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('input, select').forEach((element) => {
+          element.addEventListener('input', refreshState);
+          element.addEventListener('change', refreshState);
+        });
+        refreshState();
+      });
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>Prototype form</h1>
+      <form data-testid="form-main">
+        <label for="candidate-name">Candidate name</label>
+        <input data-testid="input-name" id="candidate-name" name="candidate-name" type="text">
+
+        <label for="candidate-role">Role</label>
+        <select data-testid="select-role" id="candidate-role" name="candidate-role">
+          <option value="">Select one</option>
+          <option value="analyst">Analyst</option>
+          <option value="operator">Operator</option>
+          <option value="lead">Lead</option>
+        </select>
+
+        <label>
+          <input data-testid="checkbox-newsletter" type="checkbox">
+          Subscribe to low-priority updates
+        </label>
+
+        <p>Status: <strong data-testid="status">awaiting-fields</strong></p>
+        <button data-testid="button-submit" type="submit" disabled>Submit application</button>
+      </form>
+    </main>
+  </body>
+</html>

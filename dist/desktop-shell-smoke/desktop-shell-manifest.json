@@ -1,0 +1,56 @@
+{
+  "name": "cowork-desktop-shell",
+  "displayName": "Cowork Desktop",
+  "windowTitle": "Cowork Desktop | Local pilot",
+  "version": "0.1.0",
+  "buildId": "desktop-shell-1776815997192",
+  "generatedAt": "2026-04-21T23:59:57.192Z",
+  "packageType": "local_wrapper_bundle",
+  "bundleVariant": "browser_app_wrapper",
+  "supportStatus": "local_pilot_only",
+  "targetPlatform": "win32",
+  "targetArch": "x64",
+  "icon": {
+    "path": "C:\\Users\\Labry\\Documents\\CLAUDE_COWORK\\PROJET_CLAUDE\\dist\\desktop-shell-smoke\\assets\\cowork-mark.svg",
+    "format": "svg"
+  },
+  "boundaries": {
+    "addsBusinessLogic": false,
+    "loopbackOnly": true,
+    "remoteNavigationAllowed": false,
+    "browserControlExpanded": false,
+    "computerControlExpanded": true,
+    "computerControlPosture": "approved_local_actions_with_accessibility_perception"
+  },
+  "signing": {
+    "signedNativePackagingProven": false,
+    "codeSigningCertificateProvided": false,
+    "productionInstallerProven": false,
+    "requiredForProduction": [
+      "Windows code-signing certificate",
+      "Native installer packaging",
+      "SmartScreen reputation plan",
+      "Install/uninstall smoke evidence on a clean target machine"
+    ]
+  },
+  "launchers": {
+    "powershell": "C:\\Users\\Labry\\Documents\\CLAUDE_COWORK\\PROJET_CLAUDE\\dist\\desktop-shell-smoke\\launch-cowork-desktop.ps1",
+    "cmd": "C:\\Users\\Labry\\Documents\\CLAUDE_COWORK\\PROJET_CLAUDE\\dist\\desktop-shell-smoke\\launch-cowork-desktop.cmd"
+  },
+  "smokeProcedure": [
+    "Run launch-cowork-desktop.ps1 -DryRun",
+    "Run launch-cowork-desktop.ps1",
+    "Verify the operator surface opens and remains on loopback only"
+  ],
+  "diagnostics": {
+    "localOnly": true,
+    "releaseRoot": "C:\\Users\\Labry\\Documents\\CLAUDE_COWORK\\PROJET_CLAUDE\\app\\.runtime-data\\release",
+    "manifestVersion": 1
+  },
+  "usability": {
+    "intendedAudience": "single local operator",
+    "requiresExistingRuntime": true,
+    "signedNativePackagingProven": false,
+    "desktopAutonomyFoundation": "accessibility_perception_semantic_targets_checkpoints_recovery"
+  }
+}

@@ -1,0 +1,11 @@
+Cowork Desktop production signing requirements
+
+This bundle is not a signed production installer.
+Production distribution still requires:
+  1. Windows code-signing certificate and secure key handling.
+  2. Native installer packaging with install/uninstall smoke proof.
+  3. SmartScreen reputation plan.
+  4. Clean-machine validation evidence.
+  5. A release approval record that does not contain secrets.
+
+Current supported posture: local pilot wrapper bundle.

@@ -1,0 +1,34 @@
+{
+  "prompt_id": "task.ambiguity_note",
+  "family": "task",
+  "purpose": "Generate a bounded ambiguity note for unresolved disagreement or weak evidence.",
+  "owner": "runtime",
+  "status": "released",
+  "environment": "prototype",
+  "version": "1.0.0",
+  "compatible_model_aliases": ["primary_reasoning", "mock_offline"],
+  "input_contract": {
+    "mission": "string",
+    "records": "array",
+    "reasoningContextJson": "string"
+  },
+  "output_contract": {
+    "type": "structured",
+    "schema": "ambiguity_note_v1"
+  },
+  "benchmark_links": [
+    "artifact-quality-rubrics-v1",
+    "benchmark-review-protocol-v1"
+  ],
+  "change_notes": "Initial released ambiguity-note prompt.",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Produce a bounded ambiguity note. Keep uncertainty explicit, evidence-linked, and conservative."
+    },
+    {
+      "role": "user",
+      "content": "Mission: {{mission}}\nStructured records: {{records}}\nReasoning context: {{reasoningContextJson}}\nReturn ambiguityNote and uncertaintyPoints."
+    }
+  ]
+}

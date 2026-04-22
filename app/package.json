@@ -1,0 +1,42 @@
+{
+  "name": "cowork-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-first supervised coworker prototype core",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "ui:build": "vite build --config ui/vite.config.mjs",
+    "test": "node src/scripts/run-tests.js",
+    "preoperator:server": "npm run ui:build --silent",
+    "fixtures:server": "node src/scripts/start-fixture-server.js",
+    "operator:server": "node src/scripts/start-operator-server.js",
+    "bench:browser": "node src/scripts/run-browser-benchmarks.js",
+    "bench:computer": "node src/scripts/run-computer-benchmarks.js",
+    "validation:advanced-desktop": "node src/scripts/run-advanced-desktop-scenarios.js",
+    "mission:sample": "node src/scripts/run-sample-mission.js",
+    "llm:smoke": "node src/scripts/run-llm-smoke-validation.js",
+    "secret:llm": "node src/scripts/manage-llm-secret.js",
+    "secret:llm:smoke": "node src/scripts/run-secret-store-smoke.js",
+    "validation:real:prepare": "node src/scripts/prepare-real-surface-validation.js",
+    "validation:real:record": "node src/scripts/record-real-surface-validation.js",
+    "validation:real:summary": "node src/scripts/compile-real-surface-validation-summary.js",
+    "pilot:prepare": "node src/scripts/run-pilot-prepare.js",
+    "pilot:validate": "node src/scripts/run-pilot-validate.js",
+    "pilot:summary": "node src/scripts/run-pilot-summary.js",
+    "release:doctor": "node src/scripts/run-release-doctor.js",
+    "readiness:report": "node src/scripts/run-readiness-report.js",
+    "readiness:execute": "node src/scripts/run-readiness-execute.js",
+    "operational:deep:report": "node src/scripts/run-operational-deep-report.js",
+    "runtime:prune": "node src/scripts/prune-runtime-data.js"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "playwright": "^1.54.2",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "vite": "^8.0.9"
+  }
+}

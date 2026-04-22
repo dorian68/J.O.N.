@@ -1040,11 +1040,11 @@ function ConversationSidebar({ conversations, activeConversationId, onSelect, on
     return (
       <aside className="conversation-sidebar collapsed" aria-label={t.conversations} data-testid="conversation-sidebar">
         <button type="button" className="side-rail-button" onClick={onToggle} aria-label={t.openConversations} title={t.openConversations}>
-          <span>☰</span>
+          <span>|||</span>
           <small>{t.conversationsShort}</small>
         </button>
         <button type="button" className="side-rail-button subtle" onClick={onNew} aria-label={t.newConversation} title={t.newConversation}>
-          <span>＋</span>
+          <span>+</span>
         </button>
       </aside>
     );
@@ -1192,7 +1192,7 @@ function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversati
     return (
       <aside className="activity-panel collapsed" aria-label={t.runInspector} data-testid="run-inspector">
         <button type="button" className="side-rail-button" onClick={onToggle} aria-label={t.openInspector} title={t.openInspector}>
-          <span>↗</span>
+          <span>i</span>
           <small>{t.inspectorShort}</small>
         </button>
         {scopedRun ? <span className={`rail-status-dot ${statusTone(scopedRun.status)}`} title={scopedRun.status} /> : null}

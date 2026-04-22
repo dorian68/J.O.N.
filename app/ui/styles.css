@@ -2966,3 +2966,233 @@ body[data-surface="user"] .preflight-card {
     flex-direction: column;
   }
 }
+
+/* Collapsible conversation shell */
+.react-cowork-main,
+.react-cowork-main.with-history {
+  grid-template-columns: 4.35rem minmax(0, 1fr) 4.35rem;
+}
+
+.react-cowork-main.history-open.inspector-collapsed {
+  grid-template-columns: minmax(16rem, 19rem) minmax(0, 1fr) 4.35rem;
+}
+
+.react-cowork-main.history-collapsed.inspector-open {
+  grid-template-columns: 4.35rem minmax(0, 1fr) minmax(20rem, 24rem);
+}
+
+.react-cowork-main.history-open.inspector-open {
+  grid-template-columns: minmax(16rem, 19rem) minmax(0, 1fr) minmax(20rem, 24rem);
+}
+
+.conversation-sidebar,
+.activity-panel {
+  display: block;
+  transition: width 180ms ease, padding 180ms ease, background 180ms ease;
+}
+
+.conversation-sidebar.collapsed,
+.activity-panel.collapsed {
+  padding: 0.72rem 0.48rem;
+  overflow: hidden;
+  background: rgba(248, 244, 234, 0.74);
+}
+
+.side-rail-button {
+  width: 100%;
+  min-height: 3.1rem;
+  border: 1px solid rgba(38, 36, 29, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  gap: 0.12rem;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(39, 35, 22, 0.08);
+}
+
+.side-rail-button + .side-rail-button {
+  margin-top: 0.55rem;
+}
+
+.side-rail-button span {
+  font-weight: 900;
+  font-size: 1.05rem;
+}
+
+.side-rail-button small {
+  font-size: 0.62rem;
+  color: var(--muted);
+  writing-mode: vertical-rl;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.side-rail-button.subtle {
+  min-height: 2.55rem;
+}
+
+.side-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.rail-status-dot {
+  width: 0.72rem;
+  height: 0.72rem;
+  display: block;
+  border-radius: 999px;
+  margin: 0.65rem auto 0;
+  background: var(--muted);
+  box-shadow: 0 0 0 5px rgba(30, 45, 36, 0.08);
+}
+
+.rail-status-dot.ok {
+  background: #247a4b;
+}
+
+.rail-status-dot.warn {
+  background: #b36b18;
+}
+
+.rail-status-dot.danger {
+  background: #b73b2f;
+}
+
+.clarification-card {
+  border: 1px solid rgba(179, 107, 24, 0.24);
+  background: linear-gradient(135deg, rgba(255, 248, 226, 0.88), rgba(255, 255, 255, 0.82));
+  border-radius: 22px;
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.7rem;
+  width: min(100%, 680px);
+}
+
+.clarification-card p {
+  margin: 0.2rem 0 0;
+  color: var(--ink);
+}
+
+.clarification-card small {
+  color: var(--muted);
+}
+
+.clarification-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.clarification-options button {
+  border-radius: 999px;
+  padding: 0.48rem 0.72rem;
+  border: 1px solid rgba(32, 49, 38, 0.14);
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.run-trace-list {
+  list-style: none;
+  display: grid;
+  gap: 0.7rem;
+  padding: 0;
+  margin: 0;
+}
+
+.run-trace-list li {
+  display: grid;
+  grid-template-columns: 0.8rem minmax(0, 1fr);
+  gap: 0.62rem;
+  align-items: start;
+}
+
+.run-trace-list i {
+  width: 0.62rem;
+  height: 0.62rem;
+  margin-top: 0.28rem;
+  border-radius: 999px;
+  background: rgba(31, 44, 35, 0.24);
+}
+
+.run-trace-list li.ok i,
+.run-trace-list li.done i {
+  background: #247a4b;
+}
+
+.run-trace-list li.warn i,
+.run-trace-list li.active i {
+  background: #b36b18;
+}
+
+.run-trace-list li.danger i {
+  background: #b73b2f;
+}
+
+.run-trace-list strong,
+.run-trace-list span,
+.run-trace-list small {
+  display: block;
+}
+
+.run-trace-list span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.inspector-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.inspector-grid span {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.inspector-grid strong {
+  color: var(--ink);
+  text-align: right;
+}
+
+@media (max-width: 1280px) {
+  .react-cowork-main,
+  .react-cowork-main.with-history {
+    grid-template-columns: 4.1rem minmax(0, 1fr) 4.1rem;
+  }
+
+  .react-cowork-main.history-open.inspector-collapsed {
+    grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr) 4.1rem;
+  }
+
+  .react-cowork-main.history-collapsed.inspector-open {
+    grid-template-columns: 4.1rem minmax(0, 1fr) minmax(18rem, 22rem);
+  }
+
+  .activity-panel {
+    display: block;
+  }
+}
+
+@media (max-width: 920px) {
+  .react-cowork-main,
+  .react-cowork-main.with-history,
+  .react-cowork-main.history-open.inspector-collapsed,
+  .react-cowork-main.history-collapsed.inspector-open,
+  .react-cowork-main.history-open.inspector-open {
+    grid-template-columns: 1fr;
+  }
+
+  .conversation-sidebar,
+  .activity-panel {
+    display: none;
+  }
+}

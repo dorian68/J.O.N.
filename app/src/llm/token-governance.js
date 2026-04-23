@@ -3,6 +3,10 @@ import { LLM_MODEL_ALIAS, REASONING_STAGE } from "../config.js";
 
 const DEFAULT_RECORD_LIMIT = 5;
 const DEFAULT_EVENT_REDUCTION_ORDER = ["events", "evidence", "artifacts", "sources"];
+const NON_BLOCKING_MANDATORY_BUDGET_REASONS = Object.freeze(new Set([
+  "stage_token_budget_would_be_exceeded",
+  "stage_usd_budget_would_be_exceeded"
+]));
 
 export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
   [REASONING_STAGE.CONVERSATION_TURN]: {
@@ -11,10 +15,10 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 2_200,
-    hardStopTokenTarget: 5_200,
-    stageBudgetTokens: 7_200,
-    stageBudgetUsd: 0.09,
+    requestTokenTarget: 3_200,
+    hardStopTokenTarget: 9_000,
+    stageBudgetTokens: 20_000,
+    stageBudgetUsd: 0.18,
     maxOutputTokensTarget: 760,
     cacheEligible: true,
     reuseEligible: true,
@@ -30,7 +34,7 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
       guidelines: 4,
       variables: 6,
       policyConstraints: 4,
-      maxContextChars: 10_000
+      maxContextChars: 7_500
     },
     inputLimits: {
       records: 0,
@@ -159,6 +163,38 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
       variables: 8,
       policyConstraints: 5,
       maxContextChars: 8_000
+    },
+    inputLimits: {
+      records: 0,
+      sourceReferences: 0
+    }
+  },
+  [REASONING_STAGE.BROWSER_PLAN]: {
+    id: "stage.browser_plan",
+    priority: "critical",
+    mandatory: true,
+    preferredModelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
+    downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
+    requestTokenTarget: 2_300,
+    hardStopTokenTarget: 4_200,
+    stageBudgetTokens: 5_000,
+    stageBudgetUsd: 0.1,
+    maxOutputTokensTarget: 820,
+    cacheEligible: true,
+    reuseEligible: true,
+    suppressUnderBudgetPressure: false,
+    deterministicFallbackEligible: true,
+    operatorDisclosureRequired: true,
+    contextLimits: {
+      sources: 0,
+      artifacts: 0,
+      evidence: 1,
+      events: 6,
+      observations: 6,
+      guidelines: 5,
+      variables: 8,
+      policyConstraints: 5,
+      maxContextChars: 10_500
     },
     inputLimits: {
       records: 0,
@@ -551,6 +587,7 @@ export function normalizeReasoningStage(value) {
     case REASONING_STAGE.MISSION_UNDERSTANDING:
     case REASONING_STAGE.RUN_HANDOFF_DECISION:
     case REASONING_STAGE.DESKTOP_PLAN:
+    case REASONING_STAGE.BROWSER_PLAN:
     case REASONING_STAGE.PLAN_GENERATION:
     case REASONING_STAGE.DECISION_NOTE_DRAFT:
     case REASONING_STAGE.EVALUATION_SUPPORT:
@@ -720,6 +757,10 @@ function describeBudgetPressure(reasons, fallback = "Budget pressure detected.")
   return reasons.map((reason) => BUDGET_REASON_LABELS[reason] ?? reason).join(" ");
 }
 
+function mandatoryLiveBlockReasons(reasons = []) {
+  return reasons.filter((reason) => !NON_BLOCKING_MANDATORY_BUDGET_REASONS.has(reason));
+}
+
 function cloneOutput(value) {
   return deepClone(value);
 }
@@ -883,9 +924,10 @@ export class TokenGovernanceController {
       this.#incrementStageMetric(stage, "downgradedCalls");
     }
 
-    const liveProviderBlocked = policy.mandatory && budgetEvaluation.pressure;
+    const blockingBudgetReasons = policy.mandatory ? mandatoryLiveBlockReasons(budgetEvaluation.reasons) : budgetEvaluation.reasons;
+    const liveProviderBlocked = policy.mandatory && blockingBudgetReasons.length > 0;
     const liveProviderBlockReason = liveProviderBlocked
-      ? describeBudgetPressure(budgetEvaluation.reasons, "Mandatory live provider call blocked under budget pressure.")
+      ? describeBudgetPressure(blockingBudgetReasons, "Mandatory live provider call blocked under budget pressure.")
       : null;
 
     if (!policy.mandatory && policy.suppressUnderBudgetPressure && budgetEvaluation.pressure) {
@@ -943,6 +985,7 @@ export class TokenGovernanceController {
         estimatedRequestUsd: budgetEvaluation.estimatedRequestUsd,
         budgetPressure: budgetEvaluation.pressure,
         budgetPressureReasons: budgetEvaluation.reasons,
+        blockingBudgetPressureReasons: blockingBudgetReasons,
         remainingRunTokens,
         remainingSessionTokens,
         remainingRunUsd,

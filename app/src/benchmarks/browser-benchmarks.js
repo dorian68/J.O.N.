@@ -139,6 +139,8 @@ export async function runBrowserBenchmarks() {
       selector: { testId: "status-value" },
       expectedText: "ready"
     });
+    const primitiveSessionState = await primitiveBrowser.getSessionState();
+    const activePrimitiveTarget = primitiveSessionState.targets.find((target) => target.id === primitiveSessionState.activeTargetId) ?? null;
 
     const assertions = {
       researchCompleted: researchResult.run.status === "completed",
@@ -149,6 +151,10 @@ export async function runBrowserBenchmarks() {
       formCompleted: formResult.run.status === "completed",
       formApprovalCount: formResult.approvals.length >= 2,
       formEvidenceCount: formResult.evidence.length >= 1,
+      evidenceIncludesBrowserState: [
+        ...researchResult.evidence,
+        ...formResult.evidence
+      ].every((entry) => Boolean(entry.metadata?.browserState?.url)),
       refusalRunStopped: deniedFormResult.run.status === "stopped",
       refusalApprovalDenied: deniedApproval?.decision === APPROVAL_DECISION.DENIED,
       refusalNoImplicitWrite: deniedFormResult.evidence.length === 1 && deniedFormResult.artifacts.length === 0,
@@ -157,7 +163,12 @@ export async function runBrowserBenchmarks() {
       ambiguousDomDetected: ambiguousRanking.ambiguous === true,
       blockerDetected: blockerBefore.blocked === true,
       blockerDismissed: blockerAfter.blocked === false && modalDismissed.validated === true,
-      outcomeVerified: outcomeValidated.validated === true
+      outcomeVerified: outcomeValidated.validated === true,
+      browserStateTracked: primitiveSessionState.targetCount >= 1
+        && Boolean(activePrimitiveTarget)
+        && activePrimitiveTarget.navigationHistory.length >= 4
+        && activePrimitiveTarget.recentActions.some((action) => action.action === "navigate")
+        && activePrimitiveTarget.recentActions.some((action) => action.action === "verify_outcome")
     };
 
     const assertionDetails = {
@@ -257,6 +268,21 @@ export async function runBrowserBenchmarks() {
           evidenceIds: formResult.evidence.map((entry) => entry.id)
         }
       },
+      evidenceIncludesBrowserState: {
+        label: "Browser evidence includes state",
+        expected: "page screenshot evidence has browserState metadata",
+        observed: [
+          ...researchResult.evidence,
+          ...formResult.evidence
+        ].map((entry) => ({
+          evidenceId: entry.id,
+          hasBrowserState: Boolean(entry.metadata?.browserState?.url),
+          url: entry.metadata?.browserState?.url ?? null
+        })),
+        reason: assertions.evidenceIncludesBrowserState
+          ? "Browser page evidence carries current URL/title/action state for the run inspector."
+          : "At least one browser evidence record lacks browser state metadata."
+      },
       refusalRunStopped: {
         label: "Refusal flow stops the run cleanly",
         expected: "run status stopped",
@@ -344,6 +370,20 @@ export async function runBrowserBenchmarks() {
         reason: outcomeValidated.validated === true
           ? "Outcome verification confirmed the expected state."
           : "Outcome verification did not confirm the expected state."
+      },
+      browserStateTracked: {
+        label: "Browser state is tracked",
+        expected: "active target, navigation history and recent actions",
+        observed: {
+          targetCount: primitiveSessionState.targetCount,
+          activeTargetId: primitiveSessionState.activeTargetId,
+          activeUrl: activePrimitiveTarget?.url ?? null,
+          navigationHistoryCount: activePrimitiveTarget?.navigationHistory.length ?? 0,
+          recentActionTypes: activePrimitiveTarget?.recentActions.map((action) => action.action).slice(-8) ?? []
+        },
+        reason: assertions.browserStateTracked
+          ? "The browser controller keeps enough state to explain the current tab and recent actions."
+          : "The browser controller did not expose the expected current tab/navigation/action state."
       }
     };
 
@@ -370,6 +410,7 @@ export async function runBrowserBenchmarks() {
         modalDismissed,
         outcomeValidated
       },
+      browserSessionState: primitiveSessionState,
       assertions,
       assertionDetails,
       cases: [
@@ -399,7 +440,8 @@ export async function runBrowserBenchmarks() {
           assertions: {
             formCompleted: assertions.formCompleted,
             formApprovalCount: assertions.formApprovalCount,
-            formEvidenceCount: assertions.formEvidenceCount
+            formEvidenceCount: assertions.formEvidenceCount,
+            evidenceIncludesBrowserState: assertions.evidenceIncludesBrowserState
           },
           assertionDetails
         },
@@ -426,7 +468,8 @@ export async function runBrowserBenchmarks() {
             ambiguousDomDetected: assertions.ambiguousDomDetected,
             blockerDetected: assertions.blockerDetected,
             blockerDismissed: assertions.blockerDismissed,
-            outcomeVerified: assertions.outcomeVerified
+            outcomeVerified: assertions.outcomeVerified,
+            browserStateTracked: assertions.browserStateTracked
           },
           assertionDetails
         }

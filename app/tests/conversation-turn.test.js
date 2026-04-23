@@ -95,6 +95,27 @@ export async function run() {
   assert.equal(actionTurn.reply.includes("qualifier"), false);
   assert.equal(actionTurn.reply.includes("run born"), false);
   assert.equal(actionTurn.uiBlocks.some((block) => block.type === "actionPlan"), false);
+  assert.equal(actionTurn.reply, "Oui. Je prépare l’action.");
+
+  const catalogTurn = validateConversationTurnOutput(buildDeterministicConversationTurn({
+    message: "Quels navigateurs et applications sont disponibles sur cette machine ?"
+  }), {
+    message: "Quels navigateurs et applications sont disponibles sur cette machine ?"
+  });
+  assert.equal(catalogTurn.action, "inspect_then_answer");
+  assert.deepEqual(catalogTurn.capabilityRequests.map((request) => request.id), [
+    "list_installed_applications",
+    "list_installed_browsers"
+  ]);
+  const usageCatalogTurn = validateConversationTurnOutput(buildDeterministicConversationTurn({
+    message: "quels navigateurs et applications peux-tu utiliser sur cette machine ?"
+  }), {
+    message: "quels navigateurs et applications peux-tu utiliser sur cette machine ?"
+  });
+  assert.deepEqual(usageCatalogTurn.capabilityRequests.map((request) => request.id), [
+    "list_installed_applications",
+    "list_installed_browsers"
+  ]);
 
   const sanitizedTurn = validateConversationTurnOutput({
     intentType: "desktop_action",
@@ -123,7 +144,87 @@ export async function run() {
   }, {
     message: "Ouvre le navigateur"
   });
-  assert.equal(sanitizedTurn.reply, "Oui. J’ai besoin de ton accord pour lancer cette action.");
+  assert.equal(sanitizedTurn.reply, "Oui. Je prépare l’ouverture.");
+
+  const polishedApprovalTurn = validateConversationTurnOutput({
+    intentType: "desktop_action",
+    action: "prepare_mission_preflight",
+    reply: "Oui. J’ai besoin de ton accord pour lancer Microsoft Edge.",
+    requiresClarification: false,
+    clarificationQuestion: "",
+    capabilityRequests: [],
+    missionDraft: {
+      objective: "Ouvre Microsoft Edge",
+      deliverable: "",
+      constraints: [],
+      forbiddenActions: [],
+      mode: "",
+      parameters: {}
+    },
+    uiBlocks: [],
+    safetyNotes: []
+  }, {
+    message: "Ouvre Microsoft Edge"
+  });
+  assert.equal(polishedApprovalTurn.reply, "Confirme et je lance Microsoft Edge.");
+
+  const polishedChoiceTurn = validateConversationTurnOutput({
+    intentType: "desktop_action",
+    action: "prepare_mission_preflight",
+    reply: "Oui. J'ai besoin de ton accord pour ouvrir ton navigateur web. Tu préfères Microsoft Edge ou Google Chrome ?",
+    requiresClarification: true,
+    clarificationQuestion: "Tu préfères Microsoft Edge ou Google Chrome ?",
+    capabilityRequests: [],
+    missionDraft: {
+      objective: "Ouvre mon navigateur web",
+      deliverable: "",
+      constraints: [],
+      forbiddenActions: [],
+      mode: "",
+      parameters: {}
+    },
+    uiBlocks: [],
+    safetyNotes: []
+  }, {
+    message: "Ouvre mon navigateur web"
+  });
+  assert.equal(polishedChoiceTurn.reply, "Tu préfères Microsoft Edge ou Google Chrome ?");
+
+  const repairedMissionDraftTurn = validateConversationTurnOutput({
+    intentType: "desktop_action",
+    action: "prepare_mission_preflight",
+    reply: "Oui. Je prépare l’ouverture.",
+    requiresClarification: false,
+    clarificationQuestion: "",
+    capabilityRequests: [],
+    uiBlocks: [],
+    safetyNotes: []
+  }, {
+    message: "ouvre mon navigateur web"
+  });
+  assert.equal(repairedMissionDraftTurn.missionDraft.objective, "ouvre mon navigateur web");
+
+  const sanitizedModeTurn = validateConversationTurnOutput({
+    intentType: "desktop_action",
+    action: "prepare_mission_preflight",
+    reply: "Oui. Je prépare l’ouverture.",
+    requiresClarification: false,
+    clarificationQuestion: "",
+    capabilityRequests: [],
+    missionDraft: {
+      objective: "ouvre Edge",
+      deliverable: "",
+      constraints: [],
+      forbiddenActions: [],
+      mode: "supervised",
+      parameters: {}
+    },
+    uiBlocks: [],
+    safetyNotes: []
+  }, {
+    message: "ouvre Edge"
+  });
+  assert.equal(sanitizedModeTurn.missionDraft.mode, "");
 
   const blocks = normalizeUiBlocks([
     {

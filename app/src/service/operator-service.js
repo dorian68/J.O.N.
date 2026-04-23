@@ -72,6 +72,14 @@ import {
   validateSkillManifest
 } from "../capabilities/skill-manifest.js";
 import { validateOperationalDeepSkills } from "../capabilities/skill-validation-harness.js";
+import {
+  buildWorkspaceMissionBrief,
+  buildWorkspaceStateSummary,
+  detectCliAgentKind,
+  detectTerminalState,
+  evaluateTerminalIntervention,
+  normalizeTerminalSession
+} from "../workspace/terminal-orchestration.js";
 
 function buildScenarioCatalog({ researchDefinition, computerDefinition }) {
   return [
@@ -282,6 +290,435 @@ function conversationTurnRecord({ projectId, conversationId = null, role, kind, 
     metadata,
     createdAt: nowIso()
   };
+}
+
+function normalizeClarificationOption(option) {
+  if (!option || typeof option !== "object") {
+    const label = compactConversationMessage(option);
+    return label ? { id: "", label, value: label, aliases: [] } : null;
+  }
+  const id = compactConversationMessage(option.id ?? option.value ?? "");
+  const label = compactConversationMessage(option.label ?? option.name ?? option.title ?? id);
+  if (!id && !label) {
+    return null;
+  }
+  const aliases = Array.isArray(option.aliases)
+    ? option.aliases.map(compactConversationMessage).filter(Boolean).slice(0, 8)
+    : [];
+  return {
+    ...option,
+    id,
+    label,
+    value: compactConversationMessage(option.value ?? id ?? label),
+    aliases
+  };
+}
+
+function normalizeClarificationOptions(options) {
+  return Array.isArray(options)
+    ? options.map(normalizeClarificationOption).filter(Boolean).slice(0, 8)
+    : [];
+}
+
+function normalizeChoiceRequest(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const options = normalizeClarificationOptions(value.options);
+  const question = compactConversationMessage(value.question ?? "");
+  if (!question || options.length === 0) {
+    return null;
+  }
+  const resolutionTarget = value.resolutionTarget && typeof value.resolutionTarget === "object" && !Array.isArray(value.resolutionTarget)
+    ? {
+      parameterPath: compactConversationMessage(value.resolutionTarget.parameterPath ?? ""),
+      labelPath: compactConversationMessage(value.resolutionTarget.labelPath ?? "")
+    }
+    : null;
+  return {
+    id: compactConversationMessage(value.id ?? "choice_request"),
+    kind: compactConversationMessage(value.kind ?? "generic"),
+    title: compactConversationMessage(value.title ?? ""),
+    question,
+    required: value.required !== false,
+    resolutionTarget,
+    options
+  };
+}
+
+function choiceRequestFromPreflight(preflight) {
+  const understanding = preflight?.understanding ?? preflight ?? {};
+  const existing = normalizeChoiceRequest(understanding.choiceRequest);
+  if (existing) {
+    return existing;
+  }
+  const options = normalizeClarificationOptions(understanding.clarificationOptions);
+  if (options.length === 0) {
+    return null;
+  }
+  return normalizeChoiceRequest({
+    id: "choice_browser_launch",
+    kind: "browser",
+    title: "Choisis le navigateur",
+    question: understanding.clarificationQuestion || "Quel navigateur veux-tu ouvrir ?",
+    required: true,
+    resolutionTarget: {
+      parameterPath: "parameters.browserLaunch.browserId",
+      labelPath: "parameters.browserLaunch.browserLabel"
+    },
+    options: options.map((option) => ({
+      ...option,
+      description: option.description ?? "Navigateur détecté sur cette machine."
+    }))
+  });
+}
+
+function normalizeMatchText(value) {
+  return compactConversationMessage(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function matchClarificationOption(answer, options = []) {
+  const normalizedAnswer = normalizeMatchText(answer);
+  if (!normalizedAnswer) {
+    return null;
+  }
+  const answerTokens = new Set(normalizedAnswer.split(/\s+/).filter(Boolean));
+  for (const option of normalizeClarificationOptions(options)) {
+    const candidates = [
+      option.id,
+      option.label,
+      option.value,
+      ...(option.aliases ?? [])
+    ].map(normalizeMatchText).filter(Boolean);
+    if (candidates.some((candidate) => candidate === normalizedAnswer || normalizedAnswer.includes(candidate))) {
+      return option;
+    }
+    if (candidates.some((candidate) => candidate.split(/\s+/).some((token) => token.length >= 3 && answerTokens.has(token)))) {
+      return option;
+    }
+  }
+  return null;
+}
+
+function clarificationQuestionFrom({ plannerOutput = null, preflight = null } = {}) {
+  const understanding = preflight?.understanding ?? preflight ?? {};
+  return compactConversationMessage(
+    plannerOutput?.clarificationQuestion
+      ?? understanding.clarificationQuestion
+      ?? ""
+  );
+}
+
+function clarificationOptionsFrom(preflight) {
+  const understanding = preflight?.understanding ?? preflight ?? {};
+  return normalizeClarificationOptions(understanding.choiceRequest?.options ?? understanding.clarificationOptions);
+}
+
+function applicationLaunchIntent(text) {
+  const normalized = normalizeMatchText(text);
+  return /\b(open|launch|start|ouvrir|ouvre|lance|demarre|démarre)\b/i.test(text)
+    && /\b(app|application|logiciel|editeur|editor|note|notes|bloc notes|bloc-notes|outil)\b/.test(normalized);
+}
+
+function applicationChoiceKeywords(text) {
+  const normalized = normalizeMatchText(text);
+  if (/\b(note|notes|editeur|editor|texte|text)\b/.test(normalized)) {
+    return ["note", "notes", "notepad", "obsidian", "notion", "editor", "editeur", "text", "texte", "code", "word"];
+  }
+  if (/\b(calculatrice|calculator|calc)\b/.test(normalized)) {
+    return ["calculator", "calculatrice", "calc"];
+  }
+  return normalized.split(/\s+/).filter((token) => token.length >= 4).slice(0, 8);
+}
+
+function normalizedApplicationOption(application) {
+  if (!application || typeof application !== "object") {
+    return null;
+  }
+  const id = compactConversationMessage(application.id ?? "");
+  const label = compactConversationMessage(application.label ?? application.name ?? id);
+  if (!id || !label) {
+    return null;
+  }
+  return {
+    id,
+    label,
+    value: id,
+    description: compactConversationMessage(application.kind ?? application.source ?? "Application détectée"),
+    aliases: [
+      application.processName,
+      application.executablePath,
+      application.kind,
+      application.source
+    ].map(compactConversationMessage).filter(Boolean)
+  };
+}
+
+function compactApplicationCatalogForPrompt(applications = [], limit = 16) {
+  return applications.slice(0, limit).map((application) => ({
+    id: compactConversationMessage(application.id ?? ""),
+    label: compactConversationMessage(application.label ?? application.name ?? application.id ?? "").slice(0, 80),
+    kind: compactConversationMessage(application.kind ?? application.source ?? "").slice(0, 60),
+    processName: compactConversationMessage(application.processName ?? "").slice(0, 80)
+  })).filter((application) => application.id && application.label);
+}
+
+function compactBrowserCatalogForPrompt(browsers = [], limit = 8) {
+  return browsers.slice(0, limit).map((browser) => ({
+    id: compactConversationMessage(browser.id ?? ""),
+    label: compactConversationMessage(browser.label ?? browser.name ?? browser.id ?? "").slice(0, 80),
+    processName: compactConversationMessage(browser.processName ?? "").slice(0, 80)
+  })).filter((browser) => browser.id && browser.label);
+}
+
+function compactCapabilityGraphForConversation(capabilityGraph) {
+  const topCapabilities = (capabilityGraph?.topCapabilities ?? []).slice(0, 8).map((capability) => ({
+    id: capability.id,
+    label: compactConversationMessage(capability.label ?? capability.id ?? "").slice(0, 100),
+    skillId: capability.skillId ?? null,
+    riskLevel: capability.riskLevel ?? null,
+    approvalRequired: Boolean(capability.approvalRequired),
+    score: capability.score ?? 0,
+    affordances: (capability.affordances ?? []).slice(0, 3).map((item) => compactConversationMessage(item).slice(0, 120)),
+    knownLimits: (capability.knownLimits ?? []).slice(0, 2).map((item) => compactConversationMessage(item).slice(0, 120))
+  }));
+  return {
+    nodeCount: capabilityGraph?.nodeCount ?? topCapabilities.length,
+    topCapabilities
+  };
+}
+
+function compactExternalConversationContext(context = {}) {
+  const recentMessages = Array.isArray(context.recentMessages) ? context.recentMessages.slice(-4).map((message) => ({
+    role: message.role === "assistant" ? "assistant" : "user",
+    kind: compactConversationMessage(message.kind ?? "").slice(0, 40),
+    text: compactConversationMessage(message.text ?? "").slice(0, 420)
+  })) : [];
+  return {
+    source: compactConversationMessage(context.source ?? "").slice(0, 80),
+    conversationId: compactConversationMessage(context.conversationId ?? "").slice(0, 80),
+    recentMessages
+  };
+}
+
+function timeoutError(message, metadata = {}) {
+  return Object.assign(new Error(message), {
+    code: "RUN_WAIT_TIMEOUT",
+    ...metadata
+  });
+}
+
+function waitWithTimeout(promise, timeoutMs, message, metadata = {}) {
+  if (!Number.isFinite(Number(timeoutMs)) || Number(timeoutMs) <= 0) {
+    return promise;
+  }
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(timeoutError(message, metadata)), Number(timeoutMs));
+    })
+  ]).finally(() => {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  });
+}
+
+function scoreApplicationForMessage(application, message) {
+  const keywords = applicationChoiceKeywords(message);
+  const haystack = normalizeMatchText([
+    application.id,
+    application.label,
+    application.kind,
+    application.processName,
+    application.executablePath,
+    application.source
+  ].join(" "));
+  return keywords.reduce((score, keyword) => score + (haystack.includes(normalizeMatchText(keyword)) ? 1 : 0), 0);
+}
+
+function buildApplicationChoiceRequest({ message, missionDraft, availableApplications = [] }) {
+  if (!applicationLaunchIntent(message) || missionDraft?.parameters?.applicationLaunch?.applicationId) {
+    return null;
+  }
+  const candidates = availableApplications
+    .map(normalizedApplicationOption)
+    .filter(Boolean)
+    .map((application) => ({
+      application,
+      score: scoreApplicationForMessage(application, message)
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.application.label.localeCompare(right.application.label))
+    .slice(0, 6)
+    .map((entry) => entry.application);
+  if (candidates.length <= 1) {
+    return null;
+  }
+  return normalizeChoiceRequest({
+    id: "choice_application_launch",
+    kind: "application",
+    title: "Choisis l’application",
+    question: "Quelle application veux-tu ouvrir ?",
+    required: true,
+    resolutionTarget: {
+      parameterPath: "parameters.applicationLaunch.applicationId",
+      labelPath: "parameters.applicationLaunch.applicationLabel"
+    },
+    options: candidates
+  });
+}
+
+function preflightWithChoiceRequest(preflight, choiceRequest) {
+  const normalized = normalizeChoiceRequest(choiceRequest);
+  if (!preflight || !normalized) {
+    return preflight;
+  }
+  const understanding = preflight.understanding ?? preflight;
+  return {
+    ...preflight,
+    understanding: {
+      ...understanding,
+      coverageStatus: "clarification_needed",
+      requiresClarification: true,
+      clarificationQuestion: normalized.question,
+      clarificationOptions: normalized.options.map((option) => ({
+        id: option.id,
+        label: option.label
+      })),
+      choiceRequest: normalized,
+      nextRunRecommendation: null
+    }
+  };
+}
+
+function enrichPreflightWithChoiceRequest({ message, missionDraft, preflight, availableApplications }) {
+  const existing = choiceRequestFromPreflight(preflight);
+  if (existing) {
+    return preflightWithChoiceRequest(preflight, existing);
+  }
+  const applicationChoice = buildApplicationChoiceRequest({
+    message,
+    missionDraft,
+    availableApplications
+  });
+  return applicationChoice ? preflightWithChoiceRequest(preflight, applicationChoice) : preflight;
+}
+
+function setNestedValue(target, dottedPath, value) {
+  const parts = compactConversationMessage(dottedPath).split(".").filter(Boolean);
+  if (parts[0] === "missionSpec") {
+    parts.shift();
+  }
+  if (parts.length === 0) {
+    return;
+  }
+  let cursor = target;
+  while (parts.length > 1) {
+    const part = parts.shift();
+    cursor[part] = cursor[part] && typeof cursor[part] === "object" && !Array.isArray(cursor[part])
+      ? cursor[part]
+      : {};
+    cursor = cursor[part];
+  }
+  cursor[parts[0]] = value;
+}
+
+function buildPendingClarificationState({ sourceTurnId, message, plannerOutput, missionDraft, preflight }) {
+  const understanding = preflight?.understanding ?? preflight ?? {};
+  const requiresClarification = Boolean(plannerOutput?.requiresClarification || understanding.requiresClarification);
+  if (!requiresClarification) {
+    return null;
+  }
+  const question = clarificationQuestionFrom({ plannerOutput, preflight });
+  return {
+    id: createId("clarify"),
+    status: "awaiting_user",
+    sourceTurnId,
+    originalMessage: compactConversationMessage(message),
+    question,
+    options: clarificationOptionsFrom(preflight),
+    choiceRequest: choiceRequestFromPreflight(preflight),
+    missionDraft: missionDraft ?? plannerOutput?.missionDraft ?? null,
+    preflight: preflight ?? null,
+    createdAt: nowIso()
+  };
+}
+
+function normalizePendingClarificationState(value) {
+  if (!value || typeof value !== "object" || value.status !== "awaiting_user") {
+    return null;
+  }
+  const question = compactConversationMessage(value.question ?? "");
+  const originalMessage = compactConversationMessage(value.originalMessage ?? "");
+  if (!question && !originalMessage) {
+    return null;
+  }
+  return {
+    id: compactConversationMessage(value.id ?? createId("clarify")),
+    status: "awaiting_user",
+    sourceTurnId: compactConversationMessage(value.sourceTurnId ?? ""),
+    originalMessage,
+    question,
+    options: normalizeClarificationOptions(value.options),
+    choiceRequest: normalizeChoiceRequest(value.choiceRequest),
+    missionDraft: value.missionDraft && typeof value.missionDraft === "object" ? value.missionDraft : null,
+    preflight: value.preflight && typeof value.preflight === "object" ? value.preflight : null,
+    createdAt: compactConversationMessage(value.createdAt ?? "")
+  };
+}
+
+function compactPendingClarificationForPrompt(pendingClarification) {
+  if (!pendingClarification) {
+    return null;
+  }
+  return {
+    id: pendingClarification.id,
+    originalMessage: pendingClarification.originalMessage,
+    question: pendingClarification.question,
+    choiceRequest: pendingClarification.choiceRequest ? {
+      id: pendingClarification.choiceRequest.id,
+      kind: pendingClarification.choiceRequest.kind,
+      question: pendingClarification.choiceRequest.question,
+      options: pendingClarification.choiceRequest.options.map((option) => ({
+        id: option.id,
+        label: option.label
+      }))
+    } : null,
+    options: pendingClarification.options.map((option) => ({
+      id: option.id,
+      label: option.label
+    })),
+    expectedUserResponse: "Treat the current user message as an answer to this pending clarification unless it clearly starts a new unrelated request."
+  };
+}
+
+function buildClarifiedMissionSpec(pendingClarification, selectedOption) {
+  const draft = pendingClarification?.missionDraft ?? {};
+  const missionSpec = {
+    objective: compactConversationMessage(draft.objective ?? pendingClarification?.originalMessage ?? ""),
+    deliverable: compactConversationMessage(draft.deliverable ?? ""),
+    constraints: Array.isArray(draft.constraints) ? draft.constraints : [],
+    forbiddenActions: Array.isArray(draft.forbiddenActions) ? draft.forbiddenActions : [],
+    mode: compactConversationMessage(draft.mode ?? ""),
+    parameters: {
+      ...(draft.parameters && typeof draft.parameters === "object" ? draft.parameters : {})
+    }
+  };
+  const choiceRequest = normalizeChoiceRequest(pendingClarification.choiceRequest);
+  const parameterPath = choiceRequest?.resolutionTarget?.parameterPath || "parameters.browserLaunch.browserId";
+  const labelPath = choiceRequest?.resolutionTarget?.labelPath || "";
+  setNestedValue(missionSpec, parameterPath, selectedOption.id || selectedOption.value || selectedOption.label);
+  if (labelPath) {
+    setNestedValue(missionSpec, labelPath, selectedOption.label);
+  }
+  return missionSpec;
 }
 
 function conversationTitleFromMessage(message) {
@@ -709,8 +1146,19 @@ export class OperatorService extends EventEmitter {
     return this.fixtureServer.manifest;
   }
 
-  async close() {
-    await Promise.allSettled(this.activeRuns.values());
+  async close({ timeoutMs = 0 } = {}) {
+    const activeRunSettlement = Promise.allSettled(this.activeRuns.values());
+    try {
+      await waitWithTimeout(
+        activeRunSettlement,
+        timeoutMs,
+        "Timed out while waiting for active runs during service close."
+      );
+    } catch (error) {
+      if (error.code !== "RUN_WAIT_TIMEOUT") {
+        throw error;
+      }
+    }
     await this.runtimeHandle.close();
     await this.fixtureServer.close();
   }
@@ -1053,7 +1501,7 @@ export class OperatorService extends EventEmitter {
     const config = this.getAgentConfiguration();
     return {
       message: compactConversationMessage(message || "ouvre mon éditeur de note"),
-      preview: "Oui. J’ai besoin de ton accord pour lancer l’application.",
+      preview: "Confirme et je lance l’application.",
       visibleSystemPrompt: config.conversationalSystemPrompt,
       hiddenLayers: [
         "classification",
@@ -1096,6 +1544,206 @@ export class OperatorService extends EventEmitter {
     return buildRunReviewModel(bundle, this.listPendingApprovals(runId));
   }
 
+  getWorkspaceState(projectId, { conversationId = null } = {}) {
+    const project = this.runtimeHandle.database.getProject(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}.`);
+    }
+    const missionBrief = this.runtimeHandle.database.getLatestWorkspaceMissionBrief(projectId, { conversationId })
+      ?? this.runtimeHandle.database.getLatestWorkspaceMissionBrief(projectId);
+    const terminals = this.runtimeHandle.database.listWorkspaceTerminalSessions(projectId, {
+      conversationId,
+      limit: 50
+    });
+    const decisions = this.runtimeHandle.database.listWorkspaceTerminalDecisions(projectId, {
+      conversationId,
+      limit: 80
+    });
+    const alerts = decisions
+      .filter((decision) => ["request_human_approval", "suggest_user_reply", "escalate_human"].includes(decision.action))
+      .slice(-8);
+    return {
+      missionBrief,
+      terminals,
+      decisions,
+      alerts,
+      summary: buildWorkspaceStateSummary({ missionBrief, terminals, decisions }),
+      browserStrategy: {
+        preferredMode: "workspace_browser_mode",
+        supportedModes: ["workspace_browser_mode", "system_browser_mode"],
+        rationale: "Workspace browser mode is preferred for traceable web work; system browser mode remains available for visible local desktop tasks with approvals."
+      },
+      autonomyPolicy: {
+        defaultMode: "assisted",
+        supportedModes: ["assisted", "supervised_autonomy", "manual_only"],
+        hardSafetyFloor: [
+          "no credential extraction",
+          "no payment or purchase automation",
+          "no stealth or security bypass",
+          "no destructive shell action without approval"
+        ]
+      }
+    };
+  }
+
+  upsertWorkspaceMissionBrief(projectId, payload = {}) {
+    const project = this.runtimeHandle.database.getProject(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}.`);
+    }
+    const brief = buildWorkspaceMissionBrief({
+      id: payload.id ?? createId("wmb"),
+      projectId,
+      conversationId: payload.conversationId ?? null,
+      objective: payload.objective ?? payload.mission ?? "",
+      status: payload.status ?? "active",
+      progress: payload.progress ?? [],
+      blockers: payload.blockers ?? [],
+      decisions: payload.decisions ?? [],
+      nextSteps: payload.nextSteps ?? [],
+      metadata: payload.metadata ?? {}
+    });
+    const saved = this.runtimeHandle.database.upsertWorkspaceMissionBrief(brief);
+    this.emitStateChanged("workspace.mission_brief.updated", {
+      projectId,
+      conversationId: saved.conversationId,
+      missionBriefId: saved.id,
+      status: saved.status
+    });
+    return {
+      missionBrief: saved,
+      workspace: this.getWorkspaceState(projectId, { conversationId: saved.conversationId })
+    };
+  }
+
+  attachWorkspaceTerminal(projectId, payload = {}) {
+    const project = this.runtimeHandle.database.getProject(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}.`);
+    }
+    const session = normalizeTerminalSession({
+      ...payload,
+      id: payload.id ?? createId("term"),
+      projectId,
+      agentKind: payload.agentKind ?? detectCliAgentKind(payload),
+      status: payload.status ?? "attached",
+      authorized: Boolean(payload.authorized),
+      autonomyMode: payload.autonomyMode ?? "assisted"
+    });
+    const saved = this.runtimeHandle.database.insertWorkspaceTerminalSession(session);
+    const detection = detectTerminalState({
+      recentOutput: saved.recentOutput,
+      processRunning: payload.processRunning ?? true,
+      exitCode: payload.exitCode ?? null,
+      explicitStatus: payload.status ?? null
+    });
+    const normalizedTerminal = detection.status === saved.status
+      ? saved
+      : this.runtimeHandle.database.updateWorkspaceTerminalSession(saved.id, {
+        status: detection.status,
+        metadata: {
+          lastDetection: detection
+        },
+        updatedAt: nowIso()
+      });
+    const missionBrief = this.runtimeHandle.database.getLatestWorkspaceMissionBrief(projectId, {
+      conversationId: normalizedTerminal.conversationId
+    });
+    const intervention = evaluateTerminalIntervention({
+      terminal: normalizedTerminal,
+      missionBrief,
+      detection
+    });
+    const decision = this.runtimeHandle.database.insertWorkspaceTerminalDecision({
+      id: createId("wtd"),
+      terminalId: normalizedTerminal.id,
+      projectId,
+      conversationId: normalizedTerminal.conversationId,
+      decisionType: intervention.decisionType,
+      action: intervention.action,
+      reason: intervention.reason,
+      requiresApproval: intervention.requiresApproval,
+      payload: {
+        detection,
+        confidence: intervention.confidence,
+        ...(intervention.payload ?? {})
+      },
+      createdAt: nowIso()
+    });
+    this.emitStateChanged("workspace.terminal.attached", {
+      projectId,
+      conversationId: normalizedTerminal.conversationId,
+      terminalId: normalizedTerminal.id,
+      status: normalizedTerminal.status,
+      action: decision.action
+    });
+    return {
+      terminal: normalizedTerminal,
+      decision,
+      workspace: this.getWorkspaceState(projectId, { conversationId: normalizedTerminal.conversationId })
+    };
+  }
+
+  updateWorkspaceTerminal(projectId, terminalId, payload = {}) {
+    const existing = this.runtimeHandle.database.getWorkspaceTerminalSession(terminalId);
+    if (!existing || existing.projectId !== projectId) {
+      throw new Error(`Workspace terminal not found: ${terminalId}.`);
+    }
+    const detection = detectTerminalState({
+      recentOutput: payload.recentOutput ?? existing.recentOutput,
+      processRunning: payload.processRunning ?? true,
+      exitCode: payload.exitCode ?? null,
+      explicitStatus: payload.status ?? null
+    });
+    const terminal = this.runtimeHandle.database.updateWorkspaceTerminalSession(terminalId, {
+      ...payload,
+      status: detection.status,
+      agentKind: payload.agentKind ?? detectCliAgentKind({
+        command: payload.command ?? existing.command,
+        title: payload.label ?? existing.label,
+        recentOutput: payload.recentOutput ?? existing.recentOutput
+      }),
+      metadata: {
+        ...(payload.metadata ?? {}),
+        lastDetection: detection
+      },
+      updatedAt: nowIso()
+    });
+    const missionBrief = this.runtimeHandle.database.getLatestWorkspaceMissionBrief(projectId, {
+      conversationId: terminal.conversationId
+    });
+    const intervention = evaluateTerminalIntervention({ terminal, missionBrief, detection });
+    const decision = this.runtimeHandle.database.insertWorkspaceTerminalDecision({
+      id: createId("wtd"),
+      terminalId: terminal.id,
+      projectId,
+      conversationId: terminal.conversationId,
+      decisionType: intervention.decisionType,
+      action: intervention.action,
+      reason: intervention.reason,
+      requiresApproval: intervention.requiresApproval,
+      payload: {
+        detection,
+        confidence: intervention.confidence,
+        ...(intervention.payload ?? {})
+      },
+      createdAt: nowIso()
+    });
+    this.emitStateChanged("workspace.terminal.updated", {
+      projectId,
+      conversationId: terminal.conversationId,
+      terminalId: terminal.id,
+      status: terminal.status,
+      action: decision.action,
+      requiresApproval: decision.requiresApproval
+    });
+    return {
+      terminal,
+      decision,
+      workspace: this.getWorkspaceState(projectId, { conversationId: terminal.conversationId })
+    };
+  }
+
   async getDashboard(projectId = null) {
     const projects = this.listProjects();
     const selectedProjectId = projectId ?? projects[0]?.id ?? null;
@@ -1111,6 +1759,7 @@ export class OperatorService extends EventEmitter {
     const availableApplications = await this.listInstalledApplications();
     const capabilityGraph = await this.getCapabilityGraph();
     const operationalDeep = await buildOperationalDeepReadinessReport();
+    const workspace = selectedProjectId ? this.getWorkspaceState(selectedProjectId) : null;
     return {
       fixtureManifest: this.fixtureManifest,
       llmGatewayStatus: this.runtimeHandle.runtime.getLlmGatewayStatus(),
@@ -1130,6 +1779,7 @@ export class OperatorService extends EventEmitter {
         generalDesktopControlSupported: availableApplications.length > 0
       },
       operationalDeep,
+      workspace,
         capabilityGraph: {
           summary: capabilityGraph.summary,
           preview: compactCapabilityGraphForPrompt(capabilityGraph.nodes, {
@@ -1362,6 +2012,53 @@ export class OperatorService extends EventEmitter {
     return this.runtimeHandle.database.listConversationTurns(projectId, { limit, conversationId });
   }
 
+  async #resolvePendingClarification({ projectId, pendingClarification, message }) {
+    const selectedOption = matchClarificationOption(message, pendingClarification.options);
+    if (!selectedOption?.id) {
+      return null;
+    }
+    const preview = await this.previewMission(projectId, {
+      missionSpec: buildClarifiedMissionSpec(pendingClarification, selectedOption)
+    });
+    const understanding = preview.preflight?.understanding ?? preview.preflight ?? {};
+    if (understanding.requiresClarification) {
+      return null;
+    }
+    const reply = `D’accord. J’utiliserai ${selectedOption.label}. Confirme et je lance.`;
+    return {
+      selectedOption,
+      preflight: preview.preflight,
+      missionDraft: preview.missionDraft,
+      turn: {
+        id: createId("turn"),
+        projectId,
+        conversationId: null,
+        message,
+        intentType: "desktop_action",
+        action: "prepare_mission_preflight",
+        reply,
+        requiresClarification: false,
+        clarificationQuestion: "",
+        capabilityRequests: [],
+        uiBlocks: [],
+        capabilityResults: [],
+        missionDraft: preview.missionDraft,
+        preflight: preview.preflight,
+        generationMode: "clarification_resolution",
+        fallbackReason: null,
+        llm: {
+          providerAlias: "conversation_state",
+          modelAlias: null,
+          providerModel: null,
+          estimatedCost: 0,
+          tokenUsage: null,
+          tokenGovernance: null
+        },
+        generatedAt: nowIso()
+      }
+    };
+  }
+
   async handleConversationTurn(projectId, turnRequest = {}) {
     const project = this.runtimeHandle.database.getProject(projectId);
     if (!project) {
@@ -1379,6 +2076,10 @@ export class OperatorService extends EventEmitter {
         source: "user_home"
       }
     });
+    const pendingClarification = normalizePendingClarificationState(conversation.metadata?.pendingClarification);
+    const resolvedClarification = pendingClarification
+      ? await this.#resolvePendingClarification({ projectId, pendingClarification, message })
+      : null;
     this.runtimeHandle.database.insertConversationTurn(conversationTurnRecord({
       projectId,
       conversationId: conversation.id,
@@ -1387,9 +2088,77 @@ export class OperatorService extends EventEmitter {
       content: message,
       payload: {
         source: "user_home",
-        conversationId: conversation.id
+        conversationId: conversation.id,
+        clarificationResponseTo: pendingClarification?.id ?? null
       }
     }));
+    if (resolvedClarification) {
+      const turn = {
+        ...resolvedClarification.turn,
+        conversationId: conversation.id
+      };
+      this.runtimeHandle.database.insertConversationTurn(conversationTurnRecord({
+        projectId,
+        conversationId: conversation.id,
+        role: "assistant",
+        kind: "turn",
+        content: turn.reply,
+        payload: {
+          conversationId: conversation.id,
+          intentType: turn.intentType,
+          action: turn.action,
+          uiBlocks: turn.uiBlocks,
+          capabilityResults: turn.capabilityResults,
+          missionDraft: turn.missionDraft,
+          preflight: turn.preflight,
+          requiresClarification: false,
+          clarificationQuestion: "",
+          clarificationOptions: [],
+          choiceRequest: null,
+          clarificationResolved: {
+            pendingClarificationId: pendingClarification.id,
+            selectedOption: {
+              id: resolvedClarification.selectedOption.id,
+              label: resolvedClarification.selectedOption.label
+            }
+          }
+        },
+        metadata: {
+          conversationId: conversation.id,
+          generationMode: turn.generationMode,
+          fallbackReason: turn.fallbackReason,
+          llm: turn.llm,
+          clarificationResolved: true
+        }
+      }));
+      this.runtimeHandle.database.updateConversation(conversation.id, {
+        title: conversation.title || conversationTitleFromMessage(pendingClarification.originalMessage || message),
+        metadata: {
+          ...(conversation.metadata ?? {}),
+          pendingClarification: null,
+          lastIntentType: turn.intentType,
+          lastAction: turn.action,
+          lastGenerationMode: turn.generationMode,
+          lastClarificationResolvedAt: nowIso()
+        },
+        updatedAt: nowIso()
+      });
+      this.emitStateChanged("conversation.turn.completed", {
+        projectId,
+        conversationId: conversation.id,
+        turnId: turn.id,
+        intentType: turn.intentType,
+        action: turn.action,
+        generationMode: turn.generationMode,
+        clarificationResolved: true
+      });
+      return {
+        conversation: this.runtimeHandle.database.getConversation(conversation.id),
+        turn,
+        preflight: turn.preflight,
+        missionDraft: turn.missionDraft
+      };
+    }
     const persistedHistory = this.runtimeHandle.database.listConversationTurns(projectId, {
       limit: 24,
       conversationId: conversation.id
@@ -1400,16 +2169,18 @@ export class OperatorService extends EventEmitter {
     const capabilityGraph = await this.getCapabilityGraph();
     const relevantCapabilityGraph = compactCapabilityGraphForPrompt(capabilityGraph.nodes, {
       mission: message,
-      limit: 18,
+      limit: 12,
       feedbackRecords: capabilityGraph.feedbackRecords
     });
+    const conversationCapabilityGraph = compactCapabilityGraphForConversation(relevantCapabilityGraph);
+    const promptBrowsers = compactBrowserCatalogForPrompt(availableBrowsers);
+    const promptApplications = compactApplicationCatalogForPrompt(availableApplications);
+    const externalContext = compactExternalConversationContext(turnRequest.context && typeof turnRequest.context === "object" ? turnRequest.context : {});
     const input = {
       message,
-      visibleAssistantSystemPrompt: agentConfig.conversationalSystemPrompt,
-      guardrails: agentConfig.guardrails,
-      capabilityGraph: relevantCapabilityGraph,
+      capabilityGraph: conversationCapabilityGraph,
       conversationContext: {
-        ...(turnRequest.context && typeof turnRequest.context === "object" ? turnRequest.context : {}),
+        ...externalContext,
         conversation: {
           id: conversation.id,
           title: conversation.title,
@@ -1417,11 +2188,12 @@ export class OperatorService extends EventEmitter {
           status: conversation.status,
           updatedAt: conversation.updatedAt
         },
-        persistedTurns: compactConversationHistory(persistedHistory)
+        persistedTurns: compactConversationHistory(persistedHistory),
+        pendingClarification: compactPendingClarificationForPrompt(pendingClarification)
       },
       safeCapabilities: safeCapabilitiesDescriptor(),
-      availableBrowsers,
-      availableApplications: availableApplications.slice(0, 40),
+      availableBrowsers: promptBrowsers,
+      availableApplications: promptApplications,
       activeRunState: buildActiveRunState(this.listActiveRunIds(), this.runtimeHandle.database)
     };
     const promptRefs = [
@@ -1436,11 +2208,11 @@ export class OperatorService extends EventEmitter {
           message,
           visibleAssistantSystemPrompt: agentConfig.conversationalSystemPrompt,
           guardrails: JSON.stringify(agentConfig.guardrails),
-          capabilityGraph: JSON.stringify(relevantCapabilityGraph),
+          capabilityGraph: JSON.stringify(conversationCapabilityGraph),
           conversationContext: JSON.stringify(input.conversationContext ?? null),
           safeCapabilities: JSON.stringify(input.safeCapabilities),
-          availableBrowsers: JSON.stringify(availableBrowsers),
-          availableApplications: JSON.stringify(availableApplications.slice(0, 40)),
+          availableBrowsers: JSON.stringify(promptBrowsers),
+          availableApplications: JSON.stringify(promptApplications),
           activeRunState: JSON.stringify(input.activeRunState)
         }
       }
@@ -1479,6 +2251,25 @@ export class OperatorService extends EventEmitter {
         fallbackReason: error.category ?? "provider_unavailable"
       };
     }
+    const deterministicTurnHint = validateConversationTurnOutput(buildDeterministicConversationTurn(input), { message });
+    if (
+      plannerResult.output.action === "inspect_then_answer"
+      && plannerResult.output.capabilityRequests.length === 0
+      && deterministicTurnHint.action === "inspect_then_answer"
+      && deterministicTurnHint.capabilityRequests.length > 0
+    ) {
+      plannerResult = {
+        ...plannerResult,
+        output: {
+          ...plannerResult.output,
+          capabilityRequests: deterministicTurnHint.capabilityRequests,
+          safetyNotes: [
+            ...(plannerResult.output.safetyNotes ?? []),
+            "Safe read-only capability requests completed from deterministic intent hints."
+          ]
+        }
+      };
+    }
 
     const capabilityExecution = await executeSafeConversationCapabilities({
       requests: plannerResult.output.capabilityRequests,
@@ -1514,6 +2305,12 @@ export class OperatorService extends EventEmitter {
       });
       preflight = preview.preflight;
       missionDraft = preview.missionDraft;
+      preflight = enrichPreflightWithChoiceRequest({
+        message,
+        missionDraft,
+        preflight,
+        availableApplications
+      });
     }
 
     const turn = {
@@ -1536,6 +2333,7 @@ export class OperatorService extends EventEmitter {
       capabilityResults: capabilityExecution.capabilityResults,
       missionDraft,
       preflight,
+      choiceRequest: choiceRequestFromPreflight(preflight),
       generationMode: plannerResult.generationMode,
       fallbackReason: plannerResult.fallbackReason ?? null,
       llm: plannerResult.callRecord ? {
@@ -1555,6 +2353,13 @@ export class OperatorService extends EventEmitter {
       },
       generatedAt: nowIso()
     };
+    const nextPendingClarification = buildPendingClarificationState({
+      sourceTurnId: turn.id,
+      message,
+      plannerOutput: plannerResult.output,
+      missionDraft,
+      preflight
+    });
 
     this.runtimeHandle.database.insertConversationTurn(conversationTurnRecord({
       projectId,
@@ -1571,7 +2376,10 @@ export class OperatorService extends EventEmitter {
         missionDraft: turn.missionDraft,
         preflight: turn.preflight,
         requiresClarification: turn.requiresClarification,
-        clarificationQuestion: turn.clarificationQuestion
+        clarificationQuestion: turn.clarificationQuestion,
+        clarificationOptions: clarificationOptionsFrom(turn.preflight),
+        choiceRequest: choiceRequestFromPreflight(turn.preflight),
+        pendingClarificationId: nextPendingClarification?.id ?? null
       },
       metadata: {
         conversationId: conversation.id,
@@ -1584,6 +2392,7 @@ export class OperatorService extends EventEmitter {
       title: conversation.title || conversationTitleFromMessage(message),
       metadata: {
         ...(conversation.metadata ?? {}),
+        pendingClarification: nextPendingClarification,
         lastIntentType: turn.intentType,
         lastAction: turn.action,
         lastGenerationMode: turn.generationMode
@@ -1630,10 +2439,15 @@ export class OperatorService extends EventEmitter {
     return readConversationArtifact(artifactId);
   }
 
-  async waitForRun(runId) {
+  async waitForRun(runId, { timeoutMs = 0 } = {}) {
     const activeRun = this.activeRuns.get(runId);
     if (activeRun) {
-      await activeRun;
+      await waitWithTimeout(
+        activeRun,
+        timeoutMs,
+        `Timed out while waiting for run ${runId} to settle.`,
+        { runId }
+      );
     }
     return this.getRunDetail(runId);
   }

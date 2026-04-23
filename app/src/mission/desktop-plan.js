@@ -79,7 +79,14 @@ function normalizeWindow(value) {
   };
 }
 
-function selectApplication(mission, applications = []) {
+function selectApplication(mission, applications = [], preferredApplicationId = "") {
+  const preferred = String(preferredApplicationId ?? "").trim().toLowerCase();
+  if (preferred) {
+    const explicit = applications.find((application) => String(application.id ?? "").toLowerCase() === preferred);
+    if (explicit) {
+      return explicit;
+    }
+  }
   const text = normalizedText(mission);
   for (const application of applications) {
     const label = normalizedText(application.label);
@@ -239,7 +246,10 @@ export function validateDesktopPlanOutput(output, { maxSteps = 14 } = {}) {
 export function buildDeterministicDesktopPlan(input = {}) {
   const mission = String(input.mission ?? input.originalMission ?? "").trim();
   const applications = asArray(input.installedApplications).map(normalizeApplication).filter(Boolean);
-  const selectedApplication = selectApplication(mission, applications);
+  const preferredApplicationId = input.missionSpec?.parameters?.applicationLaunch?.applicationId
+    ?? input.missionUnderstanding?.applicationLaunch?.applicationId
+    ?? "";
+  const selectedApplication = selectApplication(mission, applications, preferredApplicationId);
   const textToType = extractTextToType(mission);
   const steps = [
     {

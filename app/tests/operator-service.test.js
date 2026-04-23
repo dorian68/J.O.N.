@@ -87,6 +87,29 @@ export async function run() {
         content: "notes"
       }
     ], {
+      applications: [
+        {
+          id: "notepad",
+          label: "Notepad",
+          kind: "text_editor",
+          processName: "notepad",
+          executablePath: "C:\\Windows\\System32\\notepad.exe"
+        },
+        {
+          id: "obsidian",
+          label: "Obsidian",
+          kind: "notes",
+          processName: "Obsidian",
+          executablePath: "C:\\Users\\Labry\\AppData\\Local\\Obsidian\\Obsidian.exe"
+        },
+        {
+          id: "calculator",
+          label: "Calculator",
+          kind: "utility",
+          processName: "CalculatorApp",
+          executablePath: "C:\\Windows\\System32\\calc.exe"
+        }
+      ],
       browsers: [
         {
           id: "edge",
@@ -126,6 +149,10 @@ export async function run() {
     assert.equal(pausedDetail.pendingApprovals.length, 1);
     assert.equal(pausedDetail.review.operatorState.code, "blocked_approval");
     assert.equal(pausedDetail.pendingApprovals[0].evidenceId != null, true);
+    await assert.rejects(
+      () => service.waitForRun(launch.runId, { timeoutMs: 30 }),
+      (error) => error.code === "RUN_WAIT_TIMEOUT" && error.runId === launch.runId
+    );
 
     await service.resolveApproval(pendingApproval.id, APPROVAL_DECISION.APPROVED_ONCE, "Controlled approval for service test.");
     const completedDetail = await service.waitForRun(launch.runId);
@@ -192,6 +219,48 @@ export async function run() {
     });
     assert.equal(browserSelectedPreview.preflight.understanding.requiresClarification, false);
     assert.equal(browserSelectedPreview.preflight.understanding.selectedBrowser?.id, "edge");
+
+    const browserConversation = await service.handleConversationTurn(project.id, {
+      message: "Open my browser on this machine."
+    });
+    assert.equal(browserConversation.preflight.understanding.requiresClarification, true);
+    assert.equal(browserConversation.preflight.understanding.clarificationOptions.length, 2);
+    const pendingConversation = service.runtimeHandle.database.getConversation(browserConversation.conversation.id);
+    assert.equal(pendingConversation.metadata?.pendingClarification?.status, "awaiting_user");
+    assert.equal(pendingConversation.metadata?.pendingClarification?.options.length, 2);
+
+    const clarifiedConversation = await service.handleConversationTurn(project.id, {
+      conversationId: browserConversation.conversation.id,
+      message: "Microsoft Edge"
+    });
+    assert.equal(clarifiedConversation.turn.generationMode, "clarification_resolution");
+    assert.equal(clarifiedConversation.turn.action, "prepare_mission_preflight");
+    assert.equal(clarifiedConversation.preflight.understanding.requiresClarification, false);
+    assert.equal(clarifiedConversation.preflight.understanding.selectedBrowser?.id, "edge");
+    assert.equal(clarifiedConversation.missionDraft.parameters.browserLaunch.browserId, "edge");
+    const resolvedConversation = service.runtimeHandle.database.getConversation(browserConversation.conversation.id);
+    assert.equal(resolvedConversation.metadata?.pendingClarification, null);
+
+    const appChoiceConversation = await service.handleConversationTurn(project.id, {
+      message: "Ouvre mon éditeur de notes."
+    });
+    assert.equal(appChoiceConversation.preflight.understanding.requiresClarification, true);
+    assert.equal(appChoiceConversation.preflight.understanding.choiceRequest.kind, "application");
+    assert.equal(appChoiceConversation.preflight.understanding.choiceRequest.options.some((option) => option.id === "notepad"), true);
+    assert.equal(appChoiceConversation.preflight.understanding.choiceRequest.options.some((option) => option.id === "obsidian"), true);
+    const pendingAppChoice = service.runtimeHandle.database.getConversation(appChoiceConversation.conversation.id);
+    assert.equal(pendingAppChoice.metadata?.pendingClarification?.choiceRequest?.kind, "application");
+
+    const clarifiedAppChoice = await service.handleConversationTurn(project.id, {
+      conversationId: appChoiceConversation.conversation.id,
+      message: "Obsidian"
+    });
+    assert.equal(clarifiedAppChoice.turn.generationMode, "clarification_resolution");
+    assert.equal(clarifiedAppChoice.preflight.understanding.requiresClarification, false);
+    assert.equal(clarifiedAppChoice.missionDraft.parameters.applicationLaunch.applicationId, "obsidian");
+    assert.equal(clarifiedAppChoice.missionDraft.parameters.applicationLaunch.applicationLabel, "Obsidian");
+    const resolvedAppChoice = service.runtimeHandle.database.getConversation(appChoiceConversation.conversation.id);
+    assert.equal(resolvedAppChoice.metadata?.pendingClarification, null);
 
     const browserMissionLaunch = await service.startMission(project.id, {
       missionSpec: {

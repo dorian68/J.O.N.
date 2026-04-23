@@ -38,6 +38,34 @@ export async function run() {
   const clickStep = semanticClickPlan.steps.find((step) => step.primitive === "click_point");
   assert.equal(clickStep.target.semanticTarget, "Search");
 
+  const preferredApplicationPlan = validateDesktopPlanOutput(buildDeterministicDesktopPlan({
+    mission: "Open my note editor.",
+    missionSpec: {
+      parameters: {
+        applicationLaunch: {
+          applicationId: "obsidian"
+        }
+      }
+    },
+    installedApplications: [
+      {
+        id: "notepad",
+        label: "Notepad",
+        kind: "text_editor",
+        processName: "notepad",
+        executablePath: "C:\\Windows\\System32\\notepad.exe"
+      },
+      {
+        id: "obsidian",
+        label: "Obsidian",
+        kind: "notes",
+        processName: "Obsidian",
+        executablePath: "C:\\Users\\Labry\\AppData\\Local\\Obsidian\\Obsidian.exe"
+      }
+    ]
+  }));
+  assert.equal(preferredApplicationPlan.selectedApplication.id, "obsidian");
+
   const clarification = validateDesktopPlanOutput(buildDeterministicDesktopPlan({
     mission: "Open the app and type hello.",
     installedApplications: []

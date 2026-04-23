@@ -10,6 +10,8 @@
     "bench:browser": "npm --prefix app run bench:browser",
     "bench:computer": "npm --prefix app run bench:computer",
     "validation:advanced-desktop": "npm --prefix app run validation:advanced-desktop --",
+    "smoke:browser-planner": "npm --prefix app run smoke:browser-planner --",
+    "smoke:browser-operator": "npm --prefix app run smoke:browser-operator --",
     "llm:smoke": "npm --prefix app run llm:smoke --",
     "secret:llm": "npm --prefix app run secret:llm --",
     "secret:llm:smoke": "npm --prefix app run secret:llm:smoke",

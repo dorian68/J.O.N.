@@ -162,6 +162,135 @@ const FILE_PRIMITIVE_METADATA = Object.freeze({
   }
 });
 
+const BROWSER_PRIMITIVE_METADATA = Object.freeze({
+  "browser.plan_mission": {
+    description: "Generate a governed DOM-first browser run plan from a natural web mission and current browser/page state.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["browser_plan", "verification_goals"],
+    affordances: ["plan web mission", "choose browser steps", "identify blockers", "prepare evidence strategy"],
+    relevance: { web_research: 1, browser_action: 1, safe_inspection: 0.7 }
+  },
+  "browser.open_session": {
+    description: "Open a controlled browser session with explicit allowlisted hosts.",
+    riskLevel: "medium",
+    approvalRequired: true,
+    rollbackPossible: false,
+    evidenceExpected: ["browser_session_state"],
+    affordances: ["open controlled browser", "create browser session", "initialize active tab"],
+    relevance: { web_research: 0.95, browser_action: 0.95, desktop_action: 0.45 }
+  },
+  "browser.navigate": {
+    description: "Navigate the active controlled tab to an allowlisted URL.",
+    riskLevel: "medium",
+    approvalRequired: true,
+    rollbackPossible: false,
+    evidenceExpected: ["navigation_history", "current_url"],
+    affordances: ["open URL", "navigate site", "visit allowlisted page"],
+    relevance: { web_research: 1, browser_action: 0.95 }
+  },
+  "browser.read_state": {
+    description: "Read current controlled browser session state: active tab, URL, title, loading state, recent actions and blockers.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["browser_session_state"],
+    affordances: ["know current tab", "inspect current URL", "summarize browser state"],
+    relevance: { web_research: 0.9, browser_action: 0.9, safe_inspection: 0.75, local_question: 0.45 }
+  },
+  "browser.read_dom": {
+    description: "Capture a DOM-first page snapshot with text and interactive elements.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["dom_snapshot"],
+    affordances: ["read page", "inspect links", "inspect buttons", "inspect forms"],
+    relevance: { web_research: 1, safe_inspection: 0.8, browser_action: 0.75 }
+  },
+  "browser.query_interactive": {
+    description: "Rank visible DOM targets such as links, buttons, inputs and selects against a semantic selector.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["target_ranking"],
+    affordances: ["find link", "find button", "find field", "detect ambiguity"],
+    relevance: { web_research: 0.85, browser_action: 0.9, safe_inspection: 0.6 }
+  },
+  "browser.click": {
+    description: "Click a bounded DOM target in the controlled browser.",
+    riskLevel: "high",
+    approvalRequired: true,
+    rollbackPossible: false,
+    evidenceExpected: ["before_after_page_state"],
+    affordances: ["click link", "click button", "select page action"],
+    relevance: { browser_action: 0.95, web_research: 0.7 }
+  },
+  "browser.type": {
+    description: "Type or fill approved text into a DOM field in the controlled browser.",
+    riskLevel: "medium",
+    approvalRequired: true,
+    rollbackPossible: false,
+    evidenceExpected: ["field_value_verification"],
+    affordances: ["type in search box", "fill field", "enter text"],
+    relevance: { browser_action: 0.9, web_research: 0.7, text_editing: 0.45 }
+  },
+  "browser.select": {
+    description: "Select an approved option in a DOM select field.",
+    riskLevel: "medium",
+    approvalRequired: true,
+    rollbackPossible: false,
+    evidenceExpected: ["field_value_verification"],
+    affordances: ["select option", "choose filter", "set form field"],
+    relevance: { browser_action: 0.8, web_research: 0.5 }
+  },
+  "browser.wait_state": {
+    description: "Wait for browser load state or a visible selector after navigation or interaction.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["page_load_state"],
+    affordances: ["wait for page", "detect change", "wait for selector"],
+    relevance: { web_research: 0.85, browser_action: 0.85 }
+  },
+  "browser.extract_text": {
+    description: "Extract text content from selected DOM targets for structured evidence.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["structured_extraction"],
+    affordances: ["extract text", "read result", "build table"],
+    relevance: { web_research: 1, safe_inspection: 0.75 }
+  },
+  "browser.detect_blockers": {
+    description: "Detect visible blocking UI such as modals or dialogs; anti-bot and auth gates are reported, not bypassed.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["blocker_state"],
+    affordances: ["detect modal", "detect blocker", "stop on captcha or login"],
+    relevance: { web_research: 0.75, browser_action: 0.75, safe_inspection: 0.55 }
+  },
+  "browser.verify_outcome": {
+    description: "Verify URL, text visibility, field value or checkbox state after a browser action.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["verification_summary"],
+    affordances: ["verify result", "check field", "confirm navigation"],
+    relevance: { web_research: 0.9, browser_action: 0.9, proof_capture: 0.55 }
+  },
+  "browser.capture_evidence": {
+    description: "Capture page screenshot evidence with DOM snapshot and current browser state.",
+    riskLevel: "low",
+    approvalRequired: false,
+    rollbackPossible: false,
+    evidenceExpected: ["page_screenshot", "browser_session_state"],
+    affordances: ["screenshot page", "capture proof", "record current state"],
+    relevance: { proof_capture: 1, web_research: 0.85, browser_action: 0.7 }
+  }
+});
+
 function cleanText(value, maxLength = 1000) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
@@ -343,7 +472,29 @@ function buildToolNodes() {
       }
     });
   });
-  return [...desktopNodes, ...fileNodes];
+  const browserNodes = Object.entries(BROWSER_PRIMITIVE_METADATA).map(([primitive, meta]) => capabilityNode({
+    kind: "tool",
+    id: primitive,
+    label: primitive,
+    sourceKind: "browser_primitive_provider",
+    sourceId: primitive,
+    skillId: "skill.browser",
+    riskLevel: meta.riskLevel,
+    approvalRequired: meta.approvalRequired,
+    rollbackPossible: meta.rollbackPossible,
+    relevance: meta.relevance,
+    payload: {
+      primitive,
+      description: meta.description,
+      evidenceExpected: meta.evidenceExpected,
+      affordances: meta.affordances,
+      knownLimits: [
+        "Browser tools only operate on governed controlled sessions and allowlisted surfaces.",
+        "Anti-bot, CAPTCHA, credential, and authentication blockers are reported or handed off manually; they are not bypassed."
+      ]
+    }
+  }));
+  return [...desktopNodes, ...fileNodes, ...browserNodes];
 }
 
 function buildExternalToolNodes(externalToolProviders = []) {

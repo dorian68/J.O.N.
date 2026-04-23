@@ -60,14 +60,36 @@ const BUILTIN_SKILL_MANIFEST_BASE = [
     surfaceKind: "browser",
     implementationStatus: SKILL_IMPLEMENTATION_STATUS.OPERATIONAL_BASIC,
     capabilityDepth: SKILL_DEPTH.OPERATIONAL_BASIC,
-    description: "Open a browser, search or navigate, inspect results, scroll, click visible targets, and capture proof.",
+    description: "Operate an allowlisted controlled browser with DOM-first navigation, page state awareness, structured extraction, bounded interaction, and screenshot proof.",
     appMatchers: [/browser/i, /edge/i, /chrome/i, /firefox/i, /brave/i, /navigateur/i],
-    affordances: ["open browser", "web search", "navigate", "scroll", "click visible target", "capture proof"],
-    primitives: ["launch_application", "focus_window", "type_text", "send_hotkey", "click_point", "scroll_window", "capture_window"],
-    inputs: ["targetBrowser", "url", "query", "semanticTarget"],
-    outputs: ["visible_window_after_launch", "window_capture", "action_log"],
-    policyHooks: ["local_app_launch", "browser_navigation", "desktop_click", "desktop_text_input"],
-    evidenceHooks: ["before_capture", "after_capture", "window_capture"],
+    affordances: ["plan a governed web run", "open controlled browser", "navigate allowlisted URL", "read current page state", "list links/buttons/forms", "click DOM target", "type into field", "wait for page change", "extract structured page data", "capture page proof"],
+    primitives: [
+      "launch_application",
+      "focus_window",
+      "type_text",
+      "send_hotkey",
+      "click_point",
+      "scroll_window",
+      "capture_window",
+      "browser.plan_mission",
+      "browser.open_session",
+      "browser.navigate",
+      "browser.read_state",
+      "browser.read_dom",
+      "browser.query_interactive",
+      "browser.click",
+      "browser.type",
+      "browser.select",
+      "browser.wait_state",
+      "browser.extract_text",
+      "browser.detect_blockers",
+      "browser.verify_outcome",
+      "browser.capture_evidence"
+    ],
+    inputs: ["targetBrowser", "url", "query", "semanticTarget", "fieldMap", "expectedOutcome"],
+    outputs: ["browser_session_state", "page_state", "dom_snapshot", "structured_extraction", "page_screenshot", "action_log"],
+    policyHooks: ["local_app_launch", "browser_navigation", "browser_read", "browser_click", "browser_text_input", "browser_submit_or_publish"],
+    evidenceHooks: ["page_state", "dom_snapshot", "page_screenshot", "browser_action_log"],
     rollbackSupport: "none",
     missionRelevance: { web_research: 1, browser_action: 0.95, safe_inspection: 0.45, desktop_action: 0.6 }
   },
@@ -230,30 +252,30 @@ const DEEP_SKILL_PROFILES = Object.freeze({
   "skill.browser": {
     supportedWorkflows: [
       {
-        id: "browser.open_search_capture",
-        label: "Open browser, perform bounded search, capture visible proof",
-        requiredPrimitives: ["launch_application", "focus_window", "type_text", "send_hotkey", "capture_window"],
-        successCriteria: ["browser window visible", "query visible or navigation proof captured"]
+        id: "browser.controlled_navigation_state",
+        label: "Open a controlled browser, navigate allowlisted URLs, and maintain current tab state",
+        requiredPrimitives: ["browser.plan_mission", "browser.open_session", "browser.navigate", "browser.wait_state", "browser.read_state"],
+        successCriteria: ["active target id exists", "current URL remains allowlisted", "navigation history records attempted pages"]
       },
       {
-        id: "browser.navigate_url_capture",
-        label: "Navigate to an allowed URL and capture proof",
-        requiredPrimitives: ["launch_application", "focus_window", "type_text", "send_hotkey", "capture_window"],
-        successCriteria: ["target domain or URL is visible in evidence"]
+        id: "browser.dom_first_extract",
+        label: "Read DOM state and extract structured page data",
+        requiredPrimitives: ["browser.read_dom", "browser.query_interactive", "browser.extract_text"],
+        successCriteria: ["DOM snapshot exists", "interactive elements are enumerated", "requested values are linked to selectors"]
       },
       {
-        id: "browser.visible_target_interaction",
-        label: "Click or scroll visible browser content under approval",
-        requiredPrimitives: ["click_point", "scroll_window", "capture_window"],
-        successCriteria: ["before/after capture exists", "action log explains target"]
+        id: "browser.governed_interaction_verify",
+        label: "Perform bounded DOM interaction and verify the outcome",
+        requiredPrimitives: ["browser.click", "browser.type", "browser.wait_state", "browser.verify_outcome", "browser.capture_evidence"],
+        successCriteria: ["interaction action is recorded", "outcome verification passes or records a blocker", "page evidence contains browser state"]
       }
     ],
-    stateDetectors: ["browser_window_visible", "address_bar_or_page_focused", "page_capture_available", "navigation_result_changed"],
-    semanticTargets: ["address_bar", "search_box", "visible_link", "visible_button", "result_region"],
-    verifiers: ["verify_browser_visible", "verify_query_or_url_visible", "verify_before_after_navigation", "verify_capture_saved"],
-    recoveryStrategies: ["focus_new_browser_window", "retry_address_bar_hotkey", "reobserve_windows", "capture_failure_proof"],
-    knownFailureModes: ["cookie_banner_blocks_target", "captcha_or_login_gate", "network_unavailable", "page_load_timeout"],
-    evidenceRequirements: ["before_capture", "after_capture", "window_capture", "action_log"]
+    stateDetectors: ["browser_session_active", "active_target_known", "current_url_known", "page_load_state_known", "dom_snapshot_available", "blocker_state_known"],
+    semanticTargets: ["url", "link", "button", "search_box", "input_field", "select_field", "result_region", "blocking_dialog"],
+    verifiers: ["verify_allowlisted_url", "verify_page_loaded", "verify_dom_target_not_ambiguous", "verify_field_value", "verify_text_visible", "verify_screenshot_saved"],
+    recoveryStrategies: ["wait_for_page_state", "retry_dom_snapshot_once", "detect_blocker_and_stop", "ask_manual_takeover_on_auth_or_captcha", "capture_failure_proof"],
+    knownFailureModes: ["cookie_banner_blocks_target", "captcha_or_login_gate", "network_unavailable", "page_load_timeout", "ambiguous_dom_target", "site_requires_manual_auth"],
+    evidenceRequirements: ["page_screenshot", "browser_session_state", "dom_snapshot_summary", "action_log", "verification_summary"]
   },
   "skill.app_launch": {
     supportedWorkflows: [

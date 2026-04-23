@@ -40,8 +40,10 @@ Le produit est :
 
 - une application desktop,
 - centrée sur des projets et des runs,
+- pensée comme un `workspace AI` missionnel où la conversation, les terminaux autorisés, le navigateur, les artefacts, les preuves et les coûts composent une même surface de travail,
 - capable d'utiliser des outils locaux et distants,
 - capable de `browser control` et de `computer control` sous supervision,
+- capable de superviser des agents CLI spécialisés uniquement dans des terminaux explicitement attachés et gouvernés,
 - orientée livrables,
 - gouvernée par permissions et approvals,
 - conçue pour monter progressivement vers plus d'autonomie.
@@ -52,6 +54,7 @@ Le produit n'est pas :
 
 - un clone UI d'un agent CLI,
 - un simple chat avec quelques tools,
+- une suite de panneaux statiques sans fil conducteur missionnel,
 - un navigateur automatisé sans contrôle,
 - une plateforme purement développeur,
 - un orchestrateur multi-agent pour le plaisir d'orchestrer,
@@ -81,6 +84,8 @@ Quand un utilisateur veut transformer une mission floue ou lourde en travail ter
 Le centre de gravité n'est ni le terminal, ni la boîte de texte, ni le modèle LLM seul.
 
 Le centre de gravité est le **run de travail**.
+
+Dans l'expérience desktop, ce run vit dans un **workspace missionnel** : la conversation reste l'entrée principale, mais JON peut aussi suivre des terminaux autorisés, un navigateur contrôlé ou système, des artefacts, des preuves, des coûts et des handoffs.
 
 Un run comprend :
 

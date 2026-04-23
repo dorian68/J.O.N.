@@ -25,4 +25,31 @@ export async function run() {
     "Browser is installed.",
     "Operator approvals remain unchanged."
   ]);
+
+  const runNowPlan = normalizePlanOutput({
+    missionSummary: "Open browser safely.",
+    runNowPlan: [
+      "Confirm the browser choice.",
+      "Launch the selected browser.",
+      "Verify the window opened."
+    ],
+    assumptions: ["Approval is still required before launch."]
+  });
+  assert.deepEqual(runNowPlan.steps, [
+    "Confirm the browser choice.",
+    "Launch the selected browser.",
+    "Verify the window opened."
+  ]);
+  assert.deepEqual(runNowPlan.assumptions, ["Approval is still required before launch."]);
+
+  const actionPlan = normalizePlanOutput({
+    actions: [
+      { action: "Open Microsoft Edge", detail: "Use the governed app-launch capability." },
+      { title: "Check result", description: "Confirm a visible browser window exists." }
+    ]
+  });
+  assert.deepEqual(actionPlan.steps, [
+    "Open Microsoft Edge: Use the governed app-launch capability.",
+    "Check result: Confirm a visible browser window exists."
+  ]);
 }

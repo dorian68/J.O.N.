@@ -4,6 +4,7 @@ import { buildDeterministicRunHandoffDecision } from "../mission/run-handoff-dec
 import { buildDeterministicDesktopPlan } from "../mission/desktop-plan.js";
 import { buildDeterministicAmbiguityOutput, buildDeterministicEvaluationOutput } from "../reasoning/evaluator.js";
 import { buildDeterministicConversationTurn } from "../conversation/conversation-turn.js";
+import { buildDeterministicBrowserPlan } from "../browser/browser-planner.js";
 
 const SCORE_WEIGHTS = {
   High: 1,
@@ -131,6 +132,8 @@ export function buildDeterministicFallbackOutput(callType, input = {}) {
       return buildDeterministicRunHandoffDecision(input);
     case LLM_CALL_TYPE.DESKTOP_PLAN:
       return buildDeterministicDesktopPlan(input);
+    case LLM_CALL_TYPE.BROWSER_PLAN:
+      return buildDeterministicBrowserPlan(input);
     case LLM_CALL_TYPE.PLAN_GENERATION:
       return buildDeterministicPlanOutput(input);
     case LLM_CALL_TYPE.DECISION_NOTE_DRAFT:

@@ -4,7 +4,8 @@ import {
   detectUnsupportedMissionRequests,
   inferMissionMode,
   missionModeToScenarioType,
-  scenarioTypeToMissionMode
+  scenarioTypeToMissionMode,
+  validateMissionUnderstandingOutput
 } from "../src/mission/mission-understanding.js";
 
 export async function run() {
@@ -71,6 +72,9 @@ export async function run() {
   assert.equal(browserClarification.computerActionType, "launch_browser");
   assert.equal(browserClarification.requiresClarification, true);
   assert.equal(browserClarification.clarificationOptions.length, 2);
+  assert.equal(browserClarification.choiceRequest.kind, "browser");
+  assert.equal(browserClarification.choiceRequest.options.length, 2);
+  assert.equal(browserClarification.choiceRequest.resolutionTarget.parameterPath, "parameters.browserLaunch.browserId");
   assert.equal(browserClarification.selectedBrowser, null);
 
   const browserSelected = buildDeterministicMissionUnderstanding({
@@ -120,6 +124,27 @@ export async function run() {
   assert.equal(browserCaptureFollowUp.computerActionType, "capture_browser_window");
   assert.equal(browserCaptureFollowUp.requiresClarification, false);
   assert.equal(browserCaptureFollowUp.selectedBrowser?.id, "edge");
+
+  const stringListOutput = {
+    ...buildDeterministicMissionUnderstanding({
+      mission: "Open the browser and search release readiness.",
+      availableBrowsers: [
+        { id: "edge", label: "Microsoft Edge", processName: "msedge" }
+      ]
+    }),
+    coveredNow: "Open Microsoft Edge\nSearch release readiness",
+    requestedOutcomes: "Open Microsoft Edge; Search release readiness",
+    runNowPlan: "Open Microsoft Edge\nSearch release readiness",
+    verificationGoals: "Verify the browser opened\nPersist visible proof"
+  };
+  const normalizedStringLists = validateMissionUnderstandingOutput(stringListOutput, {
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" }
+    ]
+  });
+  assert.equal(Array.isArray(normalizedStringLists.coveredNow), true);
+  assert.equal(normalizedStringLists.coveredNow.length, 2);
+  assert.equal(normalizedStringLists.runNowPlan.length, 2);
 
   const vagueUnderstanding = buildDeterministicMissionUnderstanding({
     mission: "Handle this for me."

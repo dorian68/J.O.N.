@@ -14,6 +14,15 @@ function normalizeErrorCategory(error) {
   return error?.category ?? "provider_unavailable";
 }
 
+function normalizeValidationError(error) {
+  if (error?.category) {
+    return error;
+  }
+  return Object.assign(new Error(error?.message || "Provider output failed structured validation."), {
+    category: "malformed_output"
+  });
+}
+
 function sleep(delayMs) {
   if (!delayMs || delayMs <= 0) {
     return Promise.resolve();
@@ -327,7 +336,12 @@ export class InternalLlmGateway {
             input: governanceDecision.input ?? input,
             metadata
           });
-          const output = validateOutput ? validateOutput(response.output) : response.output;
+          let output;
+          try {
+            output = validateOutput ? validateOutput(response.output) : response.output;
+          } catch (error) {
+            throw normalizeValidationError(error);
+          }
           const tokenUsage = response.tokenUsage ?? null;
           const estimatedCost = response.estimatedCost ?? null;
           const usageSnapshotBefore = {

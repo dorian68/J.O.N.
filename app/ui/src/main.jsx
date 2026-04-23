@@ -181,7 +181,14 @@ function mergeBackendConversations(current = [], backend = []) {
       next.push(backendConversationToSession(conversation));
     }
   }
-  return sortConversations(next).slice(0, 50);
+  const withoutEmptyPlaceholders = next.filter((conversation) => {
+    const isEmptyLocalPlaceholder = conversation.source === "local"
+      && !conversation.backendId
+      && !conversation.runId
+      && (conversation.messages ?? []).length === 0;
+    return !isEmptyLocalPlaceholder;
+  });
+  return sortConversations(withoutEmptyPlaceholders).slice(0, 50);
 }
 
 function sortConversations(conversations = []) {
@@ -359,6 +366,9 @@ function conversationTurnsToMessages(turns = []) {
         uiBlocks: payload.uiBlocks ?? [],
         requiresClarification: payload.requiresClarification,
         clarificationQuestion: payload.clarificationQuestion,
+        clarificationOptions: payload.clarificationOptions ?? [],
+        choiceRequest: payload.choiceRequest ?? null,
+        clarificationResolved: payload.clarificationResolved ?? null,
         generationMode: turn.metadata?.generationMode,
         fallbackReason: turn.metadata?.fallbackReason,
         llm: turn.metadata?.llm
@@ -393,7 +403,7 @@ function App() {
   const [historyHydratedProjectId, setHistoryHydratedProjectId] = useState(null);
   const [conversationSessions, setConversationSessions] = useState(() => {
     const stored = sortConversations(loadStoredConversations());
-    return stored.length > 0 ? stored : [createLocalConversation({ title: stringsForLocale(detectInitialLocale()).newConversation })];
+    return stored;
   });
   const [activeConversationId, setActiveConversationId] = useState(null);
 
@@ -436,10 +446,6 @@ function App() {
     }
     setConversationSessions((current) => {
       const merged = mergeBackendConversations(current, backendConversations);
-      const active = current.find((conversation) => conversation.id === activeConversationId);
-      if ((!active || (active.source === "local" && !active.backendId && (active.messages ?? []).length === 0)) && merged[0]) {
-        queueMicrotask(() => setActiveConversationId(merged[0].id));
-      }
       return merged;
     });
   }, [dashboard?.conversation?.conversations]);
@@ -466,17 +472,6 @@ function App() {
       cancelled = true;
     };
   }, [activeConversationId, conversationSessions, selectedProjectId]);
-
-  useEffect(() => {
-    if (!activeConversationId && conversationSessions[0]?.id) {
-      setActiveConversationId(conversationSessions[0].id);
-      setMessages(conversationSessions[0].messages ?? []);
-      if (conversationSessions[0].runId) {
-        setSelectedRunId(conversationSessions[0].runId);
-        selectedRunIdRef.current = conversationSessions[0].runId;
-      }
-    }
-  }, [activeConversationId, conversationSessions]);
 
   useEffect(() => {
     if (!activeConversationId) {
@@ -531,15 +526,11 @@ function App() {
   }, [selectedRunId]);
 
   useEffect(() => {
-    if (!selectedProjectId || historyHydratedProjectId === selectedProjectId || messages.length > 0 || selectedRunId) {
+    if (!selectedProjectId || historyHydratedProjectId === selectedProjectId) {
       return;
     }
-    const persistedMessages = conversationTurnsToMessages(dashboard?.conversation?.recentTurns ?? []);
-    if (persistedMessages.length > 0) {
-      setMessages(persistedMessages.slice(-32));
-    }
     setHistoryHydratedProjectId(selectedProjectId);
-  }, [dashboard?.conversation?.recentTurns, historyHydratedProjectId, messages.length, selectedProjectId, selectedRunId]);
+  }, [historyHydratedProjectId, selectedProjectId]);
 
   async function selectConversation(conversationId) {
     const conversation = conversationSessions.find((candidate) => candidate.id === conversationId);
@@ -726,18 +717,22 @@ function App() {
     setFeedback(null);
   }
 
-  function stageClarificationAnswer(answer) {
+  async function stageClarificationAnswer(answer) {
     const text = compactText(answer);
     if (!text) {
       composerInputRef.current?.focus();
       return;
     }
-    setDraft((current) => ({
-      ...current,
-      objective: text
-    }));
-    setFeedback({ tone: "info", text: t.clarificationReady });
-    requestAnimationFrame(() => composerInputRef.current?.focus());
+    if (busy.reviewing) {
+      setDraft((current) => ({
+        ...current,
+        objective: text
+      }));
+      setFeedback({ tone: "info", text: t.clarificationReady });
+      requestAnimationFrame(() => composerInputRef.current?.focus());
+      return;
+    }
+    await submitConversationMessage(text, { source: "clarification" });
   }
 
   async function openRun(runId) {
@@ -757,20 +752,38 @@ function App() {
     }
   }
 
-  async function reviewMission() {
-    const objective = draft.objective.trim();
+  async function submitConversationMessage(rawObjective, { source = "composer" } = {}) {
+    const objective = compactText(rawObjective);
     if (!objective || !selectedProjectId) {
       return;
     }
+    const draftForRequest = {
+      ...draft,
+      objective
+    };
+    setDraft((current) => ({
+      ...current,
+      objective
+    }));
     setFeedback(null);
     setPreflight(null);
     setConfirmedDraft(null);
     setSelectedRunId(null);
     selectedRunIdRef.current = null;
     setRunDetail(null);
+    let conversationIdForRequest = activeConversationId;
+    let conversationForRequest = conversationSessions.find((conversation) => conversation.id === conversationIdForRequest) ?? null;
+    if (!conversationForRequest) {
+      conversationForRequest = createLocalConversation({
+        title: titleFromMessage(objective, t.newConversation),
+        messages: []
+      });
+      conversationIdForRequest = conversationForRequest.id;
+      setConversationSessions((current) => sortConversations([conversationForRequest, ...current]).slice(0, 50));
+      setActiveConversationId(conversationIdForRequest);
+    }
     appendMessage({ role: "user", kind: "mission", text: objective });
-    const activeConversationForRequest = conversationSessions.find((conversation) => conversation.id === activeConversationId);
-    const backendConversationId = conversationBackendId(activeConversationForRequest);
+    const backendConversationId = conversationBackendId(conversationForRequest);
     const assistantMessageId = appendMessage({
       role: "assistant",
       kind: "turn",
@@ -788,14 +801,15 @@ function App() {
           conversationId: backendConversationId,
           context: {
             conversationId: backendConversationId,
+            source,
             recentMessages: messages.slice(-8).map((message) => ({
               role: message.role,
               kind: message.kind,
               text: message.text
             }))
           },
-          missionSpec: buildMissionSpec(draft, {
-            includeMode: draft.modeTouched && Boolean(draft.mode)
+          missionSpec: buildMissionSpec(draftForRequest, {
+            includeMode: draftForRequest.modeTouched && Boolean(draftForRequest.mode)
           })
         })
       }, {
@@ -811,9 +825,9 @@ function App() {
       }
       setPreflight(response.preflight ?? null);
       setConfirmedDraft(response.missionDraft ?? null);
-      if (response.conversation && activeConversationId) {
+      if (response.conversation && conversationIdForRequest) {
         setConversationSessions((current) => sortConversations(current.map((conversation) => {
-          if (conversation.id !== activeConversationId) {
+          if (conversation.id !== conversationIdForRequest) {
             return conversation;
           }
           return {
@@ -845,6 +859,10 @@ function App() {
     } finally {
       setBusy((current) => ({ ...current, reviewing: false }));
     }
+  }
+
+  async function reviewMission() {
+    await submitConversationMessage(draft.objective.trim(), { source: "composer" });
   }
 
   async function startMission() {
@@ -1019,6 +1037,7 @@ function App() {
           runDetail={runDetail}
           events={activityEvents}
           runs={runs}
+          workspace={dashboard?.workspace ?? null}
           selectedRunId={selectedRunId}
           conversation={activeConversation}
           conversationId={activeConversationBackendId}
@@ -1040,7 +1059,7 @@ function ConversationSidebar({ conversations, activeConversationId, onSelect, on
     return (
       <aside className="conversation-sidebar collapsed" aria-label={t.conversations} data-testid="conversation-sidebar">
         <button type="button" className="side-rail-button" onClick={onToggle} aria-label={t.openConversations} title={t.openConversations}>
-          <span>|||</span>
+          <span>≡</span>
           <small>{t.conversationsShort}</small>
         </button>
         <button type="button" className="side-rail-button subtle" onClick={onNew} aria-label={t.newConversation} title={t.newConversation}>
@@ -1152,7 +1171,43 @@ function runCapabilitySummary(scopedRun, scopedRunDetail) {
   };
 }
 
-function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, pendingApprovals, liveStatus, locale, t }) {
+function browserStateFromEvidence(evidence = []) {
+  const states = evidence
+    .map((item) => item.metadata?.browserState)
+    .filter(Boolean);
+  return states.at(-1) ?? null;
+}
+
+function terminalStatusLabel(status, t) {
+  if (status === "waiting_for_input" || status === "needs_attention") {
+    return t.terminalWaiting;
+  }
+  if (status === "running") {
+    return t.terminalRunning;
+  }
+  if (status === "completed") {
+    return t.terminalCompleted;
+  }
+  if (status === "error") {
+    return t.terminalError;
+  }
+  return t.terminalAttached;
+}
+
+function terminalStatusTone(status) {
+  if (status === "waiting_for_input" || status === "needs_attention") {
+    return "warn";
+  }
+  if (status === "error") {
+    return "danger";
+  }
+  if (status === "completed") {
+    return "ok";
+  }
+  return "neutral";
+}
+
+function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, pendingApprovals, liveStatus, locale, t }) {
   const linkedRunIds = new Set([
     ...(Array.isArray(conversation?.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : []),
     conversation?.metadata?.latestRunId,
@@ -1178,6 +1233,15 @@ function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversati
     ...(scopedRunDetail?.review?.artifacts ?? [])
   ].filter(Boolean);
   const calls = scopedRunDetail?.llmCalls ?? [];
+  const browserState = browserStateFromEvidence(evidence);
+  const browserActionTypes = (browserState?.recentActions ?? [])
+    .map((action) => action.action)
+    .filter(Boolean)
+    .slice(-6);
+  const workspaceMission = workspace?.missionBrief ?? null;
+  const workspaceTerminals = workspace?.terminals ?? [];
+  const workspaceDecisions = workspace?.decisions ?? [];
+  const workspaceAlerts = workspace?.alerts ?? [];
   const traceItems = runTraceItems({
     scopedRun,
     events: scopedEvents,
@@ -1192,7 +1256,7 @@ function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversati
     return (
       <aside className="activity-panel collapsed" aria-label={t.runInspector} data-testid="run-inspector">
         <button type="button" className="side-rail-button" onClick={onToggle} aria-label={t.openInspector} title={t.openInspector}>
-          <span>i</span>
+          <span>⌁</span>
           <small>{t.inspectorShort}</small>
         </button>
         {scopedRun ? <span className={`rail-status-dot ${statusTone(scopedRun.status)}`} title={scopedRun.status} /> : null}
@@ -1239,6 +1303,86 @@ function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversati
             </li>
           ))}
         </ol>
+      </section>
+
+      <section className="activity-section">
+        <h3>{t.workspaceMission}</h3>
+        {workspaceMission ? (
+          <div className="activity-card">
+            <strong>{workspaceMission.objective}</strong>
+            <span>{t.status}: {workspaceMission.status}</span>
+            {workspaceMission.nextSteps?.length > 0 ? (
+              <small>{t.nextSteps}: {workspaceMission.nextSteps.slice(0, 2).join(" · ")}</small>
+            ) : null}
+          </div>
+        ) : <p className="muted">{t.noWorkspaceMission}</p>}
+      </section>
+
+      <section className="activity-section">
+        <h3>{t.terminalSurfaces}</h3>
+        {workspaceTerminals.length === 0 ? <p className="muted">{t.noTerminals}</p> : null}
+        {workspaceTerminals.slice(0, 6).map((terminal) => (
+          <div className="activity-card compact" key={terminal.id}>
+            <strong>{terminal.label}</strong>
+            <span>
+              <span className={`mini-badge ${terminalStatusTone(terminal.status)}`}>{terminalStatusLabel(terminal.status, t)}</span>
+              <span className="inline-separator">·</span>
+              {t.terminalAgent}: {terminal.agentKind}
+            </span>
+            <small>{t.terminalAutonomy}: {terminal.autonomyMode} · {t.terminalAuthorized}: {terminal.authorized ? "yes" : "no"}</small>
+            {terminal.lastPrompt ? <small>{terminal.lastPrompt}</small> : null}
+          </div>
+        ))}
+      </section>
+
+      {workspaceAlerts.length > 0 ? (
+        <section className="activity-section">
+          <h3>{t.terminalAlerts}</h3>
+          <ol className="run-trace-list">
+            {workspaceAlerts.map((alert) => (
+              <li key={alert.id} className={alert.requiresApproval ? "warn" : "neutral"}>
+                <i aria-hidden="true" />
+                <div>
+                  <strong>{alert.action}</strong>
+                  <span>{alert.reason}</span>
+                  <small>{formatDate(alert.createdAt, locale)}</small>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      <section className="activity-section">
+        <h3>{t.browserState}</h3>
+        {browserState ? (
+          <>
+            <div className="inspector-grid">
+              <span>{t.pageTitle}<strong>{browserState.title || t.notAvailable}</strong></span>
+              <span>{t.activeUrl}<strong>{browserState.url || t.notAvailable}</strong></span>
+              <span>{t.navigationSteps}<strong>{browserState.navigationHistory?.length ?? 0}</strong></span>
+              <span>{t.blockers}<strong>{browserState.blocker?.blocked ? browserState.blocker.reason || t.failed : t.notAvailable}</strong></span>
+            </div>
+            {browserActionTypes.length > 0 ? (
+              <ul className="activity-timeline compact">
+                {browserActionTypes.map((action, index) => (
+                  <li key={`${action}-${index}`}>
+                    <span>{action}</span>
+                    <small>{t.lastBrowserActions}</small>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
+        ) : <p className="muted">{t.noBrowserState}</p>}
+      </section>
+
+      <section className="activity-section">
+        <h3>{t.browserStrategy}</h3>
+        <div className="inspector-grid">
+          <span>{t.workspaceBrowserMode}<strong>{workspace?.browserStrategy?.preferredMode === "workspace_browser_mode" ? t.done : t.notAvailable}</strong></span>
+          <span>{t.systemBrowserMode}<strong>{workspace?.browserStrategy?.supportedModes?.includes("system_browser_mode") ? t.done : t.notAvailable}</strong></span>
+        </div>
       </section>
 
       <section className="activity-section">
@@ -1300,6 +1444,19 @@ function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversati
             <li key={call.id}>
               <span>{call.callType}</span>
               <small>{call.resultStatus} · {call.tokenUsage?.totalTokens ?? 0} {t.tokens}</small>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="activity-section">
+        <h3>{t.terminalDecisions}</h3>
+        {workspaceDecisions.length === 0 ? <p className="muted">{t.noTerminalDecisions}</p> : null}
+        <ul className="activity-timeline compact">
+          {workspaceDecisions.slice(-6).reverse().map((decision) => (
+            <li key={decision.id}>
+              <span>{decision.action}</span>
+              <small>{decision.reason} · {formatDate(decision.createdAt, locale)}</small>
             </li>
           ))}
         </ul>
@@ -1453,9 +1610,12 @@ function Message({ message, onStartMission, onClarificationAnswer, busy, t }) {
 function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }) {
   const turn = message.turn ?? {};
   const understanding = normalizePreflight(message.preflight);
+  const choiceRequest = turn.choiceRequest ?? understanding?.choiceRequest ?? null;
   const requiresClarification = Boolean(turn.requiresClarification || understanding?.requiresClarification);
-  const clarificationQuestion = turn.clarificationQuestion || understanding?.clarificationQuestion || t.clarificationFallback;
-  const clarificationOptions = Array.isArray(understanding?.clarificationOptions)
+  const clarificationQuestion = choiceRequest?.question || turn.clarificationQuestion || understanding?.clarificationQuestion || t.clarificationFallback;
+  const clarificationOptions = Array.isArray(choiceRequest?.options)
+    ? choiceRequest.options
+    : Array.isArray(understanding?.clarificationOptions)
     ? understanding.clarificationOptions
     : Array.isArray(turn.clarificationOptions)
       ? turn.clarificationOptions
@@ -1477,7 +1637,8 @@ function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }
         ) : null}
         {!message.streaming ? <UiBlocks blocks={message.uiBlocks ?? turn.uiBlocks ?? []} /> : null}
         {requiresClarification ? (
-          <ClarificationCard
+          <ChoiceCard
+            choiceRequest={choiceRequest}
             question={clarificationQuestion}
             options={clarificationOptions}
             onAnswer={onClarificationAnswer}
@@ -1499,22 +1660,24 @@ function clarificationAnswerText(option, t) {
   return label ? `${t.clarificationAnswerPrefix} ${label}` : "";
 }
 
-function ClarificationCard({ question, options = [], onAnswer, t }) {
+function ChoiceCard({ choiceRequest = null, question, options = [], onAnswer, t }) {
   const normalizedOptions = Array.isArray(options) ? options : [];
+  const title = compactText(choiceRequest?.title) || t.clarificationNeededTitle;
   return (
-    <div className="clarification-card" data-testid="clarification-card">
+    <div className="clarification-card choice-card" data-testid="choice-card">
       <div>
-        <strong>{t.clarificationNeededTitle}</strong>
+        <strong>{title}</strong>
         <p>{question || t.clarificationFallback}</p>
       </div>
       {normalizedOptions.length > 0 ? (
         <div className="clarification-options" aria-label={t.clarificationOptions}>
           {normalizedOptions.slice(0, 6).map((option) => {
             const label = compactText(option?.label ?? option?.name ?? option?.id ?? option);
-            const value = compactText(option?.reply ?? option?.value ?? clarificationAnswerText(option, t));
+            const value = compactText(option?.reply ?? label ?? option?.value ?? clarificationAnswerText(option, t));
             return (
               <button type="button" key={`${label}-${value}`} onClick={() => onAnswer?.(value || label)}>
-                {label}
+                <span>{label}</span>
+                {option?.description ? <small>{option.description}</small> : null}
               </button>
             );
           })}
@@ -1778,6 +1941,7 @@ function PreflightMessage({ message, onStartMission, onClarificationAnswer, busy
   const understanding = normalizePreflight(message.preflight);
   if (!understanding) return null;
   const requiresClarification = Boolean(understanding.requiresClarification);
+  const choiceRequest = understanding.choiceRequest ?? null;
   return (
     <article className={`react-message assistant ${requiresClarification ? "warn" : "ok"}`}>
       <div className="react-avatar">JON</div>
@@ -1785,9 +1949,10 @@ function PreflightMessage({ message, onStartMission, onClarificationAnswer, busy
         {message.meta ? <p className="chat-meta">{message.meta}</p> : null}
         <p>{understanding.missionSummary ?? understanding.clarifiedObjective ?? message.text}</p>
         {requiresClarification ? (
-          <ClarificationCard
-            question={understanding.clarificationQuestion}
-            options={understanding.clarificationOptions}
+          <ChoiceCard
+            choiceRequest={choiceRequest}
+            question={choiceRequest?.question ?? understanding.clarificationQuestion}
+            options={choiceRequest?.options ?? understanding.clarificationOptions}
             onAnswer={onClarificationAnswer}
             t={t}
           />

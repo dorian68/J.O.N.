@@ -215,6 +215,19 @@ function normalizeComputerActionParameters(input) {
     : {};
 }
 
+function normalizeApplicationLaunchParameters(input) {
+  const applicationId = normalizeOptionalText(input.parameters?.applicationLaunch?.applicationId, "Application id", 120);
+  const applicationLabel = normalizeOptionalText(input.parameters?.applicationLaunch?.applicationLabel, "Application label", 180);
+  return applicationId || applicationLabel
+    ? {
+      applicationLaunch: {
+        ...(applicationId ? { applicationId } : {}),
+        ...(applicationLabel ? { applicationLabel } : {})
+      }
+    }
+    : {};
+}
+
 export function normalizeMissionDraft(input, missionEntryContract = buildMissionEntryContract()) {
   if (!isObject(input)) {
     throw new Error("Mission request must be an object.");
@@ -245,7 +258,8 @@ export function normalizeMissionDraft(input, missionEntryContract = buildMission
   normalized.parameters = {
     ...normalized.parameters,
     ...normalizeBrowserLaunchParameters(input),
-    ...normalizeComputerActionParameters(input)
+    ...normalizeComputerActionParameters(input),
+    ...normalizeApplicationLaunchParameters(input)
   };
 
   const hasFormValues = isObject(input.parameters?.formValues);
@@ -311,7 +325,8 @@ export function normalizeMissionSpec(input, missionEntryContract = buildMissionE
   normalized.parameters = {
     ...normalized.parameters,
     ...normalizeBrowserLaunchParameters(input),
-    ...normalizeComputerActionParameters(input)
+    ...normalizeComputerActionParameters(input),
+    ...normalizeApplicationLaunchParameters(input)
   };
 
   if (mode === "form") {
@@ -363,6 +378,12 @@ export function buildMissionStatement(spec, modeDescriptor = null, { includeExec
   }
   if (spec.parameters?.computerAction?.type) {
     lines.push(`Bounded desktop action if needed: ${spec.parameters.computerAction.type}`);
+  }
+  if (spec.parameters?.applicationLaunch?.applicationId) {
+    lines.push(`Preferred application if needed: ${spec.parameters.applicationLaunch.applicationId}`);
+  }
+  if (spec.parameters?.applicationLaunch?.applicationLabel) {
+    lines.push(`Preferred application label if needed: ${spec.parameters.applicationLaunch.applicationLabel}`);
   }
 
   if (includeExecutionFrame && modeDescriptor) {

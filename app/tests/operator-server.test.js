@@ -190,6 +190,41 @@ export async function run() {
     assert.equal(dashboard.capabilityGraph?.summary?.skills?.some((skill) => skill.id === "skill.browser"), true);
     assert.equal(Array.isArray(dashboard.desktopActionSupport?.availableBrowsers), true);
     assert.equal(dashboard.desktopActionSupport.availableBrowsers.length >= 2, true);
+    assert.equal(Boolean(dashboard.workspace?.autonomyPolicy), true);
+
+    const workspaceProjectId = dashboard.selectedProjectId ?? dashboard.projects[0].id;
+    const workspaceBrief = await fetchJson(server.baseUrl, `/api/projects/${workspaceProjectId}/workspace/mission-brief`, {
+      method: "POST",
+      body: JSON.stringify({
+        objective: "Supervise a Codex CLI worker for the current mission.",
+        nextSteps: ["Watch terminal", "Escalate if blocked"]
+      })
+    });
+    assert.equal(workspaceBrief.missionBrief.objective.includes("Codex CLI"), true);
+    const terminalAttach = await fetchJson(server.baseUrl, `/api/projects/${workspaceProjectId}/workspace/terminals`, {
+      method: "POST",
+      body: JSON.stringify({
+        label: "Codex CLI",
+        command: "codex",
+        recentOutput: "Approve this command? [y/n]",
+        authorized: true,
+        autonomyMode: "assisted"
+      })
+    });
+    assert.equal(terminalAttach.terminal.status, "waiting_for_input");
+    assert.equal(terminalAttach.decision.action, "request_human_approval");
+    const terminalUpdate = await fetchJson(server.baseUrl, `/api/projects/${workspaceProjectId}/workspace/terminals/${terminalAttach.terminal.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        recentOutput: "All tests passed. Done.",
+        processRunning: false,
+        exitCode: 0
+      })
+    });
+    assert.equal(terminalUpdate.terminal.status, "completed");
+    const workspaceState = await fetchJson(server.baseUrl, `/api/projects/${workspaceProjectId}/workspace`);
+    assert.equal(workspaceState.terminals.length, 1);
+    assert.equal(workspaceState.decisions.length >= 2, true);
 
     const capabilityPayload = await fetchJson(server.baseUrl, "/api/capabilities");
     assert.equal(capabilityPayload.summary.nodeCount > 0, true);
@@ -293,7 +328,7 @@ export async function run() {
         message: "ouvre mon éditeur de note"
       })
     });
-    assert.equal(preview.preview.includes("accord"), true);
+    assert.equal(preview.preview.includes("Confirme"), true);
     const resetConfig = await fetchJson(server.baseUrl, "/api/agent/config/reset", {
       method: "POST",
       body: JSON.stringify({})

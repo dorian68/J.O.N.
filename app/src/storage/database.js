@@ -221,6 +221,56 @@ export class PrototypeDatabase {
         FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS workspace_terminal_sessions (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        conversation_id TEXT,
+        label TEXT NOT NULL,
+        agent_kind TEXT NOT NULL,
+        command TEXT,
+        cwd TEXT,
+        status TEXT NOT NULL,
+        autonomy_mode TEXT NOT NULL,
+        authorized INTEGER NOT NULL,
+        recent_output TEXT,
+        last_prompt TEXT,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS workspace_terminal_decisions (
+        id TEXT PRIMARY KEY,
+        terminal_id TEXT NOT NULL,
+        project_id TEXT NOT NULL,
+        conversation_id TEXT,
+        decision_type TEXT NOT NULL,
+        action TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        requires_approval INTEGER NOT NULL,
+        payload_json TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY(terminal_id) REFERENCES workspace_terminal_sessions(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS workspace_mission_briefs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        conversation_id TEXT,
+        objective TEXT NOT NULL,
+        status TEXT NOT NULL,
+        progress_json TEXT,
+        blockers_json TEXT,
+        decisions_json TEXT,
+        next_steps_json TEXT,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
       CREATE TABLE IF NOT EXISTS deleted_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         object_type TEXT NOT NULL,
@@ -234,6 +284,15 @@ export class PrototypeDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_conversations_project_updated
       ON conversations(project_id, updated_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_workspace_terminals_project_updated
+      ON workspace_terminal_sessions(project_id, updated_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_workspace_terminal_decisions_project_created
+      ON workspace_terminal_decisions(project_id, created_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_workspace_mission_briefs_project_updated
+      ON workspace_mission_briefs(project_id, updated_at DESC);
     `);
     this.migrateConversationSchema();
   }
@@ -483,6 +542,268 @@ export class PrototypeDatabase {
   deleteConversation(conversationId) {
     this.db.prepare(`DELETE FROM conversation_turns WHERE conversation_id = ?`).run(conversationId);
     this.db.prepare(`DELETE FROM conversations WHERE id = ?`).run(conversationId);
+  }
+
+  insertWorkspaceTerminalSession(session) {
+    this.db.prepare(`
+      INSERT INTO workspace_terminal_sessions (
+        id, project_id, conversation_id, label, agent_kind, command, cwd, status,
+        autonomy_mode, authorized, recent_output, last_prompt, metadata_json,
+        created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      session.id,
+      session.projectId,
+      session.conversationId ?? null,
+      session.label,
+      session.agentKind ?? "unknown",
+      session.command ?? null,
+      session.cwd ?? null,
+      session.status ?? "attached",
+      session.autonomyMode ?? "assisted",
+      session.authorized ? 1 : 0,
+      session.recentOutput ?? "",
+      session.lastPrompt ?? "",
+      stringifyJson(session.metadata ?? {}),
+      session.createdAt,
+      session.updatedAt
+    );
+    return this.getWorkspaceTerminalSession(session.id);
+  }
+
+  getWorkspaceTerminalSession(terminalId) {
+    const row = this.db.prepare(`SELECT * FROM workspace_terminal_sessions WHERE id = ?`).get(terminalId);
+    return row ? this.#workspaceTerminalFromRow(row) : null;
+  }
+
+  listWorkspaceTerminalSessions(projectId, { conversationId = null, limit = 50 } = {}) {
+    const rows = conversationId
+      ? this.db.prepare(`
+          SELECT * FROM workspace_terminal_sessions
+          WHERE project_id = ? AND (conversation_id = ? OR conversation_id IS NULL)
+          ORDER BY updated_at DESC, rowid DESC
+          LIMIT ?
+        `).all(projectId, conversationId, limit)
+      : this.db.prepare(`
+          SELECT * FROM workspace_terminal_sessions
+          WHERE project_id = ?
+          ORDER BY updated_at DESC, rowid DESC
+          LIMIT ?
+        `).all(projectId, limit);
+    return rows.map((row) => this.#workspaceTerminalFromRow(row));
+  }
+
+  updateWorkspaceTerminalSession(terminalId, patch = {}) {
+    const existing = this.getWorkspaceTerminalSession(terminalId);
+    if (!existing) {
+      throw new Error(`Workspace terminal not found: ${terminalId}`);
+    }
+    const nextMetadata = {
+      ...(existing.metadata ?? {}),
+      ...(patch.metadata ?? {})
+    };
+    this.db.prepare(`
+      UPDATE workspace_terminal_sessions
+      SET conversation_id = ?, label = ?, agent_kind = ?, command = ?, cwd = ?,
+          status = ?, autonomy_mode = ?, authorized = ?, recent_output = ?,
+          last_prompt = ?, metadata_json = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      patch.conversationId ?? existing.conversationId ?? null,
+      patch.label ?? existing.label,
+      patch.agentKind ?? existing.agentKind,
+      patch.command ?? existing.command ?? null,
+      patch.cwd ?? existing.cwd ?? null,
+      patch.status ?? existing.status,
+      patch.autonomyMode ?? existing.autonomyMode,
+      (patch.authorized ?? existing.authorized) ? 1 : 0,
+      patch.recentOutput ?? existing.recentOutput ?? "",
+      patch.lastPrompt ?? existing.lastPrompt ?? "",
+      stringifyJson(nextMetadata),
+      patch.updatedAt ?? new Date().toISOString(),
+      terminalId
+    );
+    return this.getWorkspaceTerminalSession(terminalId);
+  }
+
+  insertWorkspaceTerminalDecision(decision) {
+    this.db.prepare(`
+      INSERT INTO workspace_terminal_decisions (
+        id, terminal_id, project_id, conversation_id, decision_type, action,
+        reason, requires_approval, payload_json, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      decision.id,
+      decision.terminalId,
+      decision.projectId,
+      decision.conversationId ?? null,
+      decision.decisionType ?? "terminal_state",
+      decision.action,
+      decision.reason,
+      decision.requiresApproval ? 1 : 0,
+      stringifyJson(decision.payload ?? {}),
+      decision.createdAt
+    );
+    return decision;
+  }
+
+  listWorkspaceTerminalDecisions(projectId, { terminalId = null, conversationId = null, limit = 80 } = {}) {
+    let rows;
+    if (terminalId) {
+      rows = this.db.prepare(`
+        SELECT * FROM workspace_terminal_decisions
+        WHERE project_id = ? AND terminal_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      `).all(projectId, terminalId, limit);
+    } else if (conversationId) {
+      rows = this.db.prepare(`
+        SELECT * FROM workspace_terminal_decisions
+        WHERE project_id = ? AND (conversation_id = ? OR conversation_id IS NULL)
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      `).all(projectId, conversationId, limit);
+    } else {
+      rows = this.db.prepare(`
+        SELECT * FROM workspace_terminal_decisions
+        WHERE project_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      `).all(projectId, limit);
+    }
+    return rows.map((row) => ({
+      id: row.id,
+      terminalId: row.terminal_id,
+      projectId: row.project_id,
+      conversationId: row.conversation_id ?? null,
+      decisionType: row.decision_type,
+      action: row.action,
+      reason: row.reason,
+      requiresApproval: Boolean(row.requires_approval),
+      payload: parseJson(row.payload_json, {}),
+      createdAt: row.created_at
+    })).reverse();
+  }
+
+  upsertWorkspaceMissionBrief(brief) {
+    const existing = brief.id
+      ? this.db.prepare(`SELECT * FROM workspace_mission_briefs WHERE id = ?`).get(brief.id)
+      : null;
+    const id = brief.id ?? existing?.id;
+    if (!id) {
+      throw new Error("Workspace mission brief id is required.");
+    }
+    const now = brief.updatedAt ?? new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO workspace_mission_briefs (
+        id, project_id, conversation_id, objective, status, progress_json,
+        blockers_json, decisions_json, next_steps_json, metadata_json,
+        created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        conversation_id = excluded.conversation_id,
+        objective = excluded.objective,
+        status = excluded.status,
+        progress_json = excluded.progress_json,
+        blockers_json = excluded.blockers_json,
+        decisions_json = excluded.decisions_json,
+        next_steps_json = excluded.next_steps_json,
+        metadata_json = excluded.metadata_json,
+        updated_at = excluded.updated_at
+    `).run(
+      id,
+      brief.projectId,
+      brief.conversationId ?? null,
+      brief.objective,
+      brief.status ?? "active",
+      stringifyJson(brief.progress ?? []),
+      stringifyJson(brief.blockers ?? []),
+      stringifyJson(brief.decisions ?? []),
+      stringifyJson(brief.nextSteps ?? []),
+      stringifyJson(brief.metadata ?? {}),
+      brief.createdAt ?? existing?.created_at ?? now,
+      now
+    );
+    return this.getWorkspaceMissionBrief(id);
+  }
+
+  getWorkspaceMissionBrief(briefId) {
+    const row = this.db.prepare(`SELECT * FROM workspace_mission_briefs WHERE id = ?`).get(briefId);
+    return row ? this.#workspaceMissionBriefFromRow(row) : null;
+  }
+
+  getLatestWorkspaceMissionBrief(projectId, { conversationId = null } = {}) {
+    const row = conversationId
+      ? this.db.prepare(`
+          SELECT * FROM workspace_mission_briefs
+          WHERE project_id = ? AND conversation_id = ?
+          ORDER BY updated_at DESC, rowid DESC
+          LIMIT 1
+        `).get(projectId, conversationId)
+      : this.db.prepare(`
+          SELECT * FROM workspace_mission_briefs
+          WHERE project_id = ?
+          ORDER BY updated_at DESC, rowid DESC
+          LIMIT 1
+        `).get(projectId);
+    return row ? this.#workspaceMissionBriefFromRow(row) : null;
+  }
+
+  listWorkspaceMissionBriefs(projectId, { conversationId = null, limit = 20 } = {}) {
+    const rows = conversationId
+      ? this.db.prepare(`
+          SELECT * FROM workspace_mission_briefs
+          WHERE project_id = ? AND conversation_id = ?
+          ORDER BY updated_at DESC, rowid DESC
+          LIMIT ?
+        `).all(projectId, conversationId, limit)
+      : this.db.prepare(`
+          SELECT * FROM workspace_mission_briefs
+          WHERE project_id = ?
+          ORDER BY updated_at DESC, rowid DESC
+          LIMIT ?
+        `).all(projectId, limit);
+    return rows.map((row) => this.#workspaceMissionBriefFromRow(row));
+  }
+
+  #workspaceTerminalFromRow(row) {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      conversationId: row.conversation_id ?? null,
+      label: row.label,
+      agentKind: row.agent_kind,
+      command: row.command,
+      cwd: row.cwd,
+      status: row.status,
+      autonomyMode: row.autonomy_mode,
+      authorized: Boolean(row.authorized),
+      recentOutput: row.recent_output ?? "",
+      lastPrompt: row.last_prompt ?? "",
+      metadata: parseJson(row.metadata_json, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  #workspaceMissionBriefFromRow(row) {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      conversationId: row.conversation_id ?? null,
+      objective: row.objective,
+      status: row.status,
+      progress: parseJson(row.progress_json, []),
+      blockers: parseJson(row.blockers_json, []),
+      decisions: parseJson(row.decisions_json, []),
+      nextSteps: parseJson(row.next_steps_json, []),
+      metadata: parseJson(row.metadata_json, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
   insertEvent(runId, event) {

@@ -25,6 +25,7 @@ export async function run() {
   assert.equal(result.assertions.formCompleted, true);
   assert.equal(result.assertions.formApprovalCount, true);
   assert.equal(result.assertions.formEvidenceCount, true);
+  assert.equal(result.assertions.evidenceIncludesBrowserState, true);
   assert.equal(result.assertions.refusalRunStopped, true);
   assert.equal(result.assertions.refusalApprovalDenied, true);
   assert.equal(result.assertions.refusalNoImplicitWrite, true);
@@ -34,4 +35,7 @@ export async function run() {
   assert.equal(result.assertions.blockerDetected, true);
   assert.equal(result.assertions.blockerDismissed, true);
   assert.equal(result.assertions.outcomeVerified, true);
+  assert.equal(result.assertions.browserStateTracked, true);
+  assert.equal(result.browserSessionState.targetCount >= 1, true);
+  assert.equal(result.browserSessionState.recentActions.some((action) => action.action === "navigate"), true);
 }

@@ -192,6 +192,86 @@ export async function run() {
   assert.equal(controllerStatus.stageStats.evaluation_support.totalTokens, 150);
   assert.equal(controllerStatus.stageStats.evaluation_support.estimatedCost, 0.01);
 
+  const conversationBudgetController = new TokenGovernanceController({
+    runtimeConfig: {
+      budgets: {
+        perRunTokens: 50_000,
+        perSessionTokens: 100_000,
+        perRunUsd: 10,
+        perSessionUsd: 20
+      }
+    }
+  });
+  const firstConversationDecision = conversationBudgetController.prepareRequest({
+    runId: "run_conversation_stage_pressure",
+    callType: "conversation_turn",
+    modelAlias: "utility_structuring",
+    promptRefs: [
+      { promptId: "system.visible_conversation", version: "1.0.0" }
+    ],
+    input: {
+      message: "Bonjour"
+    },
+    metadata: {
+      reasoningStage: REASONING_STAGE.CONVERSATION_TURN
+    },
+    sessionUsage: {
+      totalTokens: 0,
+      estimatedCost: 0
+    },
+    runUsage: {
+      totalTokens: 0,
+      estimatedCost: 0
+    }
+  });
+  conversationBudgetController.recordSuccess({
+    runId: "run_conversation_stage_pressure",
+    callRecord: {
+      callType: "conversation_turn",
+      tokenUsage: {
+        totalTokens: 19_900
+      },
+      estimatedCost: 0.001,
+      metadata: {
+        reasoningStage: REASONING_STAGE.CONVERSATION_TURN,
+        tokenGovernance: {
+          requestFingerprint: firstConversationDecision.fingerprint,
+          cacheEligible: true
+        }
+      }
+    },
+    output: {
+      reply: "Bonjour."
+    }
+  });
+  const stagePressureConversationDecision = conversationBudgetController.prepareRequest({
+    runId: "run_conversation_stage_pressure",
+    callType: "conversation_turn",
+    modelAlias: "utility_structuring",
+    promptRefs: [
+      { promptId: "system.visible_conversation", version: "1.0.0" }
+    ],
+    input: {
+      message: "Liste mes applications disponibles."
+    },
+    metadata: {
+      reasoningStage: REASONING_STAGE.CONVERSATION_TURN
+    },
+    sessionUsage: {
+      totalTokens: 19_900,
+      estimatedCost: 0.001
+    },
+    runUsage: {
+      totalTokens: 19_900,
+      estimatedCost: 0.001
+    }
+  });
+  assert.equal(stagePressureConversationDecision.action, "call");
+  assert.equal(stagePressureConversationDecision.skipLiveProvider, false);
+  assert.equal(stagePressureConversationDecision.governance.liveProviderBlocked, false);
+  assert.ok(stagePressureConversationDecision.governance.budgetPressureReasons.includes("stage_token_budget_would_be_exceeded"));
+  assert.equal(stagePressureConversationDecision.governance.blockingBudgetPressureReasons.length, 0);
+
   const constrainedController = new TokenGovernanceController({
     runtimeConfig: {
       budgets: {
@@ -289,4 +369,30 @@ export async function run() {
   assert.equal(blockedLiveDecision.skipLiveProvider, true);
   assert.equal(blockedLiveDecision.governance.liveProviderBlocked, true);
   assert.ok(blockedLiveDecision.governance.budgetPressureReasons.length > 0);
+
+  const browserPlanDecision = new TokenGovernanceController({}).prepareRequest({
+    runId: "run_browser_plan",
+    callType: "browser_plan",
+    modelAlias: "primary_reasoning",
+    promptRefs: [
+      { promptId: "task.browser_plan", version: "1.0.0" }
+    ],
+    input: {
+      mission: "Navigate an allowlisted browser page and capture proof.",
+      startUrl: "http://127.0.0.1:41731/index.html"
+    },
+    metadata: {
+      reasoningStage: REASONING_STAGE.BROWSER_PLAN
+    },
+    sessionUsage: {
+      totalTokens: 0,
+      estimatedCost: 0
+    },
+    runUsage: {
+      totalTokens: 0,
+      estimatedCost: 0
+    }
+  });
+  assert.equal(browserPlanDecision.action, "call");
+  assert.equal(browserPlanDecision.governance.stage, REASONING_STAGE.BROWSER_PLAN);
 }

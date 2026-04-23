@@ -28,6 +28,7 @@ Stages currently in scope:
 - `ambiguity_note`
 - `run_handoff_decision`
 - `desktop_plan`
+- `browser_plan`
 
 Current runtime reality:
 
@@ -37,6 +38,8 @@ Current runtime reality:
 - `evaluation_support` and `ambiguity_note` are optional bounded stages.
 - `run_handoff_decision` is a bounded post-run reasoning stage that decides whether one prepared next run should continue automatically.
 - `desktop_plan` is a governed desktop-autonomy stage that selects a short sequence of approved primitives from discovered apps/windows.
+- `browser_plan` is a governed browser-operator stage that turns a bounded web mission into DOM/CDP-first steps, evidence expectations, blocker detection and recovery notes.
+- Terminal workspace orchestration currently uses deterministic state detection and policy checks; it is not yet a live LLM stage and must not consume tokens until a future `terminal_orchestration` stage is explicitly introduced.
 
 ## Budget Model
 
@@ -194,6 +197,21 @@ Current runtime reality:
 - Cache/reuse eligible: yes, exact fingerprint only.
 - Operator disclosure required: yes.
 - Current implementation note: this stage may plan only governed primitives exposed by the runtime. Policy and approvals still decide whether execution is allowed.
+
+### `browser_plan`
+
+- Priority: core.
+- Mandatory: yes when a controlled browser operator run requests agentic browser planning.
+- Preferred model alias: `utility_structuring`.
+- Request token target: `1900`.
+- Hard request ceiling: `3200`.
+- Stage token budget per run: `3600`.
+- Stage USD budget per run: `0.06`.
+- Deterministic fallback eligible: yes.
+- Suppression eligible: no.
+- Cache/reuse eligible: yes, exact fingerprint only.
+- Operator disclosure required: yes.
+- Current implementation note: this stage plans only allowlisted, observable browser actions. DOM/CDP evidence remains preferred; visual fallback and human takeover are deferred.
 
 ## Context Minimization Policy
 

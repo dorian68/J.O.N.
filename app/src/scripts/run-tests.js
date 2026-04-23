@@ -92,6 +92,10 @@ const suites = [
     modulePath: "../../tests/i18n.test.js"
   },
   {
+    name: "ui-dom",
+    modulePath: "../../tests/ui-dom.test.js"
+  },
+  {
     name: "desktop-plan",
     modulePath: "../../tests/desktop-plan.test.js"
   },
@@ -138,6 +142,14 @@ const suites = [
   {
     name: "browser-benchmarks",
     modulePath: "../../tests/browser-benchmarks.test.js"
+  },
+  {
+    name: "browser-planner",
+    modulePath: "../../tests/browser-planner.test.js"
+  },
+  {
+    name: "workspace-terminal-orchestration",
+    modulePath: "../../tests/workspace-terminal-orchestration.test.js"
   },
   {
     name: "computer-benchmarks",

@@ -62,6 +62,10 @@ export async function run() {
     assert.equal(graph.nodes.some((node) => node.id === "skill.skill.terminal_guarded"), true);
     assert.equal(graph.nodes.some((node) => node.id === "skill.skill.forms_basic"), true);
     assert.equal(graph.nodes.some((node) => node.sourceKind === "file_primitive_provider" && node.rollbackPossible), true);
+    assert.equal(graph.nodes.some((node) => node.id === "tool.browser.plan_mission" && node.skillId === "skill.browser"), true);
+    assert.equal(graph.nodes.some((node) => node.id === "tool.browser.read_state" && node.skillId === "skill.browser"), true);
+    assert.equal(graph.nodes.some((node) => node.id === "tool.browser.capture_evidence" && node.payload.evidenceExpected.includes("browser_session_state")), true);
+    assert.equal(graph.nodes.some((node) => node.sourceKind === "browser_primitive_provider" && node.approvalRequired === false), true);
     const mcpNode = graph.nodes.find((node) => node.sourceKind === "mcp_server");
     assert.equal(Boolean(mcpNode), true);
     assert.equal(mcpNode.approvalRequired, true);
@@ -141,6 +145,8 @@ export async function run() {
 
     const rankedBrowser = scoreCapabilityNodesForMission(refreshed.nodes, "ouvre mon navigateur et cherche cowork", { limit: 5 });
     assert.equal(rankedBrowser.some((node) => node.skillId === "skill.browser" || node.id === "skill.skill.browser"), true);
+    const rankedWebExtraction = scoreCapabilityNodesForMission(refreshed.nodes, "lis la page web courante et extrait les liens utiles", { limit: 8 });
+    assert.equal(rankedWebExtraction.some((node) => node.id === "tool.browser.read_dom" || node.id === "tool.browser.extract_text"), true);
 
     const compact = compactCapabilityGraphForPrompt(refreshed.nodes, {
       mission: "crée un fichier texte sur mon bureau",
@@ -161,6 +167,8 @@ export async function run() {
     const summary = summarizeCapabilityGraph(refreshed.nodes, feedbackRecords);
     assert.equal(database.summarizeCapabilityFeedback().some((entry) => entry.nodeId === explorerSkill.id), true);
     assert.equal(summary.skillManifests.some((skill) => skill.id === "skill.forms_basic" && skill.implementationStatus === "operational_deep"), true);
+    const browserSkillSummary = summary.skillManifests.find((skill) => skill.id === "skill.browser");
+    assert.equal(browserSkillSummary.implementationStatus, "operational_deep");
     assert.equal(summary.deepValidation.status, "all_passed");
   } finally {
     database.close();

@@ -29,6 +29,8 @@ export const SAFE_CAPABILITY_IDS = Object.freeze([
   "generate_report_preview"
 ]);
 
+const SUPPORTED_MISSION_DRAFT_MODES = Object.freeze(new Set(["research", "form", "computer", ""]));
+
 function cleanText(value, maxLength = 1200) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
@@ -71,7 +73,7 @@ function normalizeMissionDraft(value, fallbackObjective) {
     deliverable: cleanText(value.deliverable, 180),
     constraints: cleanList(value.constraints, 6, 180),
     forbiddenActions: cleanList(value.forbiddenActions, 6, 180),
-    mode: cleanText(value.mode, 40),
+    mode: SUPPORTED_MISSION_DRAFT_MODES.has(cleanText(value.mode, 40)) ? cleanText(value.mode, 40) : "",
     parameters: isObject(value.parameters) ? value.parameters : {}
   };
 }
@@ -101,7 +103,8 @@ function desktopFolderIntent(text) {
 function appCatalogIntent(text) {
   return containsAny(text, [
     /\b(applications?|apps?|logiciels?)\b[\s\S]{0,100}\b(disponibles?|installees?|installées?|installed|available)\b/i,
-    /\b(quelles?|liste|list|show)\b[\s\S]{0,80}\b(applications?|apps?|logiciels?)\b/i
+    /\b(quels?|quelles?|liste|list|show)\b[\s\S]{0,80}\b(applications?|apps?|logiciels?)\b/i,
+    /\b(applications?|apps?|logiciels?)\b[\s\S]{0,100}\b(utiliser|use|lancer|ouvrir)\b/i
   ]);
 }
 
@@ -168,15 +171,34 @@ function containsBannedVisiblePattern(text) {
   return BANNED_VISIBLE_REPLY_PATTERNS.some((pattern) => pattern.test(text));
 }
 
+function polishVisibleReply(text) {
+  let polished = cleanText(text, 1800);
+  if (!polished) {
+    return polished;
+  }
+
+  if (/j['’]ai besoin de ton accord/i.test(polished) && /\btu pr[ée]f[èe]res\b/i.test(polished)) {
+    polished = polished.replace(/^.*?\b(tu pr[ée]f[èe]res\b)/i, "$1");
+  }
+
+  polished = polished
+    .replace(/^oui\.\s*j['’]ai besoin de ton accord pour lancer l['’]application\.?$/i, "Confirme et je lance l'application.")
+    .replace(/^oui\.\s*j['’]ai besoin de ton accord pour lancer ([^.?!]+)\.?$/i, "Confirme et je lance $1.")
+    .replace(/^oui\.\s*j['’]ai besoin de ton accord pour ouvrir ([^.?!]+)\.?$/i, "Confirme et j'ouvre $1.")
+    .replace(/\bje peux lancer l['’]action avec ton accord\.?$/i, "Confirme et je lance.");
+
+  return cleanText(polished, 1800);
+}
+
 function naturalFallbackReply({ action, intentType, message, requiresClarification, clarificationQuestion }) {
   if (requiresClarification) {
     return clarificationQuestion || "Tu peux préciser la cible ?";
   }
   if (action === "prepare_mission_preflight" || action === "start_bounded_run_after_confirmation") {
     if (/\b(ouvre|ouvrir|open|launch|lance|d[ée]marre|start)\b/i.test(message)) {
-      return "Oui. J’ai besoin de ton accord pour lancer cette action.";
+      return "Oui. Je prépare l’ouverture.";
     }
-    return "Oui. Je peux m’en occuper avec ton accord.";
+    return "Oui. Je m’en occupe.";
   }
   if (action === "inspect_then_answer") {
     return "Je regarde ça.";
@@ -185,13 +207,13 @@ function naturalFallbackReply({ action, intentType, message, requiresClarificati
     return "Oui. Je prépare ça.";
   }
   if (action === "refuse") {
-    return "Je ne peux pas faire ça tel quel. Il me faut une confirmation explicite ou une demande moins risquée.";
+    return "Je ne peux pas faire cette action. Je peux t’aider sur une version sûre de la demande.";
   }
-  return "Je suis là. Que veux-tu faire ?";
+  return "Je t’écoute.";
 }
 
 function sanitizeVisibleReply(reply, context) {
-  const text = cleanText(reply, 1800);
+  const text = polishVisibleReply(reply);
   if (!text || containsBannedVisiblePattern(text)) {
     return naturalFallbackReply(context);
   }
@@ -222,7 +244,7 @@ export function buildDeterministicConversationTurn(input = {}) {
     return {
       intentType: "out_of_scope",
       action: "refuse",
-      reply: "Je ne peux pas faire ça tel quel. Il me faut une demande plus précise et une confirmation explicite.",
+      reply: "Je ne peux pas faire cette action. Je peux t’aider sur une version sûre de la demande.",
       requiresClarification: false,
       clarificationQuestion: "",
       capabilityRequests: [],
@@ -248,6 +270,22 @@ export function buildDeterministicConversationTurn(input = {}) {
       missionDraft: null,
       uiBlocks: [],
       safetyNotes: ["Read-only desktop folder listing only; no file content is opened."]
+    };
+  }
+  if (appCatalogIntent(lower) && browserCatalogIntent(lower)) {
+    return {
+      intentType: "safe_inspection",
+      action: "inspect_then_answer",
+      reply: "Je regarde les applications et navigateurs disponibles.",
+      requiresClarification: false,
+      clarificationQuestion: "",
+      capabilityRequests: [
+        { id: "list_installed_applications", reason: "The user asked for available local applications.", parameters: {}, order: 1 },
+        { id: "list_installed_browsers", reason: "The user asked for available browsers.", parameters: {}, order: 2 }
+      ],
+      missionDraft: null,
+      uiBlocks: [],
+      safetyNotes: ["Read-only local application and browser catalogs."]
     };
   }
   if (appCatalogIntent(lower)) {
@@ -293,7 +331,7 @@ export function buildDeterministicConversationTurn(input = {}) {
     return {
       intentType: "desktop_action",
       action: "prepare_mission_preflight",
-      reply: "Oui. J’ai besoin de ton accord pour lancer cette action.",
+      reply: "Oui. Je prépare l’action.",
       requiresClarification: false,
       clarificationQuestion: "",
       capabilityRequests: [],
@@ -365,7 +403,17 @@ export function validateConversationTurnOutput(output, context = {}) {
   const capabilityRequests = Array.isArray(output.capabilityRequests)
     ? output.capabilityRequests.map(normalizeCapabilityRequest).filter(Boolean).slice(0, 4)
     : [];
-  const missionDraft = normalizeMissionDraft(output.missionDraft, context.message ?? output.message ?? "");
+  let missionDraft = normalizeMissionDraft(output.missionDraft, context.message ?? output.message ?? "");
+  if (["prepare_mission_preflight", "start_bounded_run_after_confirmation"].includes(action) && !missionDraft) {
+    missionDraft = normalizeMissionDraft({
+      objective: context.message ?? output.message ?? "",
+      deliverable: "Résultat vérifié et preuve visible si disponible",
+      constraints: [],
+      forbiddenActions: ["Ne pas supprimer, publier, soumettre ou utiliser des identifiants."],
+      mode: "",
+      parameters: {}
+    }, context.message ?? output.message ?? "");
+  }
   if (["prepare_mission_preflight", "start_bounded_run_after_confirmation"].includes(action) && !missionDraft) {
     throw Object.assign(new Error("Conversation action requires missionDraft."), {
       category: "malformed_output"

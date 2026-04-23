@@ -115,7 +115,7 @@ const SCREENSHOT_PATTERNS = Object.freeze([
 ]);
 
 const GENERAL_DESKTOP_ACTION_PATTERNS = Object.freeze([
-  /\b(open|launch|start|ouvrir|ouvre|lance|démarre|demarre)\b[\s\S]{0,120}\b(app|application|notepad|bloc-?notes?|calculator|calculatrice|paint|explorer|file explorer|word|excel|powerpoint|terminal|powershell)\b/i,
+  /\b(open|launch|start|ouvrir|ouvre|lance|démarre|demarre)\b[\s\S]{0,120}\b(app|application|logiciel|outil|éditeur|editeur|notepad|bloc-?notes?|calculator|calculatrice|paint|explorer|file explorer|word|excel|powerpoint|terminal|powershell)\b/i,
   /\b(type|write|enter|saisis|tape|écris|ecris)\b[\s\S]{0,120}\b(in|dans|into|sur)\b[\s\S]{0,80}\b(app|application|notepad|bloc-?notes?|window|fen[eê]tre)\b/i,
   /\b(click|clique|scroll|defile|défile|hotkey|raccourci|copie|copy|paste|coller)\b/i
 ]);
@@ -169,8 +169,21 @@ function detectScreenshotIntent(text) {
   return SCREENSHOT_PATTERNS.some((pattern) => pattern.test(text));
 }
 
+function normalizeDesktopIntentText(text) {
+  return String(text ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 function detectGeneralDesktopActionIntent(text) {
-  return GENERAL_DESKTOP_ACTION_PATTERNS.some((pattern) => pattern.test(text));
+  if (GENERAL_DESKTOP_ACTION_PATTERNS.some((pattern) => pattern.test(text))) {
+    return true;
+  }
+  const normalized = normalizeDesktopIntentText(text);
+  return /\b(open|launch|start|ouvrir|ouvre|lance|demarre)\b[\s\S]{0,80}\b(editeur|editor|notepad|bloc notes)\b/.test(normalized);
 }
 
 function findExplicitBrowserChoice(text, browserCatalog = [], preferredBrowserId = "") {
@@ -190,6 +203,29 @@ function browserChoiceSummary(browser) {
   return {
     id: browser.id,
     label: browser.label
+  };
+}
+
+function buildBrowserChoiceRequest({ clarificationQuestion = "", clarificationOptions = [] } = {}) {
+  if (!Array.isArray(clarificationOptions) || clarificationOptions.length === 0) {
+    return null;
+  }
+  return {
+    id: "choice_browser_launch",
+    kind: "browser",
+    title: "Choisis le navigateur",
+    question: clarificationQuestion || "Quel navigateur veux-tu ouvrir ?",
+    required: true,
+    resolutionTarget: {
+      parameterPath: "parameters.browserLaunch.browserId",
+      labelPath: "parameters.browserLaunch.browserLabel"
+    },
+    options: clarificationOptions.map((option) => ({
+      id: option.id,
+      label: option.label,
+      value: option.id,
+      description: "Navigateur détecté sur cette machine."
+    }))
   };
 }
 
@@ -332,9 +368,14 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
   const forcedActionType = input.missionSpec?.parameters?.computerAction?.type
     ?? input.parameters?.computerAction?.type
     ?? "";
+  const applicationLaunchRequested = Boolean(
+    input.missionSpec?.parameters?.applicationLaunch?.applicationId
+    || input.parameters?.applicationLaunch?.applicationId
+  );
   const normalizedForcedActionType = String(forcedActionType).trim();
   const desktopAutonomyRequested = Boolean(
     normalizedForcedActionType === "desktop_autonomy"
+    || applicationLaunchRequested
     || detectGeneralDesktopActionIntent(missionText)
   );
   const launchRequested = Boolean(
@@ -862,6 +903,9 @@ export function inferMissionMode(input = {}) {
   if (detectGeneralDesktopActionIntent(text)) {
     scores.computer += 5;
   }
+  if (input.parameters?.applicationLaunch?.applicationId) {
+    scores.computer += 5;
+  }
   if (browserLaunchIntent && browserSearchIntent) {
     scores.computer += 2;
   }
@@ -927,6 +971,11 @@ export function buildDeterministicMissionUnderstanding(input = {}) {
     unsupportedRequests,
     browserLaunchState
   });
+  const clarificationQuestion = clarificationState.clarificationQuestion;
+  const choiceRequest = buildBrowserChoiceRequest({
+    clarificationQuestion,
+    clarificationOptions: browserLaunchState.clarificationOptions
+  });
   const ambiguityNote = buildAmbiguityNote({
     confidence: inferred.confidence,
     crossFrameNotice: inferred.crossFrameNotice,
@@ -986,14 +1035,26 @@ export function buildDeterministicMissionUnderstanding(input = {}) {
     browserSearchQuery: browserLaunchState.searchQuery || "",
     browserLaunchUrl: browserLaunchState.launchUrl ?? null,
     clarificationOptions: browserLaunchState.clarificationOptions,
+    choiceRequest,
     requiresClarification: clarificationState.requiresClarification,
-    clarificationQuestion: clarificationState.clarificationQuestion
+    clarificationQuestion
   };
 }
 
 function structuredStringArray(value, label) {
+  if (typeof value === "string") {
+    return value
+      .split(/\r?\n|[•;]+/)
+      .map((entry) => entry.replace(/^[-*\d.)\s]+/, "").trim())
+      .filter(Boolean);
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return Object.values(value).map((entry) => String(entry ?? "").trim()).filter(Boolean);
+  }
   if (!Array.isArray(value)) {
-    throw new Error(`${label} must be an array.`);
+    throw Object.assign(new Error(`${label} must be an array.`), {
+      category: "malformed_output"
+    });
   }
   return value.map((entry) => String(entry ?? "").trim()).filter(Boolean);
 }
@@ -1077,13 +1138,74 @@ function validateBrowserChoiceArray(value, label) {
   return value.map((entry, index) => validateBrowserChoice(entry, `${label}[${index}]`)).filter(Boolean);
 }
 
+function validateChoiceOption(value, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw Object.assign(new Error(`${label} must be an object.`), {
+      category: "malformed_output"
+    });
+  }
+  const id = String(value.id ?? value.value ?? "").trim();
+  const optionLabel = String(value.label ?? value.name ?? id).trim();
+  if (!id || !optionLabel) {
+    throw Object.assign(new Error(`${label} must contain id and label.`), {
+      category: "malformed_output"
+    });
+  }
+  return {
+    id,
+    label: optionLabel,
+    value: String(value.value ?? id).trim() || id,
+    description: String(value.description ?? "").trim(),
+    metadata: value.metadata && typeof value.metadata === "object" && !Array.isArray(value.metadata) ? value.metadata : {}
+  };
+}
+
+function validateChoiceRequest(value, label = "choiceRequest") {
+  if (value == null) {
+    return null;
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw Object.assign(new Error(`${label} must be an object or null.`), {
+      category: "malformed_output"
+    });
+  }
+  const id = String(value.id ?? "choice_request").trim();
+  const kind = String(value.kind ?? "generic").trim();
+  const title = String(value.title ?? "").trim();
+  const question = String(value.question ?? "").trim();
+  const options = Array.isArray(value.options)
+    ? value.options.slice(0, 8).map((option, index) => validateChoiceOption(option, `${label}.options[${index}]`))
+    : [];
+  if (!question || options.length === 0) {
+    throw Object.assign(new Error(`${label} must contain a question and at least one option.`), {
+      category: "malformed_output"
+    });
+  }
+  const resolutionTarget = value.resolutionTarget && typeof value.resolutionTarget === "object" && !Array.isArray(value.resolutionTarget)
+    ? {
+      parameterPath: String(value.resolutionTarget.parameterPath ?? "").trim(),
+      labelPath: String(value.resolutionTarget.labelPath ?? "").trim()
+    }
+    : null;
+  return {
+    id,
+    kind,
+    title,
+    question,
+    required: value.required !== false,
+    resolutionTarget,
+    options
+  };
+}
+
 function reconcileBrowserLaunchOutput(validated, context = {}) {
   const browserCatalog = normalizeBrowserCatalog(context.availableBrowsers ?? []);
   if (!["launch_browser", "launch_browser_search", "capture_browser_window"].includes(validated.computerActionType)) {
     return {
       ...validated,
       selectedBrowser: null,
-      clarificationOptions: []
+      clarificationOptions: [],
+      choiceRequest: null
     };
   }
 
@@ -1122,6 +1244,10 @@ function reconcileBrowserLaunchOutput(validated, context = {}) {
     ...validated,
     selectedBrowser,
     clarificationOptions,
+    choiceRequest: validated.choiceRequest ?? buildBrowserChoiceRequest({
+      clarificationQuestion,
+      clarificationOptions
+    }),
     requiresClarification,
     clarificationQuestion
   };
@@ -1150,6 +1276,7 @@ export function validateMissionUnderstandingOutput(output, context = {}) {
   const browserLaunchUrl = output.browserLaunchUrl == null ? null : String(output.browserLaunchUrl).trim();
   const selectedBrowser = validateBrowserChoice(output.selectedBrowser ?? null, "selectedBrowser");
   const clarificationOptions = validateBrowserChoiceArray(output.clarificationOptions ?? [], "clarificationOptions");
+  const choiceRequest = validateChoiceRequest(output.choiceRequest ?? null);
   const requiresClarification = Boolean(output.requiresClarification);
   const clarificationQuestion = String(output.clarificationQuestion ?? "").trim();
 
@@ -1220,6 +1347,7 @@ export function validateMissionUnderstandingOutput(output, context = {}) {
     browserLaunchUrl,
     selectedBrowser,
     clarificationOptions,
+    choiceRequest,
     requiresClarification,
     clarificationQuestion: requiresClarification
       ? (clarificationQuestion || "What should this run prioritize first?")

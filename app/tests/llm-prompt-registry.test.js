@@ -11,6 +11,9 @@ export async function run() {
   assert.equal(plan.version, "1.0.0");
   assert.equal(plan.environment, "prototype");
   assert.ok(plan.messages.length > 0);
+  const browserPlan = registry.resolvePrompt("task.browser_plan", "1.0.0");
+  assert.equal(browserPlan.promptId, "task.browser_plan");
+  assert.ok(browserPlan.messages[0].content.includes("DOM-first"));
 
   const resolved = registry.resolvePromptRefs([
     { promptId: "task.plan_generation", version: "1.0.0", bindings: { mission: "Test mission", scenarioType: "research", allowlistedDomains: '["127.0.0.1"]' } }

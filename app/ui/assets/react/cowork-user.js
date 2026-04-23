@@ -9894,9 +9894,23 @@ var STRINGS = Object.freeze({
 		newConversation: "Nouvelle conversation",
 		conversations: "Conversations",
 		close: "Fermer",
+		collapse: "Réduire",
+		openConversations: "Ouvrir les conversations",
+		openInspector: "Ouvrir l’inspecteur",
+		conversationsShort: "Conv.",
+		inspectorShort: "Trace",
 		adminConsole: "Console admin",
 		activity: "Activité",
 		runContext: "Contexte du run",
+		runInspector: "Inspecteur du run",
+		sessionInspector: "Session",
+		runNarrative: "Fil d’exécution",
+		decisionTrace: "Décision",
+		frame: "Cadre",
+		capability: "Capacité",
+		skill: "Skill",
+		policy: "Policy",
+		notAvailable: "Non disponible",
 		artifacts: "Artefacts",
 		evidence: "Preuves",
 		recentActions: "Actions récentes",
@@ -9925,6 +9939,13 @@ var STRINGS = Object.freeze({
 		thinking: "Je regarde ce que je peux faire.",
 		launching: "Je lance l’action autorisée.",
 		clarification: "Précision utile",
+		clarificationNeededTitle: "J’ai besoin d’une précision",
+		clarificationOptions: "Options de clarification",
+		clarificationHelp: "Choisis une option ou réponds dans le champ de message pour continuer.",
+		clarificationFallback: "Peux-tu préciser ce que tu veux que je fasse ?",
+		clarificationReady: "Réponse préparée dans le champ. Envoie-la pour continuer.",
+		clarificationAnswerPrefix: "Utilise",
+		answerInComposer: "Répondre dans le champ",
 		confirmationNeeded: "Confirmation requise",
 		actionNotStarted: "Action non lancée",
 		confirm: "Confirmer",
@@ -9986,6 +10007,33 @@ var STRINGS = Object.freeze({
 		noEvidence: "Aucune preuve liée au run actif.",
 		noRecentActions: "Aucune action récente.",
 		currentRun: "Run actif",
+		browserState: "État navigateur",
+		workspaceMission: "Mission workspace",
+		terminalSurfaces: "Terminaux attachés",
+		terminalDecisions: "Décisions terminal",
+		terminalAlerts: "Alertes terminal",
+		noWorkspaceMission: "Aucun cahier des charges workspace actif.",
+		noTerminals: "Aucun terminal attaché.",
+		noTerminalDecisions: "Aucune décision terminal enregistrée.",
+		terminalAgent: "Agent",
+		terminalAutonomy: "Autonomie",
+		terminalAuthorized: "Autorisé",
+		terminalWaiting: "Attend une réponse",
+		terminalRunning: "En cours",
+		terminalCompleted: "Terminé",
+		terminalError: "Erreur",
+		terminalAttached: "Attaché",
+		browserStrategy: "Stratégie navigateur",
+		workspaceBrowserMode: "Navigateur workspace traçable",
+		systemBrowserMode: "Navigateur système visible",
+		nextSteps: "Prochaines étapes",
+		currentPage: "Page courante",
+		activeUrl: "URL active",
+		pageTitle: "Titre",
+		navigationSteps: "Navigations",
+		lastBrowserActions: "Dernières actions navigateur",
+		blockers: "Blocage",
+		noBrowserState: "Aucun état navigateur lié aux preuves du run.",
 		status: "Statut",
 		updated: "Mis à jour",
 		llmCalls: "appels IA",
@@ -10004,9 +10052,23 @@ var STRINGS = Object.freeze({
 		newConversation: "New conversation",
 		conversations: "Conversations",
 		close: "Close",
+		collapse: "Collapse",
+		openConversations: "Open conversations",
+		openInspector: "Open inspector",
+		conversationsShort: "Chats",
+		inspectorShort: "Trace",
 		adminConsole: "Admin console",
 		activity: "Activity",
 		runContext: "Run context",
+		runInspector: "Run inspector",
+		sessionInspector: "Session",
+		runNarrative: "Execution thread",
+		decisionTrace: "Decision",
+		frame: "Frame",
+		capability: "Capability",
+		skill: "Skill",
+		policy: "Policy",
+		notAvailable: "Not available",
 		artifacts: "Artifacts",
 		evidence: "Evidence",
 		recentActions: "Recent actions",
@@ -10035,6 +10097,13 @@ var STRINGS = Object.freeze({
 		thinking: "I’m checking what I can do.",
 		launching: "I’m starting the approved action.",
 		clarification: "Useful detail",
+		clarificationNeededTitle: "I need one detail",
+		clarificationOptions: "Clarification options",
+		clarificationHelp: "Choose an option or answer in the message box to continue.",
+		clarificationFallback: "Can you clarify what you want me to do?",
+		clarificationReady: "Answer prepared in the composer. Send it to continue.",
+		clarificationAnswerPrefix: "Use",
+		answerInComposer: "Answer in composer",
 		confirmationNeeded: "Confirmation needed",
 		actionNotStarted: "Action not started",
 		confirm: "Confirm",
@@ -10096,6 +10165,33 @@ var STRINGS = Object.freeze({
 		noEvidence: "No evidence linked to the active run.",
 		noRecentActions: "No recent action.",
 		currentRun: "Active run",
+		browserState: "Browser state",
+		workspaceMission: "Workspace mission",
+		terminalSurfaces: "Attached terminals",
+		terminalDecisions: "Terminal decisions",
+		terminalAlerts: "Terminal alerts",
+		noWorkspaceMission: "No active workspace brief.",
+		noTerminals: "No attached terminal.",
+		noTerminalDecisions: "No terminal decision recorded.",
+		terminalAgent: "Agent",
+		terminalAutonomy: "Autonomy",
+		terminalAuthorized: "Authorized",
+		terminalWaiting: "Waiting for input",
+		terminalRunning: "Running",
+		terminalCompleted: "Completed",
+		terminalError: "Error",
+		terminalAttached: "Attached",
+		browserStrategy: "Browser strategy",
+		workspaceBrowserMode: "Traceable workspace browser",
+		systemBrowserMode: "Visible system browser",
+		nextSteps: "Next steps",
+		currentPage: "Current page",
+		activeUrl: "Active URL",
+		pageTitle: "Title",
+		navigationSteps: "Navigations",
+		lastBrowserActions: "Recent browser actions",
+		blockers: "Blocker",
+		noBrowserState: "No browser state linked to this run evidence.",
 		status: "Status",
 		updated: "Updated",
 		llmCalls: "AI calls",
@@ -10143,7 +10239,7 @@ function formatTime(value, locale = "fr") {
 * LICENSE file in the root directory of this source tree.
 */
 var require_react_jsx_runtime_production = /* @__PURE__ */ __commonJSMin(((exports) => {
-	var REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element");
+	var REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
 	function jsxProd(type, config, maybeKey) {
 		var key = null;
 		void 0 !== maybeKey && (key = "" + maybeKey);
@@ -10161,6 +10257,7 @@ var require_react_jsx_runtime_production = /* @__PURE__ */ __commonJSMin(((expor
 			props: maybeKey
 		};
 	}
+	exports.Fragment = REACT_FRAGMENT_TYPE;
 	exports.jsx = jsxProd;
 	exports.jsxs = jsxProd;
 }));
@@ -10302,7 +10399,9 @@ function mergeBackendConversations(current = [], backend = []) {
 		if (existingIndex >= 0) next[existingIndex] = backendConversationToSession(conversation, next[existingIndex]);
 		else next.push(backendConversationToSession(conversation));
 	}
-	return sortConversations(next).slice(0, 50);
+	return sortConversations(next.filter((conversation) => {
+		return !(conversation.source === "local" && !conversation.backendId && !conversation.runId && (conversation.messages ?? []).length === 0);
+	})).slice(0, 50);
 }
 function sortConversations(conversations = []) {
 	return [...conversations].sort((left, right) => String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? "")));
@@ -10458,6 +10557,9 @@ function conversationTurnsToMessages(turns = []) {
 				uiBlocks: payload.uiBlocks ?? [],
 				requiresClarification: payload.requiresClarification,
 				clarificationQuestion: payload.clarificationQuestion,
+				clarificationOptions: payload.clarificationOptions ?? [],
+				choiceRequest: payload.choiceRequest ?? null,
+				clarificationResolved: payload.clarificationResolved ?? null,
 				generationMode: turn.metadata?.generationMode,
 				fallbackReason: turn.metadata?.fallbackReason,
 				llm: turn.metadata?.llm
@@ -10491,15 +10593,17 @@ function App() {
 	const [liveStatus, setLiveStatus] = (0, import_react.useState)("connecting");
 	const [recentActivity, setRecentActivity] = (0, import_react.useState)([]);
 	const [detailsOpen, setDetailsOpen] = (0, import_react.useState)(false);
+	const [historyOpen, setHistoryOpen] = (0, import_react.useState)(false);
+	const [inspectorOpen, setInspectorOpen] = (0, import_react.useState)(false);
 	const [historyHydratedProjectId, setHistoryHydratedProjectId] = (0, import_react.useState)(null);
 	const [conversationSessions, setConversationSessions] = (0, import_react.useState)(() => {
-		const stored = sortConversations(loadStoredConversations());
-		return stored.length > 0 ? stored : [createLocalConversation({ title: stringsForLocale(detectInitialLocale()).newConversation })];
+		return sortConversations(loadStoredConversations());
 	});
 	const [activeConversationId, setActiveConversationId] = (0, import_react.useState)(null);
 	const selectedProjectIdRef = (0, import_react.useRef)(null);
 	const selectedRunIdRef = (0, import_react.useRef)(null);
 	const transcriptRef = (0, import_react.useRef)(null);
+	const composerInputRef = (0, import_react.useRef)(null);
 	const project = (0, import_react.useMemo)(() => currentProject(dashboard, selectedProjectId), [dashboard, selectedProjectId]);
 	const runs = (0, import_react.useMemo)(() => latestRuns(dashboard, selectedProjectId), [dashboard, selectedProjectId]);
 	const availableBrowsers = dashboard?.desktopActionSupport?.availableBrowsers ?? [];
@@ -10527,10 +10631,7 @@ function App() {
 		const backendConversations = dashboard?.conversation?.conversations ?? [];
 		if (backendConversations.length === 0) return;
 		setConversationSessions((current) => {
-			const merged = mergeBackendConversations(current, backendConversations);
-			const active = current.find((conversation) => conversation.id === activeConversationId);
-			if ((!active || active.source === "local" && !active.backendId && (active.messages ?? []).length === 0) && merged[0]) queueMicrotask(() => setActiveConversationId(merged[0].id));
-			return merged;
+			return mergeBackendConversations(current, backendConversations);
 		});
 	}, [dashboard?.conversation?.conversations]);
 	(0, import_react.useEffect)(() => {
@@ -10554,16 +10655,6 @@ function App() {
 		conversationSessions,
 		selectedProjectId
 	]);
-	(0, import_react.useEffect)(() => {
-		if (!activeConversationId && conversationSessions[0]?.id) {
-			setActiveConversationId(conversationSessions[0].id);
-			setMessages(conversationSessions[0].messages ?? []);
-			if (conversationSessions[0].runId) {
-				setSelectedRunId(conversationSessions[0].runId);
-				selectedRunIdRef.current = conversationSessions[0].runId;
-			}
-		}
-	}, [activeConversationId, conversationSessions]);
 	(0, import_react.useEffect)(() => {
 		if (!activeConversationId) return;
 		const messageFingerprint = JSON.stringify(messages.map((message) => ({
@@ -10609,17 +10700,9 @@ function App() {
 		selectedRunIdRef.current = selectedRunId;
 	}, [selectedRunId]);
 	(0, import_react.useEffect)(() => {
-		if (!selectedProjectId || historyHydratedProjectId === selectedProjectId || messages.length > 0 || selectedRunId) return;
-		const persistedMessages = conversationTurnsToMessages(dashboard?.conversation?.recentTurns ?? []);
-		if (persistedMessages.length > 0) setMessages(persistedMessages.slice(-32));
+		if (!selectedProjectId || historyHydratedProjectId === selectedProjectId) return;
 		setHistoryHydratedProjectId(selectedProjectId);
-	}, [
-		dashboard?.conversation?.recentTurns,
-		historyHydratedProjectId,
-		messages.length,
-		selectedProjectId,
-		selectedRunId
-	]);
+	}, [historyHydratedProjectId, selectedProjectId]);
 	async function selectConversation(conversationId) {
 		const conversation = conversationSessions.find((candidate) => candidate.id === conversationId);
 		if (!conversation) return;
@@ -10797,6 +10880,26 @@ function App() {
 		setDraft({ ...EMPTY_DRAFT });
 		setFeedback(null);
 	}
+	async function stageClarificationAnswer(answer) {
+		const text = compactText(answer);
+		if (!text) {
+			composerInputRef.current?.focus();
+			return;
+		}
+		if (busy.reviewing) {
+			setDraft((current) => ({
+				...current,
+				objective: text
+			}));
+			setFeedback({
+				tone: "info",
+				text: t.clarificationReady
+			});
+			requestAnimationFrame(() => composerInputRef.current?.focus());
+			return;
+		}
+		await submitConversationMessage(text, { source: "clarification" });
+	}
 	async function openRun(runId) {
 		setSelectedRunId(runId);
 		selectedRunIdRef.current = runId;
@@ -10822,21 +10925,40 @@ function App() {
 			}));
 		}
 	}
-	async function reviewMission() {
-		const objective = draft.objective.trim();
+	async function submitConversationMessage(rawObjective, { source = "composer" } = {}) {
+		const objective = compactText(rawObjective);
 		if (!objective || !selectedProjectId) return;
+		const draftForRequest = {
+			...draft,
+			objective
+		};
+		setDraft((current) => ({
+			...current,
+			objective
+		}));
 		setFeedback(null);
 		setPreflight(null);
 		setConfirmedDraft(null);
 		setSelectedRunId(null);
 		selectedRunIdRef.current = null;
 		setRunDetail(null);
+		let conversationIdForRequest = activeConversationId;
+		let conversationForRequest = conversationSessions.find((conversation) => conversation.id === conversationIdForRequest) ?? null;
+		if (!conversationForRequest) {
+			conversationForRequest = createLocalConversation({
+				title: titleFromMessage(objective, t.newConversation),
+				messages: []
+			});
+			conversationIdForRequest = conversationForRequest.id;
+			setConversationSessions((current) => sortConversations([conversationForRequest, ...current]).slice(0, 50));
+			setActiveConversationId(conversationIdForRequest);
+		}
 		appendMessage({
 			role: "user",
 			kind: "mission",
 			text: objective
 		});
-		const backendConversationId = conversationBackendId(conversationSessions.find((conversation) => conversation.id === activeConversationId));
+		const backendConversationId = conversationBackendId(conversationForRequest);
 		const assistantMessageId = appendMessage({
 			role: "assistant",
 			kind: "turn",
@@ -10857,13 +10979,14 @@ function App() {
 					conversationId: backendConversationId,
 					context: {
 						conversationId: backendConversationId,
+						source,
 						recentMessages: messages.slice(-8).map((message) => ({
 							role: message.role,
 							kind: message.kind,
 							text: message.text
 						}))
 					},
-					missionSpec: buildMissionSpec(draft, { includeMode: draft.modeTouched && Boolean(draft.mode) })
+					missionSpec: buildMissionSpec(draftForRequest, { includeMode: draftForRequest.modeTouched && Boolean(draftForRequest.mode) })
 				})
 			}, { onDelta: (text) => {
 				updateMessage(assistantMessageId, (message) => ({
@@ -10874,8 +10997,8 @@ function App() {
 			if (!response?.turn) throw new Error("Conversation stream ended without a turn payload.");
 			setPreflight(response.preflight ?? null);
 			setConfirmedDraft(response.missionDraft ?? null);
-			if (response.conversation && activeConversationId) setConversationSessions((current) => sortConversations(current.map((conversation) => {
-				if (conversation.id !== activeConversationId) return conversation;
+			if (response.conversation && conversationIdForRequest) setConversationSessions((current) => sortConversations(current.map((conversation) => {
+				if (conversation.id !== conversationIdForRequest) return conversation;
 				return {
 					...conversation,
 					backendId: response.conversation.id,
@@ -10907,6 +11030,9 @@ function App() {
 				reviewing: false
 			}));
 		}
+	}
+	async function reviewMission() {
+		await submitConversationMessage(draft.objective.trim(), { source: "composer" });
 	}
 	async function startMission() {
 		if (!selectedProjectId || !preflight || busy.starting) return;
@@ -11053,13 +11179,15 @@ function App() {
 				children: feedback.text
 			}) : null,
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
-				className: "react-cowork-main",
+				className: `react-cowork-main ${historyOpen ? "history-open" : "history-collapsed"} ${inspectorOpen ? "inspector-open" : "inspector-collapsed"}`,
 				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConversationSidebar, {
 						conversations: conversationSessions,
 						activeConversationId,
 						onSelect: selectConversation,
 						onNew: startNewMission,
+						open: historyOpen,
+						onToggle: () => setHistoryOpen((current) => !current),
 						locale,
 						t
 					}),
@@ -11078,6 +11206,7 @@ function App() {
 								messages.map((message) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, {
 									message,
 									onStartMission: startMission,
+									onClarificationAnswer: stageClarificationAnswer,
 									busy,
 									t
 								}, message.id)),
@@ -11119,6 +11248,7 @@ function App() {
 							setDetailsOpen,
 							availableBrowsers,
 							modes: dashboard?.missionEntry?.modes ?? [],
+							inputRef: composerInputRef,
 							t
 						})]
 					}),
@@ -11127,10 +11257,13 @@ function App() {
 						runDetail,
 						events: activityEvents,
 						runs,
+						workspace: dashboard?.workspace ?? null,
 						selectedRunId,
 						conversation: activeConversation,
 						conversationId: activeConversationBackendId,
 						onOpenRun: openRun,
+						open: inspectorOpen,
+						onToggle: () => setInspectorOpen((current) => !current),
 						pendingApprovals,
 						liveStatus,
 						locale,
@@ -11141,21 +11274,50 @@ function App() {
 		]
 	});
 }
-function ConversationSidebar({ conversations, activeConversationId, onSelect, onNew, locale, t }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
-		className: "conversation-sidebar",
+function ConversationSidebar({ conversations, activeConversationId, onSelect, onNew, open, onToggle, locale, t }) {
+	if (!open) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+		className: "conversation-sidebar collapsed",
 		"aria-label": t.conversations,
+		"data-testid": "conversation-sidebar",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+			type: "button",
+			className: "side-rail-button",
+			onClick: onToggle,
+			"aria-label": t.openConversations,
+			title: t.openConversations,
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "≡" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.conversationsShort })]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			type: "button",
+			className: "side-rail-button subtle",
+			onClick: onNew,
+			"aria-label": t.newConversation,
+			title: t.newConversation,
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "+" })
+		})]
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+		className: "conversation-sidebar open",
+		"aria-label": t.conversations,
+		"data-testid": "conversation-sidebar",
 		children: [
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "side-panel-header",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 					className: "eyebrow",
 					children: t.localOnly
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: t.conversations })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-					type: "button",
-					className: "small",
-					onClick: onNew,
-					children: t.new
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: t.conversations })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "side-panel-actions",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "small",
+						onClick: onNew,
+						children: t.new
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ghost small",
+						onClick: onToggle,
+						children: t.collapse
+					})]
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
@@ -11181,7 +11343,80 @@ function ConversationSidebar({ conversations, activeConversationId, onSelect, on
 		]
 	});
 }
-function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversation, conversationId, onOpenRun, pendingApprovals, liveStatus, locale, t }) {
+function runTraceItems({ scopedRun, events = [], approvals = [], artifacts = [], evidence = [], calls = [], t }) {
+	const items = [];
+	if (scopedRun) items.push({
+		id: `run-${scopedRun.id}`,
+		tone: statusTone(scopedRun.status),
+		label: scopedRun.status === "paused" ? t.waitingApproval : scopedRun.status === "completed" ? t.done : scopedRun.status === "failed" ? t.failed : t.working,
+		detail: scopedRun.summary ?? scopedRun.metadata?.missionSpec?.objective ?? t.selectedMission,
+		timestamp: scopedRun.updatedAt ?? scopedRun.createdAt
+	});
+	for (const approval of approvals.slice(0, 2)) items.push({
+		id: `approval-${approval.id}`,
+		tone: "warn",
+		label: t.confirmationNeeded,
+		detail: approval.actionLabel || approval.reason || t.waitingApproval,
+		timestamp: approval.createdAt
+	});
+	for (const event of events.slice(0, 6)) items.push({
+		id: technicalEventKey(event),
+		tone: event.type?.includes("failed") || event.type?.includes("blocked") ? "danger" : event.type?.includes("approval") ? "warn" : "ok",
+		label: eventLabel(event),
+		detail: event.type,
+		timestamp: event.createdAt
+	});
+	if (artifacts.length > 0) items.push({
+		id: "artifacts",
+		tone: "ok",
+		label: t.artifacts,
+		detail: `${artifacts.length} ${t.artifactCount}`,
+		timestamp: null
+	});
+	if (evidence.length > 0) items.push({
+		id: "evidence",
+		tone: "ok",
+		label: t.evidence,
+		detail: `${evidence.length} ${t.evidenceCount}`,
+		timestamp: null
+	});
+	if (calls.length > 0) items.push({
+		id: "llm-calls",
+		tone: "neutral",
+		label: t.generation,
+		detail: `${calls.length} ${t.llmCalls}`,
+		timestamp: calls.at(-1)?.createdAt
+	});
+	return items.slice(0, 12);
+}
+function runCapabilitySummary(scopedRun, scopedRunDetail) {
+	const missionSpec = scopedRun?.metadata?.missionSpec ?? {};
+	const routing = missionSpec.routing ?? {};
+	const review = scopedRunDetail?.review ?? {};
+	return {
+		frame: missionSpec.mode ?? routing.mode ?? scopedRun?.metadata?.scenarioType ?? "",
+		capability: routing.capabilityId ?? review.capabilityId ?? scopedRun?.metadata?.capabilityId ?? "",
+		skill: routing.skillId ?? review.skillId ?? scopedRun?.metadata?.skillId ?? "",
+		policy: scopedRun?.lifecycleStage ?? scopedRun?.status ?? ""
+	};
+}
+function browserStateFromEvidence(evidence = []) {
+	return evidence.map((item) => item.metadata?.browserState).filter(Boolean).at(-1) ?? null;
+}
+function terminalStatusLabel(status, t) {
+	if (status === "waiting_for_input" || status === "needs_attention") return t.terminalWaiting;
+	if (status === "running") return t.terminalRunning;
+	if (status === "completed") return t.terminalCompleted;
+	if (status === "error") return t.terminalError;
+	return t.terminalAttached;
+}
+function terminalStatusTone(status) {
+	if (status === "waiting_for_input" || status === "needs_attention") return "warn";
+	if (status === "error") return "danger";
+	if (status === "completed") return "ok";
+	return "neutral";
+}
+function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, pendingApprovals, liveStatus, locale, t }) {
 	const linkedRunIds = new Set([
 		...Array.isArray(conversation?.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : [],
 		conversation?.metadata?.latestRunId,
@@ -11200,18 +11435,59 @@ function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversati
 	const evidence = scopedRunDetail?.evidence ?? [];
 	const artifacts = [...scopedRunDetail?.artifacts ?? [], ...scopedRunDetail?.review?.artifacts ?? []].filter(Boolean);
 	const calls = scopedRunDetail?.llmCalls ?? [];
+	const browserState = browserStateFromEvidence(evidence);
+	const browserActionTypes = (browserState?.recentActions ?? []).map((action) => action.action).filter(Boolean).slice(-6);
+	const workspaceMission = workspace?.missionBrief ?? null;
+	const workspaceTerminals = workspace?.terminals ?? [];
+	const workspaceDecisions = workspace?.decisions ?? [];
+	const workspaceAlerts = workspace?.alerts ?? [];
+	const traceItems = runTraceItems({
+		scopedRun,
+		events: scopedEvents,
+		approvals: scopedPendingApprovals,
+		artifacts,
+		evidence,
+		calls,
+		t
+	});
+	const capabilitySummary = runCapabilitySummary(scopedRun, scopedRunDetail);
+	if (!open) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+		className: "activity-panel collapsed",
+		"aria-label": t.runInspector,
+		"data-testid": "run-inspector",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+			type: "button",
+			className: "side-rail-button",
+			onClick: onToggle,
+			"aria-label": t.openInspector,
+			title: t.openInspector,
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⌁" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.inspectorShort })]
+		}), scopedRun ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: `rail-status-dot ${statusTone(scopedRun.status)}`,
+			title: scopedRun.status
+		}) : null]
+	});
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
-		className: "activity-panel",
-		"aria-label": t.activity,
+		className: "activity-panel open",
+		"aria-label": t.runInspector,
+		"data-testid": "run-inspector",
 		children: [
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "side-panel-header",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 					className: "eyebrow",
-					children: t.activity
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: t.runContext })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-					className: `mini-badge ${liveStatus === "live" ? "ok" : "warn"}`,
-					children: liveStatus === "live" ? t.live : t.degraded
+					children: t.sessionInspector
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: t.runInspector })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "side-panel-actions",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `mini-badge ${liveStatus === "live" ? "ok" : "warn"}`,
+						children: liveStatus === "live" ? t.live : t.degraded
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ghost small",
+						onClick: onToggle,
+						children: t.collapse
+					})]
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
@@ -11238,6 +11514,139 @@ function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversati
 				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 					className: "muted",
 					children: t.noRunSelected
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runNarrative }),
+					traceItems.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noRecentActions
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
+						className: "run-trace-list",
+						children: traceItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+							className: item.tone ?? "",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: item.label }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.detail }),
+								item.timestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(item.timestamp, locale) }) : null
+							] })]
+						}, item.id))
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.workspaceMission }), workspaceMission ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "activity-card",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: workspaceMission.objective }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+							t.status,
+							": ",
+							workspaceMission.status
+						] }),
+						workspaceMission.nextSteps?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+							t.nextSteps,
+							": ",
+							workspaceMission.nextSteps.slice(0, 2).join(" · ")
+						] }) : null
+					]
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "muted",
+					children: t.noWorkspaceMission
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalSurfaces }),
+					workspaceTerminals.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noTerminals
+					}) : null,
+					workspaceTerminals.slice(0, 6).map((terminal) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "activity-card compact",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: terminal.label }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: `mini-badge ${terminalStatusTone(terminal.status)}`,
+									children: terminalStatusLabel(terminal.status, t)
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "inline-separator",
+									children: "·"
+								}),
+								t.terminalAgent,
+								": ",
+								terminal.agentKind
+							] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+								t.terminalAutonomy,
+								": ",
+								terminal.autonomyMode,
+								" · ",
+								t.terminalAuthorized,
+								": ",
+								terminal.authorized ? "yes" : "no"
+							] }),
+							terminal.lastPrompt ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: terminal.lastPrompt }) : null
+						]
+					}, terminal.id))
+				]
+			}),
+			workspaceAlerts.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalAlerts }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
+					className: "run-trace-list",
+					children: workspaceAlerts.map((alert) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+						className: alert.requiresApproval ? "warn" : "neutral",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: alert.action }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: alert.reason }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(alert.createdAt, locale) })
+						] })]
+					}, alert.id))
+				})]
+			}) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.browserState }), browserState ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "inspector-grid",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.pageTitle, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.title || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.activeUrl, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.url || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.navigationSteps, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.navigationHistory?.length ?? 0 })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.blockers, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.blocker?.blocked ? browserState.blocker.reason || t.failed : t.notAvailable })] })
+					]
+				}), browserActionTypes.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+					className: "activity-timeline compact",
+					children: browserActionTypes.map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: action }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.lastBrowserActions })] }, `${action}-${index}`))
+				}) : null] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "muted",
+					children: t.noBrowserState
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.browserStrategy }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "inspector-grid",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.workspaceBrowserMode, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: workspace?.browserStrategy?.preferredMode === "workspace_browser_mode" ? t.done : t.notAvailable })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.systemBrowserMode, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: workspace?.browserStrategy?.supportedModes?.includes("system_browser_mode") ? t.done : t.notAvailable })] })]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.decisionTrace }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "inspector-grid",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.frame, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.frame || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.capability, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.capability || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.skill, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.skill || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.policy, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.policy || t.notAvailable })] })
+					]
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
@@ -11315,6 +11724,24 @@ function ActivityPanel({ run, runDetail, events, runs, selectedRunId, conversati
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 				className: "activity-section",
 				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalDecisions }),
+					workspaceDecisions.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noTerminalDecisions
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "activity-timeline compact",
+						children: workspaceDecisions.slice(-6).reverse().map((decision) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: decision.action }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+							decision.reason,
+							" · ",
+							formatDate(decision.createdAt, locale)
+						] })] }, decision.id))
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runHistory }),
 					visibleRuns.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 						className: "muted",
@@ -11363,7 +11790,7 @@ function EmptyConversation({ t }) {
 		]
 	});
 }
-function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, setDetailsOpen, availableBrowsers, modes, t }) {
+function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, setDetailsOpen, availableBrowsers, modes, inputRef, t }) {
 	const disabled = busy.loading || busy.reviewing || busy.starting || !project;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 		className: "react-composer-card",
@@ -11371,6 +11798,7 @@ function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, 
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "react-composer-row",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+					ref: inputRef,
 					value: draft.objective,
 					onChange: (event) => onDraftChange({ objective: event.target.value }),
 					onKeyDown: (event) => {
@@ -11460,16 +11888,18 @@ function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, 
 		]
 	});
 }
-function Message({ message, onStartMission, busy, t }) {
+function Message({ message, onStartMission, onClarificationAnswer, busy, t }) {
 	if (message.kind === "turn") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TurnMessage, {
 		message,
 		onStartMission,
+		onClarificationAnswer,
 		busy: busy.starting,
 		t
 	});
 	if (message.kind === "preflight") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PreflightMessage, {
 		message,
 		onStartMission,
+		onClarificationAnswer,
 		busy: busy.starting,
 		t
 	});
@@ -11499,10 +11929,13 @@ function Message({ message, onStartMission, busy, t }) {
 		})]
 	});
 }
-function TurnMessage({ message, onStartMission, busy, t }) {
+function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }) {
 	const turn = message.turn ?? {};
 	const understanding = normalizePreflight(message.preflight);
+	const choiceRequest = turn.choiceRequest ?? understanding?.choiceRequest ?? null;
 	const requiresClarification = Boolean(turn.requiresClarification || understanding?.requiresClarification);
+	const clarificationQuestion = choiceRequest?.question || turn.clarificationQuestion || understanding?.clarificationQuestion || t.clarificationFallback;
+	const clarificationOptions = Array.isArray(choiceRequest?.options) ? choiceRequest.options : Array.isArray(understanding?.clarificationOptions) ? understanding.clarificationOptions : Array.isArray(turn.clarificationOptions) ? turn.clarificationOptions : [];
 	const canStart = Boolean(message.preflight && !requiresClarification);
 	const showStatusChip = Boolean(requiresClarification || canStart || turn.action === "refuse");
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
@@ -11543,9 +11976,12 @@ function TurnMessage({ message, onStartMission, busy, t }) {
 					]
 				}) : null,
 				!message.streaming ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UiBlocks, { blocks: message.uiBlocks ?? turn.uiBlocks ?? [] }) : null,
-				requiresClarification && (turn.clarificationQuestion || understanding?.clarificationQuestion) && !String(message.text ?? "").includes(turn.clarificationQuestion || understanding?.clarificationQuestion) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "soft-note warn",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: turn.clarificationQuestion || understanding?.clarificationQuestion })
+				requiresClarification ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChoiceCard, {
+					choiceRequest,
+					question: clarificationQuestion,
+					options: clarificationOptions,
+					onAnswer: onClarificationAnswer,
+					t
 				}) : null,
 				canStart ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActionConfirmCard, {
 					understanding,
@@ -11562,6 +11998,39 @@ function StreamingCursor({ active }) {
 		className: "stream-cursor",
 		"aria-hidden": "true"
 	}) : null;
+}
+function clarificationAnswerText(option, t) {
+	const label = compactText(option?.label ?? option?.name ?? option?.id ?? option);
+	return label ? `${t.clarificationAnswerPrefix} ${label}` : "";
+}
+function ChoiceCard({ choiceRequest = null, question, options = [], onAnswer, t }) {
+	const normalizedOptions = Array.isArray(options) ? options : [];
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "clarification-card choice-card",
+		"data-testid": "choice-card",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: compactText(choiceRequest?.title) || t.clarificationNeededTitle }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: question || t.clarificationFallback })] }),
+			normalizedOptions.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "clarification-options",
+				"aria-label": t.clarificationOptions,
+				children: normalizedOptions.slice(0, 6).map((option) => {
+					const label = compactText(option?.label ?? option?.name ?? option?.id ?? option);
+					const value = compactText(option?.reply ?? label ?? option?.value ?? clarificationAnswerText(option, t));
+					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						type: "button",
+						onClick: () => onAnswer?.(value || label),
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: label }), option?.description ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: option.description }) : null]
+					}, `${label}-${value}`);
+				})
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "secondary small",
+				onClick: () => onAnswer?.(""),
+				children: t.answerInComposer
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.clarificationHelp })
+		]
+	});
 }
 function ActionConfirmCard({ understanding, onStartMission, busy, t }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -11777,10 +12246,11 @@ function ThinkingMessage({ text, meta, t = stringsForLocale("fr") }) {
 		})]
 	});
 }
-function PreflightMessage({ message, onStartMission, busy, t }) {
+function PreflightMessage({ message, onStartMission, onClarificationAnswer, busy, t }) {
 	const understanding = normalizePreflight(message.preflight);
 	if (!understanding) return null;
 	const requiresClarification = Boolean(understanding.requiresClarification);
+	const choiceRequest = understanding.choiceRequest ?? null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: `react-message assistant ${requiresClarification ? "warn" : "ok"}`,
 		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
@@ -11794,9 +12264,12 @@ function PreflightMessage({ message, onStartMission, busy, t }) {
 					children: message.meta
 				}) : null,
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: understanding.missionSummary ?? understanding.clarifiedObjective ?? message.text }),
-				requiresClarification ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-					className: "soft-note warn",
-					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: understanding.clarificationQuestion })
+				requiresClarification ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChoiceCard, {
+					choiceRequest,
+					question: choiceRequest?.question ?? understanding.clarificationQuestion,
+					options: choiceRequest?.options ?? understanding.clarificationOptions,
+					onAnswer: onClarificationAnswer,
+					t
 				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActionConfirmCard, {
 					understanding,
 					onStartMission,

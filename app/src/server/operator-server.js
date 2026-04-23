@@ -359,6 +359,39 @@ export async function createOperatorServer({
         return;
       }
 
+      const projectWorkspaceRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace$/);
+      if (projectWorkspaceRoute && request.method === "GET") {
+        sendJson(response, 200, operatorService.getWorkspaceState(projectWorkspaceRoute.projectId, {
+          conversationId: url.searchParams.get("conversationId") ?? null
+        }));
+        return;
+      }
+
+      const projectWorkspaceBriefRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/mission-brief$/);
+      if (projectWorkspaceBriefRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, operatorService.upsertWorkspaceMissionBrief(projectWorkspaceBriefRoute.projectId, body));
+        return;
+      }
+
+      const projectWorkspaceTerminalsRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminals$/);
+      if (projectWorkspaceTerminalsRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 201, operatorService.attachWorkspaceTerminal(projectWorkspaceTerminalsRoute.projectId, body));
+        return;
+      }
+
+      const projectWorkspaceTerminalRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminals\/(?<terminalId>[^/]+)$/);
+      if (projectWorkspaceTerminalRoute && request.method === "PATCH") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, operatorService.updateWorkspaceTerminal(
+          projectWorkspaceTerminalRoute.projectId,
+          decodeURIComponent(projectWorkspaceTerminalRoute.terminalId),
+          body
+        ));
+        return;
+      }
+
       const projectRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)$/);
       if (projectRoute && request.method === "DELETE") {
         sendJson(response, 200, await operatorService.deleteProject(projectRoute.projectId));

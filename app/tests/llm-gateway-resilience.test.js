@@ -156,6 +156,37 @@ export async function run() {
   assert.equal(secondDegraded.callRecord.providerAlias, "mock_offline");
   assert.ok(secondDegraded.callRecord.fallbackChain.some((entry) => entry.errorCategory === "circuit_open"));
 
+  const malformedGateway = await createGateway({
+    liveScript: [
+      {
+        type: "return",
+        response: {
+          output: {
+            coveredNow: "not the expected shape"
+          },
+          providerModel: "scripted/primary_reasoning",
+          tokenUsage: { inputTokens: 20, outputTokens: 20, totalTokens: 40 },
+          estimatedCost: 0.001
+        }
+      }
+    ]
+  });
+  const malformedFallback = await malformedGateway.generateStructured({
+    runId: "run_malformed",
+    projectId: "prj_malformed",
+    callType: LLM_CALL_TYPE.PLAN_GENERATION,
+    promptRefs: promptRefs("Malformed output mission"),
+    input: { mission: "Malformed output mission" },
+    validateOutput: (output) => {
+      if ("coveredNow" in output) {
+        throw new Error("coveredNow must be an array.");
+      }
+      return output;
+    }
+  });
+  assert.equal(malformedFallback.callRecord.providerAlias, "mock_offline");
+  assert.ok(malformedFallback.callRecord.fallbackChain.some((entry) => entry.errorCategory === "malformed_output"));
+
   const budgetGateway = await createGateway({
     liveScript: [
       {

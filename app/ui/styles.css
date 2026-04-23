@@ -1859,6 +1859,20 @@ body[data-surface="user"] .preflight-card {
   background: var(--warning-soft);
 }
 
+.mini-badge.danger {
+  color: var(--danger);
+  background: rgba(139, 48, 48, 0.08);
+}
+
+.mini-badge.neutral {
+  color: var(--muted);
+}
+
+.inline-separator {
+  margin: 0 0.35rem;
+  color: var(--muted);
+}
+
 .preflight-grid.compact {
   margin-top: 0.85rem;
 }
@@ -2835,6 +2849,10 @@ body[data-surface="user"] .preflight-card {
   text-decoration: none;
 }
 
+.activity-card.compact {
+  padding: 0.62rem 0.68rem;
+}
+
 .activity-link[href="#"] {
   pointer-events: none;
 }
@@ -3000,14 +3018,16 @@ body[data-surface="user"] .preflight-card {
 
 .side-rail-button {
   width: 100%;
-  min-height: 3.1rem;
+  min-height: 3.25rem;
   border: 1px solid rgba(38, 36, 29, 0.1);
-  border-radius: 18px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.74);
   color: var(--ink);
-  display: grid;
-  place-items: center;
-  gap: 0.12rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
   cursor: pointer;
   box-shadow: 0 12px 28px rgba(39, 35, 22, 0.08);
 }
@@ -3022,11 +3042,17 @@ body[data-surface="user"] .preflight-card {
 }
 
 .side-rail-button small {
-  font-size: 0.62rem;
+  max-width: 3rem;
+  overflow: hidden;
+  font-size: 0.58rem;
+  line-height: 1;
   color: var(--muted);
-  writing-mode: vertical-rl;
+  writing-mode: horizontal-tb;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .side-rail-button.subtle {
@@ -3089,12 +3115,24 @@ body[data-surface="user"] .preflight-card {
 }
 
 .clarification-options button {
-  border-radius: 999px;
-  padding: 0.48rem 0.72rem;
+  border-radius: 16px;
+  padding: 0.55rem 0.78rem;
   border: 1px solid rgba(32, 49, 38, 0.14);
   background: white;
   color: var(--ink);
   cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+}
+
+.clarification-options button span {
+  font-weight: 800;
+}
+
+.clarification-options button small {
+  font-size: 0.72rem;
+  max-width: 16rem;
 }
 
 .run-trace-list {

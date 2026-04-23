@@ -704,7 +704,8 @@ export class PrototypeAgent {
           metadata: {
             screenshotPath: evidence.screenshotPath,
             snapshotTitle: evidence.snapshot.title,
-            sourceSurfaceType: target.trustClassification
+            sourceSurfaceType: target.trustClassification,
+            browserState: evidence.browserState
           },
           createdAt: nowIso()
         };
@@ -903,7 +904,8 @@ export class PrototypeAgent {
         sensitivity: "controlled_fixture",
         metadata: {
           screenshotPath: preApprovalEvidence.screenshotPath,
-          stage: "before_edit"
+          stage: "before_edit",
+          browserState: preApprovalEvidence.browserState
         },
         createdAt: nowIso()
       });
@@ -1015,7 +1017,8 @@ export class PrototypeAgent {
         linkedSourceId: null,
         sensitivity: "controlled_fixture",
         metadata: {
-          screenshotPath: evidence.screenshotPath
+          screenshotPath: evidence.screenshotPath,
+          browserState: evidence.browserState
         },
         createdAt: nowIso()
       });
@@ -1102,6 +1105,7 @@ export class PrototypeAgent {
     });
     const input = {
       mission: run.mission,
+      missionSpec: run.metadata?.missionSpec ?? null,
       missionUnderstanding,
       desktopAction,
       installedApplications,
@@ -1122,6 +1126,7 @@ export class PrototypeAgent {
         taskPromptId: "task.desktop_plan",
         bindings: {
           mission: run.mission,
+          missionSpec: JSON.stringify(input.missionSpec ?? null),
           missionUnderstanding: JSON.stringify(missionUnderstanding ?? null),
           installedApplications: JSON.stringify(installedApplications ?? []),
           visibleWindows: JSON.stringify(visibleWindows ?? []),

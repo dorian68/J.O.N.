@@ -57,6 +57,18 @@ export async function run() {
   }, contract);
   assert.equal(browserDraft.parameters.browserLaunch.browserId, "edge");
 
+  const applicationDraft = normalizeMissionDraft({
+    objective: "Open my note editor.",
+    parameters: {
+      applicationLaunch: {
+        applicationId: "obsidian",
+        applicationLabel: "Obsidian"
+      }
+    }
+  }, contract);
+  assert.equal(applicationDraft.parameters.applicationLaunch.applicationId, "obsidian");
+  assert.equal(applicationDraft.parameters.applicationLaunch.applicationLabel, "Obsidian");
+
   const researchSpec = normalizeMissionSpec({
     objective: "Compare the allowlisted pages and prepare a decision note.",
     deliverable: "Operator note",
@@ -81,6 +93,9 @@ export async function run() {
     }
   }, contract);
   assert.equal(browserSpec.parameters.browserLaunch.browserId, "chrome");
+
+  const appStatement = buildMissionStatement(applicationDraft, contract.modes.find((mode) => mode.id === "computer"));
+  assert.equal(appStatement.includes("Preferred application if needed: obsidian"), true);
 
   const formSpec = normalizeMissionSpec({
     mode: "form",

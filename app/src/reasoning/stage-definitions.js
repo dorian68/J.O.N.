@@ -103,6 +103,34 @@ export const DEFAULT_STAGE_DEFINITIONS = Object.freeze({
       }
     ]
   },
+  [REASONING_STAGE.BROWSER_PLAN]: {
+    stage: REASONING_STAGE.BROWSER_PLAN,
+    label: "Browser plan",
+    summaryTemplate: "Browser-planning context narrowed to authorized web mission, controlled browser state, DOM affordances and policy constraints.",
+    include: {
+      sources: 0,
+      artifacts: 0,
+      evidence: 1,
+      events: 8
+    },
+    policyConstraints: [
+      {
+        id: "policy.browser.allowlist_required",
+        label: "Allowlisted browser surfaces only",
+        reason: "The browser plan must keep navigation inside explicitly authorized hosts unless a future policy expansion approves it."
+      },
+      {
+        id: "policy.browser.dom_first",
+        label: "DOM-first interaction",
+        reason: "The browser operator should use structured DOM/CDP targeting before any visual or pointer fallback."
+      },
+      {
+        id: "policy.browser.no_stealth_bypass",
+        label: "No stealth or anti-bot bypass",
+        reason: "Automation blockers must be recorded and surfaced honestly; the planner must not propose evasion."
+      }
+    ]
+  },
   [REASONING_STAGE.DECISION_NOTE_DRAFT]: {
     stage: REASONING_STAGE.DECISION_NOTE_DRAFT,
     label: "Decision note draft",

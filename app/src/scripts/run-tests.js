@@ -24,12 +24,40 @@ const suites = [
     modulePath: "../../tests/capability-graph.test.js"
   },
   {
+    name: "capability-builder",
+    modulePath: "../../tests/capability-builder.test.js"
+  },
+  {
+    name: "capability-candidate-workspace",
+    modulePath: "../../tests/capability-candidate-workspace.test.js"
+  },
+  {
     name: "operational-deep-readiness",
     modulePath: "../../tests/operational-deep-readiness.test.js"
   },
   {
     name: "desktop-perception",
     modulePath: "../../tests/desktop-perception.test.js"
+  },
+  {
+    name: "desktop-recovery-planner",
+    modulePath: "../../tests/desktop-recovery-planner.test.js"
+  },
+  {
+    name: "desktop-run-watcher",
+    modulePath: "../../tests/desktop-run-watcher.test.js"
+  },
+  {
+    name: "browser-run-watcher",
+    modulePath: "../../tests/browser-run-watcher.test.js"
+  },
+  {
+    name: "project-memory",
+    modulePath: "../../tests/project-memory.test.js"
+  },
+  {
+    name: "user-memory",
+    modulePath: "../../tests/user-memory.test.js"
   },
   {
     name: "file-primitives",
@@ -136,6 +164,14 @@ const suites = [
     modulePath: "../../tests/real-surface-summary.test.js"
   },
   {
+    name: "cowork-smoke-pipeline",
+    modulePath: "../../tests/cowork-smoke-pipeline.test.js"
+  },
+  {
+    name: "real-surface-smoke-pipeline",
+    modulePath: "../../tests/real-surface-smoke-pipeline.test.js"
+  },
+  {
     name: "operator-service-real-surfaces",
     modulePath: "../../tests/operator-service-real-surfaces.test.js"
   },
@@ -150,6 +186,18 @@ const suites = [
   {
     name: "workspace-terminal-orchestration",
     modulePath: "../../tests/workspace-terminal-orchestration.test.js"
+  },
+  {
+    name: "cli-terminal-supervisor",
+    modulePath: "../../tests/cli-terminal-supervisor.test.js"
+  },
+  {
+    name: "cli-command-catalog",
+    modulePath: "../../tests/cli-command-catalog.test.js"
+  },
+  {
+    name: "browser-mode",
+    modulePath: "../../tests/browser-mode.test.js"
   },
   {
     name: "computer-benchmarks",
@@ -214,6 +262,18 @@ const suites = [
   {
     name: "runtime-llm-degraded-mode",
     modulePath: "../../tests/runtime-llm-degraded-mode.test.js"
+  },
+  {
+    name: "mobile-gateway",
+    modulePath: "../../tests/mobile-gateway.test.js"
+  },
+  {
+    name: "semantic-outcome-verifier",
+    modulePath: "../../tests/semantic-outcome-verifier.test.js"
+  },
+  {
+    name: "mission-progress-tracker",
+    modulePath: "../../tests/mission-progress-tracker.test.js"
   }
 ];
 
@@ -223,9 +283,13 @@ const results = [];
 // Force Playwright to use the bundled Chromium to avoid OS-level launch restrictions.
 process.env.COWORK_BROWSER_CHANNEL = process.env.COWORK_BROWSER_CHANNEL || "chromium";
 process.env.COWORK_HEADLESS = process.env.COWORK_HEADLESS || "1";
+process.env.COWORK_LLM_RUNTIME_PROFILE = process.env.COWORK_LLM_RUNTIME_PROFILE || "test";
+process.env.COWORK_LLM_PRODUCTION_STRICT = process.env.COWORK_LLM_PRODUCTION_STRICT || "0";
 process.env.COWORK_LLM_PROVIDER_MODE = process.env.COWORK_LLM_PROVIDER_MODE || "mock_offline";
 process.env.COWORK_LLM_ALLOW_MOCK_FALLBACK = process.env.COWORK_LLM_ALLOW_MOCK_FALLBACK || "1";
+process.env.COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK = process.env.COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK || "1";
 process.env.COWORK_LLM_REQUIRE_OS_SECRET_STORE = process.env.COWORK_LLM_REQUIRE_OS_SECRET_STORE || "0";
+process.env.COWORK_LLM_LOG_SCOPE = process.env.COWORK_LLM_LOG_SCOPE || "test";
 
 for (const suite of suites) {
   try {

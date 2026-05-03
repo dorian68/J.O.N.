@@ -82,5 +82,49 @@ export async function run() {
   assert.equal(turns[0].role, "user");
   assert.equal(turns[1].conversationId, "conv_test");
 
+  const observedAt = new Date().toISOString();
+  database.insertMemoryRecord({
+    id: "mem_test_preference",
+    scope: "user",
+    projectId: "prj_test",
+    category: "preference",
+    text: "Prefers PowerShell for local validation",
+    confidence: 0.82,
+    sourceType: "conversation",
+    sourceId: "conv_test",
+    metadata: { conversationId: "conv_test" },
+    createdAt: observedAt,
+    updatedAt: observedAt
+  });
+  database.insertMemoryRecord({
+    id: "mem_test_workflow",
+    scope: "user",
+    projectId: "prj_test",
+    category: "workflow",
+    text: "Desktop inspection workflow",
+    confidence: 0.66,
+    sourceType: "run",
+    sourceId: "run_test",
+    metadata: { runId: "run_test" },
+    createdAt: observedAt,
+    updatedAt: observedAt
+  });
+
+  const preferenceRecords = database.listMemoryRecords({
+    scope: "user",
+    projectId: "prj_test",
+    category: "preference"
+  });
+  assert.equal(preferenceRecords.length, 1);
+  assert.equal(preferenceRecords[0].metadata.conversationId, "conv_test");
+
+  const searchResults = database.searchMemoryRecords({
+    query: "PowerShell",
+    scope: "user",
+    projectId: "prj_test"
+  });
+  assert.equal(searchResults.length, 1);
+  assert.equal(searchResults[0].id, "mem_test_preference");
+
   database.close();
 }

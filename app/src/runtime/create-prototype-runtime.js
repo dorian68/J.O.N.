@@ -17,7 +17,9 @@ export async function createPrototypeRuntime({
   llmGateway,
   reasoningEngine,
   approvalResolver,
-  policyHooks
+  policyHooks,
+  workspaceLauncher,
+  browserLauncher
 } = {}) {
   const database = new PrototypeDatabase(dbPath);
   await database.open();
@@ -95,7 +97,9 @@ export async function createPrototypeRuntime({
     computerControlService: new ComputerControlService(computerProvider ?? new PowerShellWindowProvider()),
     policyEngine,
     llmGateway: resolvedLlmGateway,
-    reasoningEngine: resolvedReasoningEngine
+    reasoningEngine: resolvedReasoningEngine,
+    workspaceLauncher: workspaceLauncher ?? null,
+    browserLauncher: browserLauncher ?? null
   });
 
   return {

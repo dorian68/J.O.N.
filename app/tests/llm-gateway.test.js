@@ -3,7 +3,15 @@ import { createDefaultLlmGateway } from "../src/llm/create-default-llm-gateway.j
 import { LLM_CALL_TYPE, LLM_RESULT_STATUS } from "../src/config.js";
 
 export async function run() {
-  const gateway = await createDefaultLlmGateway({ providerMode: "mock_offline" });
+  const gateway = await createDefaultLlmGateway({
+    providerMode: "mock_offline",
+    env: {
+      ...process.env,
+      COWORK_LLM_RUNTIME_PROFILE: "test",
+      COWORK_LLM_PRODUCTION_STRICT: "0",
+      COWORK_LLM_LOG_SCOPE: "test"
+    }
+  });
 
   const plan = await gateway.generateStructured({
     runId: "run_test",

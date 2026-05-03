@@ -9,6 +9,22 @@ import {
   evaluateTerminalIntervention
 } from "../src/workspace/terminal-orchestration.js";
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForTerminalStatus(service, projectId, terminalId, status, { timeoutMs = 5000 } = {}) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const terminal = service.runtimeHandle.database.getWorkspaceTerminalSession(terminalId);
+    if (terminal?.status === status) {
+      return terminal;
+    }
+    await sleep(50);
+  }
+  throw new Error(`Timed out waiting for terminal ${terminalId} to reach ${status}.`);
+}
+
 export async function run() {
   assert.equal(
     detectCliAgentKind({ command: "codex", recentOutput: "OpenAI Codex waiting for input" }),
@@ -62,7 +78,9 @@ export async function run() {
   assert.equal(autonomousDecision.action, "auto_inject_context");
   assert.equal(autonomousDecision.requiresApproval, false);
 
-  const service = await OperatorService.create();
+  const service = await OperatorService.create({
+    cliAllowedCommands: [process.execPath]
+  });
   try {
     await service.clearTemporaryRuntimeState();
     for (const project of service.listProjects()) {
@@ -98,6 +116,40 @@ export async function run() {
     const dashboard = await service.getDashboard(project.id);
     assert.equal(dashboard.workspace.summary.terminalCount, 1);
     assert.equal(dashboard.workspace.browserStrategy.supportedModes.includes("system_browser_mode"), true);
+
+    const processResult = service.startWorkspaceTerminalProcess(project.id, {
+      label: "Node test worker",
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "console.log('worker ready')",
+          "console.log('Approve this command? [y/n]')",
+          "process.stdin.setEncoding('utf8')",
+          "process.stdin.on('data', (chunk) => { console.log('received:' + chunk.trim()); process.exit(0) })",
+          "setTimeout(() => process.exit(2), 8000)"
+        ].join(";")
+      ],
+      authorized: true,
+      autonomyMode: "assisted"
+    });
+    assert.equal(processResult.terminal.status, TERMINAL_STATUS.RUNNING);
+    const waitingTerminal = await waitForTerminalStatus(service, project.id, processResult.terminal.id, TERMINAL_STATUS.WAITING_FOR_INPUT);
+    assert.equal(waitingTerminal.recentOutput.includes("Approve this command?"), true);
+    assert.throws(
+      () => service.writeWorkspaceTerminalInput(project.id, processResult.terminal.id, { input: "y" }),
+      /requires explicit approval/
+    );
+    service.writeWorkspaceTerminalInput(project.id, processResult.terminal.id, {
+      input: "y",
+      approved: true
+    });
+    const completedTerminal = await waitForTerminalStatus(service, project.id, processResult.terminal.id, TERMINAL_STATUS.COMPLETED);
+    assert.equal(completedTerminal.recentOutput.includes("received:y"), true);
+    const terminalEvents = service.runtimeHandle.database.listWorkspaceTerminalEvents(project.id, {
+      terminalId: processResult.terminal.id
+    });
+    assert.equal(terminalEvents.some((event) => event.eventType === "process.input"), true);
   } finally {
     await service.close();
   }

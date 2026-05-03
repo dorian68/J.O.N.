@@ -22,6 +22,7 @@ export const BROWSER_PLAN_ACTIONS = Object.freeze([
   "type",
   "select",
   "extract_text",
+  "extract_structured_rows",
   "detect_blockers",
   "verify_outcome",
   "capture_evidence",
@@ -43,6 +44,13 @@ function malformed(message) {
   return Object.assign(new Error(message), {
     category: "malformed_output"
   });
+}
+
+function deterministicFallbackAllowed(llmGateway) {
+  if (!llmGateway) {
+    return true;
+  }
+  return llmGateway.getStatus?.().deterministicFallback !== false;
 }
 
 function cleanText(value, maxLength = 600) {
@@ -304,6 +312,9 @@ function normalizeStep(step, index, allowlistedHosts) {
     riskLevel: cleanText(step.riskLevel, 40) || (["click", "type", "select", "navigate"].includes(action) ? "medium" : "low"),
     requiresApproval: step.requiresApproval === true,
     evidenceLabel: cleanText(step.evidenceLabel, 120) || null,
+    artifact: step.artifact && typeof step.artifact === "object" && !Array.isArray(step.artifact) ? step.artifact : null,
+    adapter: step.adapter && typeof step.adapter === "object" && !Array.isArray(step.adapter) ? step.adapter : null,
+    outputKey: cleanText(step.outputKey, 80) || null,
     stopOnFailure: step.stopOnFailure !== false
   };
 
@@ -325,6 +336,9 @@ function normalizeStep(step, index, allowlistedHosts) {
 
   if (["query_interactive", "click", "type", "select", "extract_text"].includes(action) && !normalized.selector && !normalized.fieldMap) {
     throw malformed(`Browser action ${action} requires a selector or fieldMap.`);
+  }
+  if (action === "extract_structured_rows" && !normalized.artifact && !normalized.adapter) {
+    throw malformed("Browser extract_structured_rows step requires a generated adapter artifact.");
   }
   if (["type", "select"].includes(action) && normalized.value == null) {
     throw malformed(`Browser action ${action} requires a value.`);
@@ -533,6 +547,100 @@ export function buildDeterministicBrowserPlan(input = {}) {
   }, { allowlistedHosts, startUrl });
 }
 
+// Watcher change reasons that warrant generating a new plan from current state.
+export const BROWSER_REPLAN_TRIGGERS = Object.freeze([
+  "url_changed",
+  "blocker_changed",
+  "active_target_changed"
+]);
+
+// Returns the first change in the list that qualifies as a replan trigger.
+export function selectReplanTriggerChange(changes = []) {
+  for (const change of changes) {
+    const reasons = change.reasons ?? [];
+    const hasReplanReason = reasons.some((r) => BROWSER_REPLAN_TRIGGERS.includes(r));
+    if (!hasReplanReason) continue;
+    // Blockers that need manual intervention are not replanned — they surface to the user.
+    const blocker = change.after?.activeTarget?.blocker;
+    if (blocker?.blocked) {
+      // Auth gates and CAPTCHAs require manual handoff, not replanning.
+      const reason = String(blocker.reason ?? "").toLowerCase();
+      const manualOnly = /captcha|auth|login|sign.?in|credential|payment/.test(reason);
+      if (manualOnly) continue;
+    }
+    return change;
+  }
+  return null;
+}
+
+// Minimal safe continuation plan used when the LLM is unavailable during a replan.
+// Reads current state, captures evidence, and stops so the run has a clean record.
+export function buildDeterministicBrowserReplan(input = {}) {
+  const mission = cleanText(input.mission ?? "Browser mission continuation", 360);
+  const currentUrl = cleanText(input.currentUrl ?? input.startUrl ?? "about:blank", 2048);
+  const allowlistedHosts = normalizeHosts(input.allowlistedHosts ?? input.allowlistedDomains ?? [
+    deriveHost(currentUrl)
+  ]);
+
+  const steps = [
+    {
+      id: "replan_wait_loaded",
+      action: "wait_state",
+      label: "Wait for page to settle after state change",
+      target: { waitState: "domcontentloaded" },
+      requiresApproval: false,
+      riskLevel: "low",
+      stopOnFailure: false
+    },
+    {
+      id: "replan_read_state",
+      action: "read_state",
+      label: "Read browser state after change",
+      requiresApproval: false,
+      riskLevel: "low"
+    },
+    {
+      id: "replan_read_dom",
+      action: "read_dom",
+      label: "Inspect DOM after change",
+      requiresApproval: false,
+      riskLevel: "low"
+    },
+    {
+      id: "replan_detect_blockers",
+      action: "detect_blockers",
+      label: "Detect blocking dialogs after change",
+      requiresApproval: false,
+      riskLevel: "low",
+      stopOnFailure: true
+    },
+    {
+      id: "replan_capture_evidence",
+      action: "capture_evidence",
+      label: "Capture browser state after replan (deterministic fallback)",
+      evidenceLabel: "browser-replan-fallback-proof",
+      requiresApproval: false,
+      riskLevel: "low"
+    }
+  ];
+
+  return validateBrowserPlanOutput({
+    schemaVersion: BROWSER_PLAN_SCHEMA_VERSION,
+    missionSummary: `${mission} [replan fallback]`,
+    intentType: "page_review",
+    coverageStatus: "replan_fallback",
+    startUrl: currentUrl,
+    allowlistedHosts,
+    steps,
+    verificationGoals: ["Confirm current page state is captured after unexpected navigation."],
+    expectedEvidence: ["browser_state_after_replan", "page_screenshot"],
+    blockersToDetect: ["modal_dialog", "auth_gate", "captcha_or_automation_block"],
+    manualHandoffReasons: ["Unexpected navigation detected; manual review may be needed."],
+    safetyNotes: ["Deterministic fallback replan — no interaction, read-only observation."],
+    confidence: "low"
+  }, { allowlistedHosts, startUrl: currentUrl });
+}
+
 export async function generateBrowserPlan({
   llmGateway = null,
   runId = "browser_plan_preview",
@@ -570,7 +678,8 @@ export async function generateBrowserPlan({
             capabilityGraph: JSON.stringify(input.capabilityGraph ?? null),
             stepHints: JSON.stringify(input.stepHints ?? []),
             fieldMap: JSON.stringify(input.fieldMap ?? null),
-            expectedOutcome: input.expectedOutcome ?? ""
+            expectedOutcome: input.expectedOutcome ?? "",
+            projectMemory: JSON.stringify(input.projectMemory ?? null)
           }
         }
       ],
@@ -588,8 +697,91 @@ export async function generateBrowserPlan({
       generationMode: "llm"
     };
   } catch (error) {
+    if (!deterministicFallbackAllowed(llmGateway)) {
+      throw error;
+    }
     return {
       output: buildDeterministicBrowserPlan(input),
+      callRecord: error.callRecord ?? null,
+      generationMode: "deterministic_fallback",
+      fallbackReason: error.category ?? "provider_unavailable"
+    };
+  }
+}
+
+// Generates a continuation plan from the current mid-run page state.
+// Called when the browser watcher detects a significant change (url_changed, dom_changed, etc.)
+// and the run should adapt rather than stop.
+export async function generateBrowserReplan({
+  llmGateway = null,
+  runId = "browser_replan_preview",
+  projectId = "browser_operator",
+  input = {}
+} = {}) {
+  const currentUrl = cleanText(
+    input.currentBrowserState?.url ?? input.currentBrowserState?.activeTarget?.url ?? input.currentUrl ?? "",
+    2048
+  );
+
+  if (!llmGateway) {
+    return {
+      output: buildDeterministicBrowserReplan({ ...input, currentUrl }),
+      callRecord: null,
+      generationMode: "deterministic_fallback",
+      fallbackReason: "no_llm_gateway"
+    };
+  }
+
+  try {
+    const result = await llmGateway.generateStructured({
+      runId,
+      projectId,
+      callType: LLM_CALL_TYPE.BROWSER_REPLAN,
+      modelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
+      promptRefs: [
+        {
+          promptId: "system.primary_reasoning",
+          version: "1.0.0"
+        },
+        {
+          promptId: "task.browser_replan",
+          version: "1.0.0",
+          bindings: {
+            mission: input.mission ?? "",
+            completedStepsSummary: input.completedStepsSummary ?? "",
+            triggerReason: input.triggerReason ?? "",
+            currentBrowserState: JSON.stringify(input.currentBrowserState ?? null),
+            currentDomSnapshot: JSON.stringify(input.currentDomSnapshot ?? null),
+            visualDescription: JSON.stringify(input.visualDescription ?? null),
+            extractedData: JSON.stringify(input.extractedData ?? null),
+            allowlistedHosts: JSON.stringify(input.allowlistedHosts ?? input.allowlistedDomains ?? []),
+            projectMemory: JSON.stringify(input.projectMemory ?? null)
+          }
+        }
+      ],
+      input,
+      metadata: {
+        reasoningStage: REASONING_STAGE.BROWSER_REPLAN,
+        browserPlannerVersion: BROWSER_PLAN_SCHEMA_VERSION,
+        requestedModelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
+        replanTrigger: input.triggerReason ?? null
+      },
+      validateOutput: (output) => validateBrowserPlanOutput(output, {
+        allowlistedHosts: input.allowlistedHosts ?? input.allowlistedDomains ?? [],
+        startUrl: currentUrl
+      })
+    });
+    return {
+      output: result.output,
+      callRecord: result.callRecord,
+      generationMode: "llm"
+    };
+  } catch (error) {
+    if (!deterministicFallbackAllowed(llmGateway)) {
+      throw error;
+    }
+    return {
+      output: buildDeterministicBrowserReplan({ ...input, currentUrl }),
       callRecord: error.callRecord ?? null,
       generationMode: "deterministic_fallback",
       fallbackReason: error.category ?? "provider_unavailable"

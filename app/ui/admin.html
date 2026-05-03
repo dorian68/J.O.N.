@@ -206,11 +206,29 @@
                 <p class="muted">Secondary maintenance and benchmark tools</p>
               </div>
               <div class="card-actions">
+                <button type="button" class="secondary" data-action="run-cowork-smoke">Run cowork smoke</button>
+                <button type="button" class="secondary" data-action="run-real-surface-smoke">Run real-surface smoke</button>
                 <button type="button" class="secondary" data-action="run-benchmarks">Run benchmarks</button>
                 <button type="button" class="ghost" data-action="clear-temp-state">Clear temp state</button>
               </div>
             </section>
           </div>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Cowork smoke pipeline</h2>
+              <p class="muted">Controlled backend smoke tests for budget, memory, simultaneity, browser execution, and traceability</p>
+            </div>
+            <div id="cowork-smoke-pane"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Real-surface smoke</h2>
+              <p class="muted">Config-driven probes for canvas, PDF, dropdowns, slow pages, network failures, and optional JON allowlisted research</p>
+            </div>
+            <div id="real-surface-smoke-pane"></div>
+          </section>
 
           <section class="panel">
             <div class="panel-header">

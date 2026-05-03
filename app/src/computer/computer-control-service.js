@@ -274,7 +274,7 @@ export class ComputerControlService {
     return comparePerception(before, after);
   }
 
-  async waitForUiState(windowId, matcher, { timeoutMs = 3000, intervalMs = 100 } = {}) {
+  async waitForUiState(windowId, matcher, { timeoutMs = 6000, intervalMs = 100 } = {}) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const inspection = await this.inspectVisibleUi(windowId);
@@ -294,7 +294,7 @@ export class ComputerControlService {
     };
   }
 
-  async waitForVisibleWindowMatch(matcher, { timeoutMs = 4000, intervalMs = 120 } = {}) {
+  async waitForVisibleWindowMatch(matcher, { timeoutMs = 12000, intervalMs = 120 } = {}) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const visibleWindows = await this.listVisibleWindows();

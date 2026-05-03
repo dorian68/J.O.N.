@@ -7,6 +7,7 @@ import { LLM_CALL_TYPE, LLM_PROVIDER_ALIAS } from "../src/config.js";
 class ScriptedProvider {
   constructor(script = []) {
     this.script = [...script];
+    this.calls = [];
     this.providerAlias = LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE;
   }
 
@@ -18,7 +19,8 @@ class ScriptedProvider {
     return `scripted/${modelAlias}`;
   }
 
-  async generateStructured() {
+  async generateStructured(request = {}) {
+    this.calls.push(request);
     const next = this.script.shift();
     if (!next) {
       throw Object.assign(new Error("Script exhausted."), {
@@ -35,12 +37,13 @@ class ScriptedProvider {
   }
 }
 
-async function createGateway({ liveScript, providerOrder = ["openai_compatible", "mock_offline"], budgets } = {}) {
+async function createGateway({ liveScript, providerOrder = ["openai_compatible", "mock_offline"], budgets, productionStrict = false } = {}) {
   const promptRegistry = await new PromptRegistry().load();
+  const liveProvider = new ScriptedProvider(liveScript);
   return new InternalLlmGateway({
     promptRegistry,
     providers: new Map([
-      [LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE, new ScriptedProvider(liveScript)],
+      [LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE, liveProvider],
       [LLM_PROVIDER_ALIAS.MOCK_OFFLINE, new MockOfflineProvider()]
     ]),
     providerMode: "openai_compatible",
@@ -50,6 +53,7 @@ async function createGateway({ liveScript, providerOrder = ["openai_compatible",
         maxAttemptsPerProvider: 2,
         backoffMs: 0
       },
+      productionStrict,
       budgets: budgets ?? {
         perRunTokens: 12_000,
         perSessionTokens: 50_000,
@@ -73,7 +77,8 @@ async function createGateway({ liveScript, providerOrder = ["openai_compatible",
       },
       providers: {},
       deterministicFallback: true,
-      allowMockFallback: true
+      allowMockFallback: true,
+      productionStrict
     }
   });
 }
@@ -123,17 +128,71 @@ export async function run() {
   assert.equal(retryResult.callRecord.retryCount, 1);
   assert.equal(retryResult.callRecord.fallbackChain.length, 1);
 
-  const rateLimitGateway = await createGateway({
+  const repairGateway = await createGateway({
+    liveScript: [
+      {
+        type: "return",
+        response: {
+          output: {
+            coveredNow: "not the expected shape"
+          },
+          providerModel: "scripted/primary_reasoning",
+          tokenUsage: { inputTokens: 20, outputTokens: 20, totalTokens: 40 },
+          estimatedCost: 0.001
+        }
+      },
+      {
+        type: "return",
+        response: {
+          output: {
+            steps: ["repaired live plan step"],
+            assumptions: ["repaired assumption"]
+          },
+          providerModel: "scripted/primary_reasoning",
+          tokenUsage: { inputTokens: 30, outputTokens: 25, totalTokens: 55 },
+          estimatedCost: 0.002
+        }
+      }
+    ]
+  });
+  const repairResult = await repairGateway.generateStructured({
+    runId: "run_repair",
+    projectId: "prj_repair",
+    callType: LLM_CALL_TYPE.PLAN_GENERATION,
+    promptRefs: promptRefs("Repair output mission"),
+    input: { mission: "Repair output mission" },
+    validateOutput: (output) => {
+      if ("coveredNow" in output) {
+        throw new Error("coveredNow must be an array.");
+      }
+      return output;
+    }
+  });
+  assert.equal(repairResult.callRecord.providerAlias, "openai_compatible");
+  assert.equal(repairResult.callRecord.retryCount, 1);
+  assert.equal(repairResult.callRecord.metadata.schemaRepairAttempted, true);
+  assert.ok(repairResult.callRecord.fallbackChain.some((entry) => entry.errorCategory === "malformed_output" && entry.repairRetry === true));
+  const repairProviderCalls = repairGateway.providers.get(LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE).calls;
+  assert.equal(repairProviderCalls.length, 2);
+  assert.ok(repairProviderCalls[1].extraMessages.some((message) => message.content.includes("coveredNow must be an array.")));
+
+  const transientGateway = await createGateway({
     liveScript: [
       {
         type: "throw",
-        category: "rate_limit",
-        message: "rate limited",
+        category: "timeout",
+        message: "first timeout",
+        retryAfterMs: 0
+      },
+      {
+        type: "throw",
+        category: "timeout",
+        message: "second timeout",
         retryAfterMs: 0
       }
     ]
   });
-  const degradedResult = await rateLimitGateway.generateStructured({
+  const degradedResult = await transientGateway.generateStructured({
     runId: "run_degraded",
     projectId: "prj_degraded",
     callType: LLM_CALL_TYPE.PLAN_GENERATION,
@@ -143,9 +202,9 @@ export async function run() {
   });
   assert.equal(degradedResult.callRecord.providerAlias, "mock_offline");
   assert.equal(degradedResult.callRecord.metadata.degradedModeUsed, true);
-  assert.ok(degradedResult.callRecord.fallbackChain.some((entry) => entry.errorCategory === "rate_limit"));
+  assert.ok(degradedResult.callRecord.fallbackChain.some((entry) => entry.errorCategory === "timeout"));
 
-  const secondDegraded = await rateLimitGateway.generateStructured({
+  const secondDegraded = await transientGateway.generateStructured({
     runId: "run_degraded_again",
     projectId: "prj_degraded",
     callType: LLM_CALL_TYPE.PLAN_GENERATION,
@@ -155,6 +214,40 @@ export async function run() {
   });
   assert.equal(secondDegraded.callRecord.providerAlias, "mock_offline");
   assert.ok(secondDegraded.callRecord.fallbackChain.some((entry) => entry.errorCategory === "circuit_open"));
+
+  const strictGateway = await createGateway({
+    productionStrict: true,
+    liveScript: [
+      {
+        type: "throw",
+        category: "rate_limit",
+        message: "rate limited",
+        retryAfterMs: 0
+      },
+      {
+        type: "throw",
+        category: "rate_limit",
+        message: "rate limited again",
+        retryAfterMs: 0
+      }
+    ]
+  });
+  let strictError = null;
+  try {
+    await strictGateway.generateStructured({
+      runId: "run_strict",
+      projectId: "prj_strict",
+      callType: LLM_CALL_TYPE.PLAN_GENERATION,
+      promptRefs: promptRefs("Strict mission"),
+      input: { mission: "Strict mission" },
+      validateOutput
+    });
+  } catch (error) {
+    strictError = error;
+  }
+  assert.ok(strictError, "Production strict mode should fail closed instead of using mock fallback.");
+  assert.equal(strictError.category, "rate_limit");
+  assert.ok(strictError.callRecord.fallbackChain.some((entry) => entry.errorCategory === "mock_forbidden"));
 
   const malformedGateway = await createGateway({
     liveScript: [

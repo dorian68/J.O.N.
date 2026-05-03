@@ -57,6 +57,40 @@ export async function run() {
   }, contract);
   assert.equal(browserDraft.parameters.browserLaunch.browserId, "edge");
 
+  const upworkDraft = normalizeMissionDraft({
+    objective: "Ouvrir Upwork et lister 5 postes autour de Excel.",
+    parameters: {
+      website: "Upwork",
+      searchQuery: "Excel",
+      resultCount: 5,
+      application: "Google Chrome"
+    }
+  }, contract);
+  assert.equal(upworkDraft.parameters.browserLaunch.browserId, "chrome");
+  assert.equal(upworkDraft.parameters.browserLaunch.searchQuery, "Excel");
+  assert.equal(upworkDraft.parameters.browserLaunch.resultCount, 5);
+  assert.equal(upworkDraft.parameters.browserLaunch.targetSite, "Upwork");
+  assert.equal(upworkDraft.parameters.browserLaunch.resultType, "jobs");
+  assert.equal(upworkDraft.parameters.browserLaunch.searchUrl.includes("google.com/search"), true);
+  assert.equal(upworkDraft.parameters.browserLaunch.searchUrl.includes("Upwork"), true);
+  assert.equal(upworkDraft.parameters.browserLaunch.searchUrl.includes("Excel"), true);
+  assert.equal(upworkDraft.parameters.computerAction.type, "launch_browser_search");
+
+  const linkedInDraft = normalizeMissionDraft({
+    objective: "Open LinkedIn and list 3 data analyst jobs.",
+    parameters: {
+      website: "linkedin.com",
+      searchQuery: "data analyst",
+      resultCount: 3,
+      browser: "Chrome"
+    }
+  }, contract);
+  assert.equal(linkedInDraft.parameters.browserLaunch.browserId, "chrome");
+  assert.equal(linkedInDraft.parameters.browserLaunch.targetSite, "linkedin.com");
+  assert.equal(linkedInDraft.parameters.browserLaunch.resultType, "jobs");
+  assert.equal(linkedInDraft.parameters.browserLaunch.searchUrl.includes("site%3Alinkedin.com"), true);
+  assert.equal(linkedInDraft.parameters.computerAction.type, "launch_browser_search");
+
   const applicationDraft = normalizeMissionDraft({
     objective: "Open my note editor.",
     parameters: {
@@ -93,6 +127,23 @@ export async function run() {
     }
   }, contract);
   assert.equal(browserSpec.parameters.browserLaunch.browserId, "chrome");
+
+  const upworkSpec = normalizeMissionSpec({
+    objective: "Ouvrir Upwork et lister 5 postes autour de Excel.",
+    deliverable: "Liste de 5 postes Excel sur Upwork",
+    parameters: {
+      website: "Upwork",
+      searchQuery: "Excel",
+      resultCount: 5,
+      application: "Google Chrome"
+    }
+  }, contract);
+  assert.equal(upworkSpec.mode, "computer");
+  assert.equal(upworkSpec.parameters.browserLaunch.browserId, "chrome");
+  assert.equal(upworkSpec.parameters.computerAction.type, "launch_browser_search");
+  assert.equal(buildMissionStatement(upworkSpec).includes("Browser target site if needed: Upwork"), true);
+  assert.equal(buildMissionStatement(upworkSpec).includes("Requested browser result type if needed: jobs"), true);
+  assert.equal(buildMissionStatement(upworkSpec).includes("Requested browser result count if needed: 5"), true);
 
   const appStatement = buildMissionStatement(applicationDraft, contract.modes.find((mode) => mode.id === "computer"));
   assert.equal(appStatement.includes("Preferred application if needed: obsidian"), true);

@@ -1,8 +1,29 @@
 import fs from "node:fs/promises";
 import http from "node:http";
+import https from "node:https";
+import crypto from "node:crypto";
 import path from "node:path";
+import os from "node:os";
+import { spawn } from "node:child_process";
+import QRCode from "qrcode";
 import { APP_ROOT, DEFAULT_OPERATOR_PORT } from "../config.js";
 import { OperatorService } from "../service/operator-service.js";
+import { attachMobileTerminalWs } from "../mobile/mobile-terminal-ws.js";
+import { CoworkSmokeBackofficeService } from "../smoke/cowork-smoke-pipeline.js";
+import { RealSurfaceSmokeBackofficeService } from "../smoke/real-surface-smoke-pipeline.js";
+
+const COWORK_HOME = process.env.COWORK_HOME ?? path.join(os.homedir(), ".cowork");
+const TLS_DIR = path.join(COWORK_HOME, "tls");
+
+function getLanIp() {
+  const ifaces = os.networkInterfaces();
+  for (const list of Object.values(ifaces)) {
+    for (const iface of list) {
+      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+    }
+  }
+  return "127.0.0.1";
+}
 
 const UI_ROOT = path.join(APP_ROOT, "ui");
 
@@ -88,7 +109,9 @@ async function serveStaticAsset(response, pathname) {
     ? "/index.html"
     : pathname === "/admin" || pathname === "/admin/"
       ? "/admin.html"
-      : pathname;
+      : pathname === "/mobile" || pathname === "/mobile/"
+        ? "/mobile/index.html"
+        : pathname;
   const assetPath = path.normalize(path.join(UI_ROOT, requested));
   if (!assetPath.startsWith(UI_ROOT)) {
     sendError(response, 403, "Forbidden");
@@ -108,11 +131,91 @@ async function serveStaticAsset(response, pathname) {
   }
 }
 
+async function generateSelfSignedCert() {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
+
+  // Minimal self-signed X.509 cert using Node.js built-in crypto (available since v15)
+  // Falls back gracefully if X509Certificate generation is not available
+  try {
+    const cert = crypto.X509Certificate
+      ? (() => {
+        // Use forge-style minimal DER encoding — if unavailable, fall through
+        throw new Error("use-selfsigned");
+      })()
+      : null;
+    if (cert) return { key: privateKeyPem, cert };
+  } catch {}
+
+  // Fallback: use openssl via child_process if available, else return null (HTTP fallback)
+  try {
+    const { execFileSync } = await import("node:child_process");
+    const key = execFileSync("openssl", [
+      "req", "-x509", "-newkey", "rsa:2048", "-keyout", "/dev/stdout",
+      "-out", "/dev/stdout", "-days", "365", "-nodes",
+      "-subj", "/CN=JON-local"
+    ], { encoding: "utf8", timeout: 10000 });
+    return { key, cert: key };
+  } catch {}
+
+  return null;
+}
+
+async function buildTlsCredentials() {
+  const keyPath = path.join(TLS_DIR, "jon-local.key");
+  const certPath = path.join(TLS_DIR, "jon-local.crt");
+
+  // Reuse persistent cert if < 180 days old
+  try {
+    const stat = await fs.stat(certPath);
+    if ((Date.now() - stat.mtimeMs) / 86400000 < 180) {
+      return {
+        key: await fs.readFile(keyPath, "utf8"),
+        cert: await fs.readFile(certPath, "utf8")
+      };
+    }
+  } catch {}
+
+  await fs.mkdir(TLS_DIR, { recursive: true });
+  const localIp = getLanIp();
+
+  await new Promise((resolve, reject) => {
+    const proc = spawn("openssl", [
+      "req", "-x509", "-newkey", "rsa:2048",
+      "-keyout", keyPath, "-out", certPath,
+      "-days", "365", "-nodes",
+      "-subj", `/CN=JON-local/O=JON`,
+      "-addext", `subjectAltName=IP:${localIp},IP:127.0.0.1`
+    ], { stdio: "ignore" });
+    proc.on("close", (code) => code === 0 ? resolve() : reject(new Error(`openssl exit ${code}`)));
+    proc.on("error", reject);
+  });
+
+  return {
+    key: await fs.readFile(keyPath, "utf8"),
+    cert: await fs.readFile(certPath, "utf8")
+  };
+}
+
 export async function createOperatorServer({
   port = DEFAULT_OPERATOR_PORT,
   operatorServiceOptions = {}
 } = {}) {
+  const useTls = process.env.COWORK_TLS === "1";
+  let tlsCredentials = null;
+  if (useTls) {
+    try {
+      tlsCredentials = await buildTlsCredentials();
+      console.log(`[TLS] Certificate ready — ${path.join(TLS_DIR, "jon-local.crt")}`);
+    } catch (err) {
+      console.warn(`[TLS] Certificate generation failed (${err.message}). Falling back to HTTP.`);
+    }
+  }
+  const serverInfo = { scheme: "http", port, lanIp: getLanIp() };
+
   const operatorService = await OperatorService.create(operatorServiceOptions);
+  const smokeBackoffice = new CoworkSmokeBackofficeService();
+  const realSurfaceSmokeBackoffice = new RealSurfaceSmokeBackofficeService();
   const eventSubscribers = new Set();
 
   const broadcastEvent = (payload) => {
@@ -132,7 +235,7 @@ export async function createOperatorServer({
 
   operatorService.on("state.changed", handleStateChanged);
 
-  const server = http.createServer(async (request, response) => {
+  const requestHandler = async (request, response) => {
     try {
       if (!request.url) {
         sendError(response, 400, "Missing URL");
@@ -152,6 +255,79 @@ export async function createOperatorServer({
 
       if (pathname === "/api/dashboard" && request.method === "GET") {
         sendJson(response, 200, await operatorService.getDashboard(url.searchParams.get("projectId")));
+        return;
+      }
+
+      if (pathname === "/api/smoke/status" && request.method === "GET") {
+        sendJson(response, 200, smokeBackoffice.getStatus());
+        return;
+      }
+      if (pathname === "/api/smoke/latest" && request.method === "GET") {
+        sendJson(response, 200, {
+          latest: await smokeBackoffice.getLatest(),
+          history: await smokeBackoffice.listReports({ limit: 5 }),
+          status: smokeBackoffice.getStatus()
+        });
+        return;
+      }
+      if (pathname === "/api/smoke/run" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        const report = await smokeBackoffice.run({
+          includeBrowser: body.includeBrowser !== false,
+          runner: body.runner ?? "backoffice"
+        });
+        sendJson(response, 200, {
+          report
+        });
+        return;
+      }
+      if (pathname === "/api/smoke/real-surfaces/status" && request.method === "GET") {
+        sendJson(response, 200, realSurfaceSmokeBackoffice.getStatus());
+        return;
+      }
+      if (pathname === "/api/smoke/real-surfaces/latest" && request.method === "GET") {
+        sendJson(response, 200, {
+          latest: await realSurfaceSmokeBackoffice.getLatest(),
+          history: await realSurfaceSmokeBackoffice.listReports({ limit: 5 }),
+          status: realSurfaceSmokeBackoffice.getStatus()
+        });
+        return;
+      }
+      if (pathname === "/api/smoke/real-surfaces/run" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        const report = await realSurfaceSmokeBackoffice.run({
+          configPath: body.configPath ?? null,
+          runner: body.runner ?? "backoffice"
+        });
+        sendJson(response, 200, {
+          report
+        });
+        return;
+      }
+
+      if (pathname === "/api/memory/startup" && request.method === "GET") {
+        sendJson(response, 200, operatorService.getStartupMemoryContext(url.searchParams.get("projectId")));
+        return;
+      }
+      if (pathname === "/api/memory/records" && request.method === "GET") {
+        sendJson(response, 200, {
+          records: operatorService.listUserMemoryRecords({
+            projectId: url.searchParams.get("projectId"),
+            category: url.searchParams.get("category"),
+            limit: url.searchParams.get("limit") ?? 50
+          })
+        });
+        return;
+      }
+      if (pathname === "/api/memory/search" && request.method === "GET") {
+        sendJson(response, 200, {
+          records: operatorService.searchUserMemoryRecords({
+            query: url.searchParams.get("q") ?? "",
+            projectId: url.searchParams.get("projectId"),
+            category: url.searchParams.get("category"),
+            limit: url.searchParams.get("limit") ?? 25
+          })
+        });
         return;
       }
 
@@ -200,9 +376,69 @@ export async function createOperatorServer({
         }));
         return;
       }
+      if (pathname === "/api/capabilities/build/propose" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, await operatorService.proposeCapabilityBuild(body));
+        return;
+      }
+      if (pathname === "/api/capabilities/candidates" && request.method === "GET") {
+        sendJson(response, 200, {
+          candidates: operatorService.listCapabilityCandidates({
+            status: url.searchParams.get("status")
+          })
+        });
+        return;
+      }
+      if (pathname === "/api/capabilities/candidates" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 201, await operatorService.createCapabilityCandidate(body));
+        return;
+      }
+      const capabilityCandidateValidateRoute = matchRoute(pathname, /^\/api\/capabilities\/candidates\/(?<candidateId>[^/]+)\/validate$/);
+      if (capabilityCandidateValidateRoute && request.method === "POST") {
+        sendJson(response, 200, await operatorService.validateCapabilityCandidate(decodeURIComponent(capabilityCandidateValidateRoute.candidateId)));
+        return;
+      }
+      const capabilityCandidateEnableRoute = matchRoute(pathname, /^\/api\/capabilities\/candidates\/(?<candidateId>[^/]+)\/enable$/);
+      if (capabilityCandidateEnableRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, await operatorService.enableCapabilityCandidate(decodeURIComponent(capabilityCandidateEnableRoute.candidateId), body));
+        return;
+      }
+      const capabilityCandidateDisableRoute = matchRoute(pathname, /^\/api\/capabilities\/candidates\/(?<candidateId>[^/]+)\/disable$/);
+      if (capabilityCandidateDisableRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, await operatorService.disableCapabilityCandidate(decodeURIComponent(capabilityCandidateDisableRoute.candidateId), body));
+        return;
+      }
+      const capabilityCandidateRunHtmlRoute = matchRoute(pathname, /^\/api\/capabilities\/candidates\/(?<candidateId>[^/]+)\/run-html$/);
+      if (capabilityCandidateRunHtmlRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, await operatorService.executeCapabilityCandidateOnHtml(decodeURIComponent(capabilityCandidateRunHtmlRoute.candidateId), body));
+        return;
+      }
       if (pathname === "/api/capabilities/feedback" && request.method === "POST") {
         const body = await readJsonBody(request);
         sendJson(response, 200, await operatorService.recordOperatorCapabilityFeedback(body));
+        return;
+      }
+      const capabilityCandidateStatsRoute = matchRoute(pathname, /^\/api\/capabilities\/candidates\/(?<candidateId>[^/]+)\/stats$/);
+      if (capabilityCandidateStatsRoute && request.method === "GET") {
+        sendJson(response, 200, operatorService.getCapabilityCandidateStats(decodeURIComponent(capabilityCandidateStatsRoute.candidateId)));
+        return;
+      }
+      const capabilityCandidateOutcomeRoute = matchRoute(pathname, /^\/api\/capabilities\/candidates\/(?<candidateId>[^/]+)\/outcome$/);
+      if (capabilityCandidateOutcomeRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, operatorService.recordCapabilityRunOutcome(
+          decodeURIComponent(capabilityCandidateOutcomeRoute.candidateId),
+          { runId: body.runId ?? null, projectId: body.projectId ?? null, mission: body.mission ?? null, outcomeStatus: body.outcomeStatus, approvalCount: body.approvalCount ?? 0, evidenceCount: body.evidenceCount ?? 0 }
+        ));
+        return;
+      }
+      if (pathname === "/api/capabilities/candidates/select" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, { candidate: operatorService.selectEnabledCapabilityForMission(body.mission ?? "", body.desiredOutcome ?? "") });
         return;
       }
       if (pathname === "/api/skills" && request.method === "GET") {
@@ -265,6 +501,14 @@ export async function createOperatorServer({
         sendJson(response, 200, {
           runs: operatorService.listRuns(projectRunsRoute.projectId)
         });
+        return;
+      }
+
+      const runAuditRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/runs\/(?<runId>[^/]+)\/audit$/);
+      if (runAuditRoute && request.method === "GET") {
+        const audit = await operatorService.extractRunAudit(runAuditRoute.runId);
+        if (!audit) { sendError(response, 404, "Run not found"); return; }
+        sendJson(response, 200, audit);
         return;
       }
       if (projectRunsRoute && request.method === "POST") {
@@ -381,6 +625,13 @@ export async function createOperatorServer({
         return;
       }
 
+      const projectWorkspaceTerminalProcessesRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminal-processes$/);
+      if (projectWorkspaceTerminalProcessesRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 201, operatorService.startWorkspaceTerminalProcess(projectWorkspaceTerminalProcessesRoute.projectId, body));
+        return;
+      }
+
       const projectWorkspaceTerminalRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminals\/(?<terminalId>[^/]+)$/);
       if (projectWorkspaceTerminalRoute && request.method === "PATCH") {
         const body = await readJsonBody(request);
@@ -392,9 +643,347 @@ export async function createOperatorServer({
         return;
       }
 
+      const projectWorkspaceTerminalInputRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminals\/(?<terminalId>[^/]+)\/input$/);
+      if (projectWorkspaceTerminalInputRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, operatorService.writeWorkspaceTerminalInput(
+          projectWorkspaceTerminalInputRoute.projectId,
+          decodeURIComponent(projectWorkspaceTerminalInputRoute.terminalId),
+          body
+        ));
+        return;
+      }
+
+      const projectWorkspaceTerminalStreamRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminals\/(?<terminalId>[^/]+)\/stream$/);
+      if (projectWorkspaceTerminalStreamRoute && request.method === "GET") {
+        const { projectId: streamProjectId } = projectWorkspaceTerminalStreamRoute;
+        const terminalId = decodeURIComponent(projectWorkspaceTerminalStreamRoute.terminalId);
+        response.writeHead(200, {
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-store",
+          connection: "keep-alive"
+        });
+
+        if (operatorService.isPtyTerminalActive(terminalId)) {
+          // PTY path — raw binary stream via base64
+          response.write(`event: pty.connected\ndata: ${JSON.stringify({ terminalId, createdAt: new Date().toISOString() })}\n\n`);
+          const cb = (data, exitInfo) => {
+            if (exitInfo !== null) {
+              try {
+                response.write(`event: pty.exit\ndata: ${JSON.stringify({ terminalId, exitCode: exitInfo.exitCode })}\n\n`);
+                response.end();
+              } catch { /* response already closed */ }
+              return;
+            }
+            try {
+              const chunk = Buffer.from(data, "binary").toString("base64");
+              response.write(`event: pty.data\ndata: ${JSON.stringify({ chunk })}\n\n`);
+            } catch { /* response already closed */ }
+          };
+          operatorService.subscribeRawTerminalOutput(terminalId, cb);
+          request.on("close", () => {
+            operatorService.unsubscribeRawTerminalOutput(terminalId, cb);
+          });
+          return;
+        }
+
+        const isCliActive = operatorService.isCliTerminalActive(terminalId);
+        const isPipeType = operatorService.isTerminalTypePipe(terminalId);
+
+        if (!isCliActive && !isPipeType) {
+          // Not a known live terminal — send exit immediately
+          response.write(`event: pty.exit\ndata: ${JSON.stringify({ terminalId, exitCode: null })}\n\n`);
+          response.end();
+          return;
+        }
+
+        // Pipe terminal path — replay stored history then optionally stream live
+        response.write(`event: pty.connected\ndata: ${JSON.stringify({ terminalId, createdAt: new Date().toISOString() })}\n\n`);
+        const history = operatorService.getPipeTerminalHistory(streamProjectId, terminalId);
+        for (const event of history) {
+          let line = "";
+          if (event.eventType === "process.started") {
+            line = "[process started]\r\n";
+          } else if (event.content) {
+            line = event.content.replace(/\r?\n/g, "\r\n");
+            if (!line.endsWith("\r\n")) line += "\r\n";
+          }
+          if (line) {
+            try {
+              const chunk = Buffer.from(line, "utf8").toString("base64");
+              response.write(`event: pty.data\ndata: ${JSON.stringify({ chunk })}\n\n`);
+            } catch { /* response already closed */ }
+          }
+        }
+
+        if (isCliActive) {
+          // Subscribe to live output from the running process
+          const cb = (data, exitInfo) => {
+            if (exitInfo !== null) {
+              try {
+                response.write(`event: pty.exit\ndata: ${JSON.stringify({ terminalId, exitCode: exitInfo.exitCode })}\n\n`);
+                response.end();
+              } catch { /* response already closed */ }
+              return;
+            }
+            try {
+              const text = data.replace(/\r?\n/g, "\r\n");
+              const line = text.endsWith("\r\n") ? text : text + "\r\n";
+              const chunk = Buffer.from(line, "utf8").toString("base64");
+              response.write(`event: pty.data\ndata: ${JSON.stringify({ chunk })}\n\n`);
+            } catch { /* response already closed */ }
+          };
+          operatorService.subscribePipeTerminalOutput(terminalId, cb);
+          request.on("close", () => {
+            operatorService.unsubscribePipeTerminalOutput(terminalId, cb);
+          });
+        } else {
+          // Process has already exited — send exit after history replay
+          response.write(`event: pty.exit\ndata: ${JSON.stringify({ terminalId, exitCode: null })}\n\n`);
+          response.end();
+        }
+        return;
+      }
+
+      const projectWorkspaceTerminalResizeRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminals\/(?<terminalId>[^/]+)\/resize$/);
+      if (projectWorkspaceTerminalResizeRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, operatorService.resizeWorkspaceTerminal(
+          projectWorkspaceTerminalResizeRoute.projectId,
+          decodeURIComponent(projectWorkspaceTerminalResizeRoute.terminalId),
+          body
+        ));
+        return;
+      }
+
+      const projectWorkspaceTerminalStopRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminals\/(?<terminalId>[^/]+)\/stop$/);
+      if (projectWorkspaceTerminalStopRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, operatorService.stopWorkspaceTerminalProcess(
+          projectWorkspaceTerminalStopRoute.projectId,
+          decodeURIComponent(projectWorkspaceTerminalStopRoute.terminalId),
+          body
+        ));
+        return;
+      }
+
+      const projectTokenUsageRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/token-usage$/);
+      if (projectTokenUsageRoute && request.method === "GET") {
+        sendJson(response, 200, operatorService.getTokenUsageSummary(projectTokenUsageRoute.projectId));
+        return;
+      }
+
+      const projectBrowserRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/browser$/);
+      if (projectBrowserRoute && request.method === "GET") {
+        sendJson(response, 200, operatorService.getWorkspaceBrowserState(projectBrowserRoute.projectId));
+        return;
+      }
+      const projectBrowserOpenRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/browser\/open$/);
+      if (projectBrowserOpenRoute && request.method === "POST") {
+        const body = await readJsonBody(request).catch(() => ({}));
+        try {
+          const session = await operatorService.openWorkspaceBrowserSession(projectBrowserOpenRoute.projectId, { url: body.url ?? null });
+          sendJson(response, 200, { session });
+        } catch (err) {
+          sendJson(response, 500, { error: err.message });
+        }
+        return;
+      }
+      const projectAllowlistRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/allowlisted-domains$/);
+      if (projectAllowlistRoute && request.method === "PUT") {
+        const body = await readJsonBody(request);
+        const project = operatorService.updateProjectAllowlistedDomains(projectAllowlistRoute.projectId, body.domains ?? []);
+        sendJson(response, 200, { allowlistedDomains: project?.allowlistedDomains ?? [] });
+        return;
+      }
+
+      // ─── Mobile Gateway Routes ────────────────────────────────────────
+
+      if (pathname === "/api/mobile/server-info" && request.method === "GET") {
+        const { scheme: si_scheme, port: si_port, lanIp } = serverInfo;
+        const publicUrl = process.env.COWORK_PUBLIC_URL ?? null;
+        sendJson(response, 200, {
+          scheme: si_scheme,
+          lanUrl: `${si_scheme}://${lanIp}:${si_port}`,
+          mobileUrl: `${si_scheme}://${lanIp}:${si_port}/mobile/`,
+          publicUrl,
+          tls: Boolean(tlsCredentials),
+          lanEnabled: bindHost === "0.0.0.0"
+        });
+        return;
+      }
+
+      if (pathname === "/api/mobile/pairing/start" && request.method === "POST") {
+        try {
+          const pairing = operatorService.startMobilePairing();
+          const { scheme: si_scheme, port: si_port, lanIp } = serverInfo;
+          const publicUrl = process.env.COWORK_PUBLIC_URL ?? null;
+          const lanBase = `${si_scheme}://${lanIp}:${si_port}`;
+          const pairingUrl = `${publicUrl ?? lanBase}/mobile/?code=${pairing.pairingCode}`;
+          let qrDataUri = null;
+          try { qrDataUri = await QRCode.toDataURL(pairingUrl, { margin: 2, width: 240 }); } catch {}
+          sendJson(response, 200, {
+            ...pairing,
+            lanUrl: lanBase,
+            publicUrl,
+            pairingUrl,
+            qrDataUri,
+            lanEnabled: bindHost === "0.0.0.0"
+          });
+        } catch (err) {
+          sendError(response, 400, err.message);
+        }
+        return;
+      }
+
+      if (pathname === "/api/mobile/pairing/confirm" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        try {
+          const result = operatorService.confirmMobilePairing(body.pairingCode, {
+            deviceName: body.deviceName,
+            deviceFingerprint: body.deviceFingerprint
+          });
+          sendJson(response, 200, result);
+        } catch (err) {
+          sendError(response, 400, err.message);
+        }
+        return;
+      }
+
+      if (pathname === "/api/mobile/session/revoke" && request.method === "POST") {
+        const authHeader = request.headers["authorization"] ?? "";
+        const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+        if (token) operatorService.revokeMobileSession(token);
+        sendJson(response, 200, { revoked: true });
+        return;
+      }
+
+      // All routes below require a valid mobile session token
+      const mobileAuthHeader = request.headers["authorization"] ?? "";
+      const mobileToken = mobileAuthHeader.startsWith("Bearer ") ? mobileAuthHeader.slice(7) : null;
+      const mobileSession = mobileToken ? operatorService.validateMobileSession(mobileToken) : null;
+
+      if (pathname === "/api/mobile/session/status" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, { active: true, ...operatorService.mobileDeviceRegistry.getSessionInfo(mobileToken) });
+        return;
+      }
+
+      if (pathname === "/api/mobile/events" && request.method === "GET") {
+        // EventSource cannot send Authorization headers — accept token from query param as fallback
+        const sseUrl = new URL(request.url, "http://localhost");
+        const sseQueryToken = sseUrl.searchParams.get("token") ?? null;
+        const sseSession = mobileSession ?? (sseQueryToken ? operatorService.validateMobileSession(sseQueryToken) : null);
+        if (!sseSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const since = sseUrl.searchParams.get("since") ?? null;
+        response.writeHead(200, {
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-cache",
+          connection: "keep-alive",
+          "access-control-allow-origin": "*"
+        });
+        const flushBuffer = () => {
+          const events = operatorService.getMobileEventsSince(since);
+          for (const event of events) {
+            writeSse(response, "mobile.event", event);
+          }
+        };
+        flushBuffer();
+        const unsub = operatorService.subscribeMobileEvents((event) => {
+          writeSse(response, "mobile.event", event);
+        });
+        request.on("close", () => unsub());
+        return;
+      }
+
+      const mobileRunsRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/runs$/);
+      if (mobileRunsRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, operatorService.getMobileRuns(mobileRunsRoute.projectId));
+        return;
+      }
+
+      const mobileTerminalsRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/terminals$/);
+      if (mobileTerminalsRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, operatorService.getMobileTerminals(mobileTerminalsRoute.projectId));
+        return;
+      }
+
+      const mobileScreenshotRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/screenshot$/);
+      if (mobileScreenshotRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const screenshot = await operatorService.requestMobileScreenshot(mobileScreenshotRoute.projectId);
+        sendJson(response, 200, { screenshotBase64: screenshot ?? null });
+        return;
+      }
+
+      if (pathname === "/api/mobile/status" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const projects = operatorService.listProjects();
+        sendJson(response, 200, operatorService.getMobileStatus(projects[0]?.id ?? null));
+        return;
+      }
+
+      if (pathname === "/api/mobile/admin/devices" && request.method === "GET") {
+        sendJson(response, 200, operatorService.mobileDeviceRegistry.listDevices());
+        return;
+      }
+
+      const mobileRevokeDeviceRoute = matchRoute(pathname, /^\/api\/mobile\/admin\/devices\/(?<deviceId>[^/]+)\/revoke$/);
+      if (mobileRevokeDeviceRoute && request.method === "POST") {
+        const ok = operatorService.revokeMobileDevice(mobileRevokeDeviceRoute.deviceId);
+        sendJson(response, 200, { revoked: ok });
+        return;
+      }
+
+      if (pathname === "/api/mobile/admin/audit" && request.method === "GET") {
+        sendJson(response, 200, operatorService.mobileAuditLog.list({ limit: 100 }));
+        return;
+      }
+
+      const mobileCommandsRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/commands$/);
+      if (mobileCommandsRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          const result = await operatorService.dispatchMobileCommand(
+            body.command,
+            { ...body.params, _deviceId: mobileSession.device.id },
+            { projectId: mobileCommandsRoute.projectId, deviceId: mobileSession.device.id, token: mobileToken }
+          );
+          sendJson(response, 200, { ok: true, result });
+        } catch (err) {
+          sendError(response, err.code === "BLOCKED_COMMAND" ? 403 : 400, err.message);
+        }
+        return;
+      }
+
+      const mobileApprovalRoute = matchRoute(pathname, /^\/api\/mobile\/approvals\/(?<approvalId>[^/]+)\/respond$/);
+      if (mobileApprovalRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        const decision = body.decision === "approve" ? "approved_once" : "stop_run";
+        try {
+          await operatorService.resolveApproval(mobileApprovalRoute.approvalId, decision, { source: "mobile", deviceId: mobileSession.device.id });
+          sendJson(response, 200, { resolved: true, decision });
+        } catch (err) {
+          sendError(response, 400, err.message);
+        }
+        return;
+      }
+
+      // ─────────────────────────────────────────────────────────────────
+
       const projectRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)$/);
       if (projectRoute && request.method === "DELETE") {
         sendJson(response, 200, await operatorService.deleteProject(projectRoute.projectId));
+        return;
+      }
+
+      const runRecoverRoute = matchRoute(pathname, /^\/api\/runs\/(?<runId>[^/]+)\/recover$/);
+      if (runRecoverRoute && request.method === "POST") {
+        sendJson(response, 200, await operatorService.recoverIncompleteMission(decodeURIComponent(runRecoverRoute.runId)));
         return;
       }
 
@@ -532,15 +1121,38 @@ export async function createOperatorServer({
       console.error(`[operator-server] ${error.message}`);
       sendError(response, 500, error.message, error.stack);
     }
-  });
+  };
 
-  await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve));
+  const server = tlsCredentials
+    ? https.createServer({ key: tlsCredentials.key, cert: tlsCredentials.cert }, requestHandler)
+    : http.createServer(requestHandler);
+
+  // Default: bind on all interfaces so mobile can connect without config.
+  // Set COWORK_BIND_HOST=127.0.0.1 to restrict to localhost only.
+  const bindHost = process.env.COWORK_BIND_HOST ?? "0.0.0.0";
+  await new Promise((resolve) => server.listen(port, bindHost, resolve));
+  attachMobileTerminalWs(server, { validateSession: (token) => operatorService.validateMobileSession(token) });
   const address = server.address();
   const actualPort = typeof address === "object" && address ? address.port : port;
+  const actualHost = typeof address === "object" && address ? address.address : bindHost;
+  // When bound to 0.0.0.0, the desktop shell uses loopback to reach its own server.
+  const localHost = actualHost === "0.0.0.0" ? "127.0.0.1" : actualHost;
+
+  const scheme = tlsCredentials ? "https" : "http";
+  serverInfo.scheme = scheme;
+  serverInfo.port = actualPort;
+  if (tlsCredentials) {
+    console.log(`[TLS] HTTPS on ${bindHost}:${actualPort} — cert: ${path.join(TLS_DIR, "jon-local.crt")}`);
+  }
+  if (bindHost === "0.0.0.0") {
+    console.log(`[LAN] Mobile: ${scheme}://${serverInfo.lanIp}:${actualPort}/mobile/`);
+  }
 
   return {
     port: actualPort,
-    baseUrl: `http://127.0.0.1:${actualPort}`,
+    baseUrl: `${scheme}://${localHost}:${actualPort}`,
+    lanUrl: `${scheme}://${serverInfo.lanIp}:${actualPort}`,
+    tls: Boolean(tlsCredentials),
     operatorService,
     async close() {
       operatorService.off("state.changed", handleStateChanged);

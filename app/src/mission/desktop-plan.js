@@ -7,6 +7,8 @@ const PRIMITIVES = Object.freeze([
   "click_point",
   "scroll_window",
   "capture_window",
+  "read_visible_text",
+  "describe_window",
   "list_directory",
   "read_text_file",
   "create_text_file",
@@ -15,6 +17,9 @@ const PRIMITIVES = Object.freeze([
   "rename_path",
   "move_path",
   "delete_path",
+  "launch_workspace_cli",
+  "open_workspace_browser",
+  "await_manual_action",
   "stop"
 ]);
 
@@ -23,7 +28,10 @@ const APPLICATION_HINTS = Object.freeze({
   calculator: ["calculator", "calculatrice", "calc"],
   paint: ["paint", "mspaint"],
   file_explorer: ["file explorer", "explorer", "explorateur", "fichiers", "dossier"],
-  powershell: ["powershell", "terminal", "console"]
+  powershell: ["powershell", "terminal", "console"],
+  excel: ["excel", "microsoft excel", "spreadsheet", "tableur"],
+  word: ["word", "microsoft word", "document texte"],
+  powerpoint: ["powerpoint", "power point", "presentation", "présentation"]
 });
 
 function asArray(value) {
@@ -32,6 +40,10 @@ function asArray(value) {
 
 function normalizedText(value) {
   return String(value ?? "").toLowerCase();
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function stringArray(value, label) {
@@ -79,7 +91,127 @@ function normalizeWindow(value) {
   };
 }
 
-function selectApplication(mission, applications = [], preferredApplicationId = "") {
+function browserLaunchParameters(input = {}) {
+  const browserLaunch = input.missionSpec?.parameters?.browserLaunch
+    ?? input.missionUnderstanding?.browserLaunch
+    ?? {};
+  return isPlainObject(browserLaunch) ? browserLaunch : {};
+}
+
+function computerActionType(input = {}) {
+  return String(
+    input.missionSpec?.parameters?.computerAction?.type
+      ?? input.missionUnderstanding?.computerActionType
+      ?? ""
+  ).trim();
+}
+
+function browserApplicationForRequest(applications = [], browserLaunch = {}) {
+  const requestedBrowserId = String(browserLaunch.browserId ?? "").trim().toLowerCase();
+  if (requestedBrowserId) {
+    const exact = applications.find((application) =>
+      String(application.id ?? "").toLowerCase() === `browser_${requestedBrowserId}`
+      || String(application.id ?? "").toLowerCase() === requestedBrowserId
+    );
+    if (exact) {
+      return exact;
+    }
+  }
+  const browserApps = applications.filter((application) => String(application.kind ?? "").toLowerCase() === "browser");
+  if (requestedBrowserId) {
+    const byLabel = browserApps.find((application) =>
+      normalizedText(application.label).includes(requestedBrowserId)
+      || normalizedText(application.processName).includes(requestedBrowserId)
+    );
+    if (byLabel) {
+      return byLabel;
+    }
+  }
+  return browserApps[0] ?? null;
+}
+
+function wantsBrowserApplication(input = {}, browserLaunch = {}) {
+  const actionType = computerActionType(input);
+  return Boolean(
+    browserLaunch.browserId
+    || browserLaunch.searchQuery
+    || browserLaunch.url
+    || browserLaunch.searchUrl
+    || browserLaunch.targetSite
+    || browserLaunch.resultType
+    || browserLaunch.resultCount
+    || ["launch_browser", "launch_browser_search", "browser_autonomy"].includes(actionType)
+  );
+}
+
+function normalizeBrowserUrl(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(raw)) {
+    return `https://${raw}`;
+  }
+  return "";
+}
+
+function looksLikeSearchUrl(value) {
+  try {
+    const parsed = new URL(String(value ?? ""));
+    return /(^|\.)google\./i.test(parsed.hostname)
+      || /(^|\.)bing\./i.test(parsed.hostname)
+      || /duckduckgo\.com$/i.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function buildBrowserNavigationUrl(browserLaunch = {}) {
+  const explicitSearchUrl = normalizeBrowserUrl(browserLaunch.searchUrl);
+  if (explicitSearchUrl) {
+    return explicitSearchUrl;
+  }
+  const rawUrl = normalizeBrowserUrl(browserLaunch.url);
+  if (looksLikeSearchUrl(rawUrl)) {
+    return rawUrl;
+  }
+  const query = String(browserLaunch.searchQuery ?? "").trim();
+  const resultType = String(browserLaunch.resultType ?? "").trim();
+  const targetSite = String(browserLaunch.targetSite ?? "").trim();
+  if (rawUrl && !query && !resultType && !browserLaunch.resultCount) {
+    return rawUrl;
+  }
+  const parts = [];
+  if (rawUrl) {
+    try {
+      parts.push(`site:${new URL(rawUrl).hostname}`);
+    } catch {
+      parts.push(rawUrl);
+    }
+  } else if (targetSite) {
+    parts.push(targetSite);
+  }
+  if (query) {
+    parts.push(query);
+  }
+  if (resultType && !parts.some((part) => part.toLowerCase().includes(resultType.toLowerCase()))) {
+    parts.push(resultType);
+  }
+  const searchQuery = parts.join(" ").trim();
+  return searchQuery ? `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}` : rawUrl;
+}
+
+function selectApplication(mission, applications = [], preferredApplicationId = "", input = {}) {
+  const browserLaunch = browserLaunchParameters(input);
+  if (wantsBrowserApplication(input, browserLaunch)) {
+    const browserApplication = browserApplicationForRequest(applications, browserLaunch);
+    if (browserApplication) {
+      return browserApplication;
+    }
+  }
   const preferred = String(preferredApplicationId ?? "").trim().toLowerCase();
   if (preferred) {
     const explicit = applications.find((application) => String(application.id ?? "").toLowerCase() === preferred);
@@ -249,7 +381,11 @@ export function buildDeterministicDesktopPlan(input = {}) {
   const preferredApplicationId = input.missionSpec?.parameters?.applicationLaunch?.applicationId
     ?? input.missionUnderstanding?.applicationLaunch?.applicationId
     ?? "";
-  const selectedApplication = selectApplication(mission, applications, preferredApplicationId);
+  const browserLaunch = browserLaunchParameters(input);
+  const selectedApplication = selectApplication(mission, applications, preferredApplicationId, input);
+  const browserNavigationUrl = wantsBrowserApplication(input, browserLaunch)
+    ? buildBrowserNavigationUrl(browserLaunch)
+    : "";
   const textToType = extractTextToType(mission);
   const steps = [
     {
@@ -290,6 +426,53 @@ export function buildDeterministicDesktopPlan(input = {}) {
       requiresApproval: true,
       expectedOutcome: `${selectedApplication.label} opens visibly on this machine.`,
       verification: "A visible window for the launched app appears or becomes active."
+    });
+  }
+
+  if (selectedApplication && browserNavigationUrl && String(selectedApplication.kind ?? "").toLowerCase() === "browser") {
+    steps.push({
+      id: "focus_address_bar",
+      primitive: "send_hotkey",
+      label: "Focus the browser address bar",
+      target: { useActiveWindow: true },
+      input: { keys: "CTRL+L" },
+      riskLevel: "medium",
+      requiresApproval: true,
+      expectedOutcome: "The browser address bar is focused for the bounded navigation.",
+      verification: "The hotkey primitive is logged before typing the requested URL."
+    });
+    steps.push({
+      id: "type_browser_url",
+      primitive: "type_text",
+      label: "Type requested browser URL",
+      target: { useActiveWindow: true },
+      input: { text: browserNavigationUrl },
+      riskLevel: "medium",
+      requiresApproval: true,
+      expectedOutcome: "The requested browser URL is entered into the active browser window.",
+      verification: "The action log records the requested URL text."
+    });
+    steps.push({
+      id: "submit_browser_url",
+      primitive: "send_hotkey",
+      label: "Submit browser navigation",
+      target: { useActiveWindow: true },
+      input: { keys: "ENTER" },
+      riskLevel: "medium",
+      requiresApproval: true,
+      expectedOutcome: "The browser navigates to the requested bounded URL or search page.",
+      verification: "The hotkey primitive is logged and the active browser window is captured afterwards."
+    });
+    steps.push({
+      id: "capture_browser_window",
+      primitive: "capture_window",
+      label: "Capture browser proof",
+      target: { useActiveWindow: true },
+      input: {},
+      riskLevel: "low",
+      requiresApproval: false,
+      expectedOutcome: "Visible browser proof is persisted for review.",
+      verification: "The capture output path exists in run evidence."
     });
   }
 

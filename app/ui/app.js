@@ -3,6 +3,12 @@ const state = {
   selectedProjectId: null,
   selectedRunId: null,
   selectedBenchmarkCreatedAt: null,
+  smokeReport: null,
+  smokeHistory: [],
+  smokeStatus: null,
+  realSurfaceSmokeReport: null,
+  realSurfaceSmokeHistory: [],
+  realSurfaceSmokeStatus: null,
   runDetail: null,
   missionPreflight: null,
   preview: null,
@@ -43,6 +49,8 @@ const state = {
     preflight: false,
     mission: false,
     benchmark: false,
+    coworkSmoke: false,
+    realSurfaceSmoke: false,
     benchmarkReviewSuiteId: null,
     agentConfig: false,
     capabilityGraph: false,
@@ -78,6 +86,8 @@ const elements = {
   guardrails: document.querySelector("#guardrails-panel"),
   capabilityGraph: document.querySelector("#capability-graph-panel"),
   preview: document.querySelector("#preview-pane"),
+  coworkSmoke: document.querySelector("#cowork-smoke-pane"),
+  realSurfaceSmoke: document.querySelector("#real-surface-smoke-pane"),
   benchmarks: document.querySelector("#benchmarks-pane")
 };
 
@@ -101,7 +111,7 @@ function statusPill(status) {
   if (["completed", "pass", "gating_pass", "live"].includes(status)) {
     return "ok";
   }
-  if (["paused", "planned", "created", "skipped", "connecting"].includes(status)) {
+  if (["paused", "planned", "created", "skipped", "connecting", "blocked"].includes(status)) {
     return "warn";
   }
   if (["failed", "stopped", "fail", "gating_fail", "degraded"].includes(status)) {
@@ -626,6 +636,16 @@ async function api(path, options = {}) {
 async function refreshDashboard({ preserveRun = true } = {}) {
   const dashboard = await api("/api/dashboard");
   state.dashboard = dashboard;
+  if (IS_ADMIN_SURFACE) {
+    const smoke = await api("/api/smoke/latest").catch(() => null);
+    state.smokeReport = smoke?.latest ?? state.smokeReport;
+    state.smokeHistory = smoke?.history ?? state.smokeHistory;
+    state.smokeStatus = smoke?.status ?? state.smokeStatus;
+    const realSmoke = await api("/api/smoke/real-surfaces/latest").catch(() => null);
+    state.realSurfaceSmokeReport = realSmoke?.latest ?? state.realSurfaceSmokeReport;
+    state.realSurfaceSmokeHistory = realSmoke?.history ?? state.realSurfaceSmokeHistory;
+    state.realSurfaceSmokeStatus = realSmoke?.status ?? state.realSurfaceSmokeStatus;
+  }
   state.agentConfig = dashboard.agentConfiguration ?? state.agentConfig;
   state.lastRefreshAt = new Date().toISOString();
   syncMissionDraftWithDashboard();
@@ -868,6 +888,45 @@ async function runBenchmarks() {
   }
 }
 
+async function runCoworkSmoke() {
+  state.busy.coworkSmoke = true;
+  render();
+  try {
+    const payload = await api("/api/smoke/run", {
+      method: "POST",
+      body: JSON.stringify({
+        includeBrowser: true,
+        runner: "admin_ui"
+      })
+    });
+    state.smokeReport = payload.report;
+    await refreshDashboard({ preserveRun: true });
+    setFeedback(`Cowork smoke finished: ${payload.report.status}.`, payload.report.status === "pass" ? "ok" : "warn");
+  } finally {
+    state.busy.coworkSmoke = false;
+    render();
+  }
+}
+
+async function runRealSurfaceSmoke() {
+  state.busy.realSurfaceSmoke = true;
+  render();
+  try {
+    const payload = await api("/api/smoke/real-surfaces/run", {
+      method: "POST",
+      body: JSON.stringify({
+        runner: "admin_ui"
+      })
+    });
+    state.realSurfaceSmokeReport = payload.report;
+    await refreshDashboard({ preserveRun: true });
+    setFeedback(`Real-surface smoke finished: ${payload.report.status}.`, payload.report.status === "pass" ? "ok" : "warn");
+  } finally {
+    state.busy.realSurfaceSmoke = false;
+    render();
+  }
+}
+
 async function submitBenchmarkReview(createdAt, suiteId) {
   const classification = document.querySelector(`#benchmark-review-${suiteId}`)?.value ?? "";
   const notes = document.querySelector(`#benchmark-review-notes-${suiteId}`)?.value?.trim() ?? "";
@@ -946,6 +1005,7 @@ function readAgentConfigForm() {
       safetyPreset: document.querySelector("#guardrail-safety-preset")?.value ?? current.guardrails?.safetyPreset,
       assistantVerbosity: document.querySelector("#agent-verbosity")?.value ?? current.guardrails?.assistantVerbosity,
       conversationMode: document.querySelector("#agent-conversation-mode")?.value ?? current.guardrails?.conversationMode,
+      terminalWorkspaceView: document.querySelector("#guardrail-terminal-workspace-view")?.value ?? current.guardrails?.terminalWorkspaceView,
       debugMode: Boolean(document.querySelector("#agent-debug-mode")?.checked),
       showInternalPlansInChat: Boolean(document.querySelector("#agent-show-internal-plans")?.checked),
       showTraceLinksInChat: Boolean(document.querySelector("#agent-show-trace-links")?.checked),
@@ -2804,6 +2864,17 @@ function renderGuardrails() {
         File scope
         <input id="guardrail-file-scope" value="${escapeHtml(guardrailValue("fileScope"))}" ${state.busy.agentConfig ? "disabled" : ""}>
       </label>
+      <label class="settings-field">
+        Workspace terminal view
+        <select id="guardrail-terminal-workspace-view" ${state.busy.agentConfig ? "disabled" : ""}>
+          ${[
+            ["cards", "Compact cards"],
+            ["surface", "Rich terminal surface"]
+          ].map(([value, label]) => `
+            <option value="${value}" ${guardrailValue("terminalWorkspaceView", "cards") === value ? "selected" : ""}>${label}</option>
+          `).join("")}
+        </select>
+      </label>
     </div>
     <article class="card">
       <div class="panel-header">
@@ -3747,6 +3818,170 @@ function renderBenchmarks() {
   `;
 }
 
+function renderCoworkSmoke() {
+  if (!hasElement(elements.coworkSmoke)) {
+    return;
+  }
+  const report = state.smokeReport;
+  if (!report) {
+    elements.coworkSmoke.innerHTML = `
+      <article class="card">
+        <div class="empty">No cowork smoke report recorded yet.</div>
+        <div class="card-actions">
+          <button type="button" data-action="run-cowork-smoke" ${state.busy.coworkSmoke ? "disabled" : ""}>
+            ${state.busy.coworkSmoke ? "Running..." : "Run cowork smoke"}
+          </button>
+        </div>
+      </article>
+    `;
+    return;
+  }
+
+  const cases = report.cases ?? [];
+  elements.coworkSmoke.innerHTML = `
+    <div class="stack">
+      <article class="card">
+        <div class="timeline-header">
+          <h3>Latest cowork smoke</h3>
+          <span class="meta">${formatDate(report.completedAt ?? report.createdAt)}</span>
+        </div>
+        <div class="pill-row">
+          ${badge(report.status ?? "unknown", statusPill(report.status ?? ""))}
+          ${badge(`${report.summary?.passed ?? 0}/${report.summary?.caseCount ?? cases.length} cases passed`, report.status === "pass" ? "ok" : "warn")}
+          ${state.smokeStatus?.running ? badge("running", "warn") : ""}
+        </div>
+        <div class="card-actions">
+          <button type="button" data-action="run-cowork-smoke" ${state.busy.coworkSmoke || state.smokeStatus?.running ? "disabled" : ""}>
+            ${state.busy.coworkSmoke || state.smokeStatus?.running ? "Running..." : "Run cowork smoke"}
+          </button>
+        </div>
+        ${(report.recommendations ?? []).length === 0 ? `
+          <p class="muted">No automated recommendation. Controlled smoke gates passed.</p>
+        ` : `
+          <ul class="compact-list">
+            ${(report.recommendations ?? []).map((recommendation) => `
+              <li><strong>${escapeHtml(recommendation.label)}</strong> - ${escapeHtml(recommendation.nextStep)}</li>
+            `).join("")}
+          </ul>
+        `}
+      </article>
+
+      <div class="list">
+        ${cases.map((smokeCase) => `
+          <article class="card ${smokeCase.status === "fail" ? "danger" : smokeCase.status === "degraded" ? "warning" : ""}">
+            <div class="timeline-header">
+              <h4>${escapeHtml(smokeCase.label)}</h4>
+              <span class="meta">${escapeHtml(smokeCase.category ?? "")}</span>
+            </div>
+            <div class="pill-row">
+              ${badge(smokeCase.status, statusPill(smokeCase.status))}
+              ${badge(`${smokeCase.assertionSummary?.passed ?? 0}/${smokeCase.assertionSummary?.total ?? 0} assertions`)}
+              ${(smokeCase.relatedRunIds ?? []).map((runId) => `<button type="button" class="ghost small" data-action="inspect-run-ref" data-run-id="${escapeHtml(runId)}">Run ${escapeHtml(runId.slice(0, 10))}</button>`).join("")}
+            </div>
+            ${(smokeCase.assertions ?? []).filter((assertion) => !assertion.passed).length === 0 ? `
+              <p class="muted">All assertions passed.</p>
+            ` : `
+              <ul class="assertion-list">
+                ${(smokeCase.assertions ?? []).filter((assertion) => !assertion.passed).map((assertion) => `
+                  <li class="danger-line">
+                    <strong>${escapeHtml(assertion.label)}</strong>
+                    <span>${escapeHtml(assertion.reason)}</span>
+                    ${assertion.nextStep ? `<span class="muted">${escapeHtml(assertion.nextStep)}</span>` : ""}
+                  </li>
+                `).join("")}
+              </ul>
+            `}
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderRealSurfaceSmoke() {
+  if (!hasElement(elements.realSurfaceSmoke)) {
+    return;
+  }
+  const report = state.realSurfaceSmokeReport;
+  if (!report) {
+    elements.realSurfaceSmoke.innerHTML = `
+      <article class="card">
+        <div class="empty">No real-surface smoke report recorded yet.</div>
+        <p class="muted">Configure app/.runtime-data/validation/real-surfaces/real-surface-smoke.local.json or COWORK_REAL_SURFACE_SMOKE_CONFIG_PATH.</p>
+        <div class="card-actions">
+          <button type="button" data-action="run-real-surface-smoke" ${state.busy.realSurfaceSmoke ? "disabled" : ""}>
+            ${state.busy.realSurfaceSmoke ? "Running..." : "Run real-surface smoke"}
+          </button>
+        </div>
+      </article>
+    `;
+    return;
+  }
+  const cases = report.cases ?? [];
+  elements.realSurfaceSmoke.innerHTML = `
+    <div class="stack">
+      <article class="card">
+        <div class="timeline-header">
+          <h3>Latest real-surface smoke</h3>
+          <span class="meta">${formatDate(report.completedAt ?? report.createdAt)}</span>
+        </div>
+        <div class="pill-row">
+          ${badge(report.status ?? "unknown", statusPill(report.status ?? ""))}
+          ${badge(`${report.summary?.passed ?? 0}/${report.summary?.caseCount ?? cases.length} cases passed`, report.status === "pass" ? "ok" : "warn")}
+          ${badge(`${report.summary?.blocked ?? 0} blocked`, report.summary?.blocked ? "warn" : "")}
+          ${state.realSurfaceSmokeStatus?.running ? badge("running", "warn") : ""}
+        </div>
+        <p class="muted">
+          Config: ${escapeHtml(report.config?.loadedFromFile ? report.config.filePath : "not configured")}
+        </p>
+        <div class="card-actions">
+          <button type="button" data-action="run-real-surface-smoke" ${state.busy.realSurfaceSmoke || state.realSurfaceSmokeStatus?.running ? "disabled" : ""}>
+            ${state.busy.realSurfaceSmoke || state.realSurfaceSmokeStatus?.running ? "Running..." : "Run real-surface smoke"}
+          </button>
+        </div>
+        ${(report.recommendations ?? []).length === 0 ? `
+          <p class="muted">No automated recommendation.</p>
+        ` : `
+          <ul class="compact-list">
+            ${(report.recommendations ?? []).map((recommendation) => `
+              <li><strong>${escapeHtml(recommendation.label)}</strong> - ${escapeHtml(recommendation.nextStep)}</li>
+            `).join("")}
+          </ul>
+        `}
+      </article>
+
+      <div class="list">
+        ${cases.map((smokeCase) => `
+          <article class="card ${smokeCase.status === "fail" ? "danger" : ["blocked", "degraded"].includes(smokeCase.status) ? "warning" : ""}">
+            <div class="timeline-header">
+              <h4>${escapeHtml(smokeCase.label)}</h4>
+              <span class="meta">${escapeHtml(smokeCase.category ?? "")}</span>
+            </div>
+            <div class="pill-row">
+              ${badge(smokeCase.status, statusPill(smokeCase.status))}
+              ${badge(`${smokeCase.assertionSummary?.passed ?? 0}/${smokeCase.assertionSummary?.total ?? 0} assertions`)}
+              ${(smokeCase.relatedRunIds ?? []).map((runId) => `<button type="button" class="ghost small" data-action="inspect-run-ref" data-run-id="${escapeHtml(runId)}">Run ${escapeHtml(runId.slice(0, 10))}</button>`).join("")}
+            </div>
+            ${(smokeCase.assertions ?? []).filter((assertion) => !assertion.passed).length === 0 ? `
+              <p class="muted">All assertions passed.</p>
+            ` : `
+              <ul class="assertion-list">
+                ${(smokeCase.assertions ?? []).filter((assertion) => !assertion.passed).map((assertion) => `
+                  <li class="${assertion.severity === "blocked" ? "warn-line" : "danger-line"}">
+                    <strong>${escapeHtml(assertion.label)}</strong>
+                    <span>${escapeHtml(assertion.reason)}</span>
+                    ${assertion.nextStep ? `<span class="muted">${escapeHtml(assertion.nextStep)}</span>` : ""}
+                  </li>
+                `).join("")}
+              </ul>
+            `}
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function render() {
   document.body.classList.toggle("has-run", Boolean(currentRun()));
   document.body.classList.toggle("has-preflight", Boolean(state.missionPreflight));
@@ -3770,6 +4005,8 @@ function render() {
   renderEvidence();
   renderArtifacts();
   renderPreview();
+  renderCoworkSmoke();
+  renderRealSurfaceSmoke();
   renderBenchmarks();
 }
 
@@ -4056,6 +4293,20 @@ document.body.addEventListener("click", async (event) => {
     if (action === "run-benchmarks") {
       state.workspaceTab = "diagnostics";
       await runBenchmarks();
+      render();
+      return;
+    }
+
+    if (action === "run-cowork-smoke") {
+      state.workspaceTab = "diagnostics";
+      await runCoworkSmoke();
+      render();
+      return;
+    }
+
+    if (action === "run-real-surface-smoke") {
+      state.workspaceTab = "diagnostics";
+      await runRealSurfaceSmoke();
       render();
       return;
     }

@@ -26,9 +26,15 @@ export const DEFAULT_BROWSER_CHANNEL = process.env.COWORK_BROWSER_CHANNEL || "bu
 export const DEFAULT_HEADLESS = process.env.COWORK_HEADLESS !== "0";
 export const DEFAULT_TIMEOUT_MS = 10_000;
 export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
-export const DEFAULT_LLM_PROVIDER_MODE = process.env.COWORK_LLM_PROVIDER_MODE || "mock_offline";
+export const DEFAULT_LLM_PROVIDER_MODE = process.env.COWORK_LLM_PROVIDER_MODE || "openai_compatible";
 export const DEFAULT_PROMPT_ENVIRONMENT = process.env.COWORK_PROMPT_ENVIRONMENT || "prototype";
 export const DEFAULT_RUNTIME_RETENTION_DAYS = Number.parseInt(process.env.COWORK_RUNTIME_RETENTION_DAYS || "30", 10);
+export const DEFAULT_LLM_BUDGETS = Object.freeze({
+  perRunTokens: 50_000,
+  perSessionTokens: 250_000,
+  perRunUsd: 0.5,
+  perSessionUsd: 2
+});
 
 export const EVENT_ACTOR = {
   SYSTEM: "system",
@@ -48,7 +54,8 @@ export const APPROVAL_CATEGORY = {
   LOCAL_FOCUS: "local_focus",
   LOCAL_APP_LAUNCH: "local_app_launch",
   LOCAL_DESKTOP_ACTUATION: "local_desktop_actuation",
-  OUT_OF_SCOPE: "out_of_scope"
+  OUT_OF_SCOPE: "out_of_scope",
+  MANUAL_USER_ACTION: "manual_user_action"
 };
 
 export const APPROVAL_DECISION = {
@@ -103,10 +110,13 @@ export const LLM_CALL_TYPE = Object.freeze({
   RUN_HANDOFF_DECISION: "run_handoff_decision",
   DESKTOP_PLAN: "desktop_plan",
   BROWSER_PLAN: "browser_plan",
+  BROWSER_REPLAN: "browser_replan",
   PLAN_GENERATION: "plan_generation",
   DECISION_NOTE_DRAFT: "decision_note_draft",
   EVALUATION_SUPPORT: "evaluation_support",
-  AMBIGUITY_NOTE: "ambiguity_note"
+  AMBIGUITY_NOTE: "ambiguity_note",
+  WINDOW_DESCRIPTION: "window_description",
+  WORKSPACE_TERMINAL_REASONING: "workspace_terminal_reasoning"
 });
 
 export const LLM_RESULT_STATUS = Object.freeze({
@@ -121,10 +131,13 @@ export const REASONING_STAGE = Object.freeze({
   RUN_HANDOFF_DECISION: "run_handoff_decision",
   DESKTOP_PLAN: "desktop_plan",
   BROWSER_PLAN: "browser_plan",
+  BROWSER_REPLAN: "browser_replan",
   PLAN_GENERATION: "plan_generation",
   DECISION_NOTE_DRAFT: "decision_note_draft",
   EVALUATION_SUPPORT: "evaluation_support",
-  AMBIGUITY_NOTE: "ambiguity_note"
+  AMBIGUITY_NOTE: "ambiguity_note",
+  WINDOW_DESCRIPTION: "window_description",
+  WORKSPACE_TERMINAL_REASONING: "workspace_terminal_reasoning"
 });
 
 export const BENCHMARK_REVIEW_CLASSIFICATION = Object.freeze({

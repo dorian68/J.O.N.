@@ -66,6 +66,103 @@ export async function run() {
   }));
   assert.equal(preferredApplicationPlan.selectedApplication.id, "obsidian");
 
+  const upworkPlan = validateDesktopPlanOutput(buildDeterministicDesktopPlan({
+    mission: "Ouvrir Upwork et lister 5 postes autour de Excel.",
+    missionSpec: {
+      parameters: {
+        browserLaunch: {
+          browserId: "chrome",
+          targetSite: "Upwork",
+          searchQuery: "Excel",
+          searchUrl: "https://www.google.com/search?q=Upwork%20Excel%20jobs",
+          resultType: "jobs",
+          resultCount: 5
+        },
+        computerAction: {
+          type: "launch_browser_search"
+        }
+      }
+    },
+    installedApplications: [
+      {
+        id: "shortcut_excel",
+        label: "Microsoft Excel",
+        kind: "spreadsheet",
+        processName: "EXCEL",
+        executablePath: "C:\\Program Files\\Microsoft Office\\root\\Office16\\EXCEL.EXE"
+      },
+      {
+        id: "browser_chrome",
+        label: "Google Chrome",
+        kind: "browser",
+        processName: "chrome",
+        executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+      }
+    ]
+  }));
+  assert.equal(upworkPlan.selectedApplication.id, "browser_chrome");
+  assert.equal(upworkPlan.steps.some((step) => step.primitive === "launch_application" && step.target.appId === "shortcut_excel"), false);
+  assert.equal(upworkPlan.steps.some((step) => step.primitive === "type_text" && step.input.text.includes("google.com/search")), true);
+  assert.equal(upworkPlan.steps.some((step) => step.primitive === "type_text" && step.input.text.includes("Upwork")), true);
+  assert.equal(upworkPlan.steps.some((step) => step.primitive === "capture_window"), true);
+
+  const linkedInPlan = validateDesktopPlanOutput(buildDeterministicDesktopPlan({
+    mission: "Open LinkedIn and list 3 data analyst jobs.",
+    missionSpec: {
+      parameters: {
+        browserLaunch: {
+          browserId: "chrome",
+          url: "https://linkedin.com",
+          searchQuery: "data analyst",
+          resultType: "jobs",
+          resultCount: 3
+        },
+        computerAction: {
+          type: "launch_browser_search"
+        }
+      }
+    },
+    installedApplications: [
+      {
+        id: "shortcut_excel",
+        label: "Microsoft Excel",
+        kind: "spreadsheet",
+        processName: "EXCEL",
+        executablePath: "C:\\Program Files\\Microsoft Office\\root\\Office16\\EXCEL.EXE"
+      },
+      {
+        id: "browser_chrome",
+        label: "Google Chrome",
+        kind: "browser",
+        processName: "chrome",
+        executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+      }
+    ]
+  }));
+  assert.equal(linkedInPlan.selectedApplication.id, "browser_chrome");
+  assert.equal(linkedInPlan.steps.some((step) => step.primitive === "type_text" && step.input.text.includes("site%3Alinkedin.com")), true);
+
+  const localExcelPlan = validateDesktopPlanOutput(buildDeterministicDesktopPlan({
+    mission: "Open Excel on this machine.",
+    installedApplications: [
+      {
+        id: "shortcut_excel",
+        label: "Microsoft Excel",
+        kind: "spreadsheet",
+        processName: "EXCEL",
+        executablePath: "C:\\Program Files\\Microsoft Office\\root\\Office16\\EXCEL.EXE"
+      },
+      {
+        id: "browser_chrome",
+        label: "Google Chrome",
+        kind: "browser",
+        processName: "chrome",
+        executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+      }
+    ]
+  }));
+  assert.equal(localExcelPlan.selectedApplication.id, "shortcut_excel");
+
   const clarification = validateDesktopPlanOutput(buildDeterministicDesktopPlan({
     mission: "Open the app and type hello.",
     installedApplications: []

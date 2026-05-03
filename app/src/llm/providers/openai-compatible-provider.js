@@ -35,6 +35,10 @@ function ensureJsonResponseInstruction(messages) {
   ];
 }
 
+function shouldSendTemperature(providerModel) {
+  return !String(providerModel ?? "").toLowerCase().startsWith("gpt-5");
+}
+
 function categorizeProviderError(responseStatus) {
   if (responseStatus === 401 || responseStatus === 403) {
     return "auth_error";
@@ -88,7 +92,7 @@ export class OpenAiCompatibleProvider {
     modelMap = {
       primary_reasoning: process.env.COWORK_OPENAI_PRIMARY_MODEL || process.env.COWORK_OPENAI_MODEL || "gpt-4.1-mini",
       utility_structuring: process.env.COWORK_OPENAI_UTILITY_MODEL || process.env.COWORK_OPENAI_MODEL || "gpt-4.1-mini",
-      vision_fallback: process.env.COWORK_OPENAI_VISION_MODEL || process.env.COWORK_OPENAI_MODEL || "gpt-4.1-mini"
+      vision_fallback: process.env.COWORK_OPENAI_VISION_MODEL || "gpt-5-mini"
     },
     pricing = {}
   } = {}) {
@@ -152,7 +156,7 @@ export class OpenAiCompatibleProvider {
     };
   }
 
-  async generateStructured({ modelAlias, messages }) {
+  async generateStructured({ modelAlias, messages, extraMessages = [] }) {
     const validation = this.validateConfig();
     if (!validation.valid) {
       throw Object.assign(new Error("OpenAI-compatible provider is not configured."), {
@@ -170,7 +174,7 @@ export class OpenAiCompatibleProvider {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    const preparedMessages = ensureJsonResponseInstruction(messages);
+    const preparedMessages = ensureJsonResponseInstruction([...messages, ...(extraMessages ?? [])]);
 
     try {
       const response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
@@ -182,7 +186,7 @@ export class OpenAiCompatibleProvider {
         },
         body: JSON.stringify({
           model: providerModel,
-          temperature: 0,
+          ...(shouldSendTemperature(providerModel) ? { temperature: 0 } : {}),
           response_format: {
             type: "json_object"
           },

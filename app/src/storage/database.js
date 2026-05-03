@@ -11,6 +11,22 @@ function parseJson(value, fallback = null) {
   return value == null ? fallback : JSON.parse(value);
 }
 
+function memoryRecordFromRow(row) {
+  return {
+    id: row.id,
+    scope: row.scope,
+    projectId: row.project_id,
+    category: row.category,
+    text: row.text,
+    confidence: row.confidence,
+    sourceType: row.source_type,
+    sourceId: row.source_id,
+    metadata: parseJson(row.metadata_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 export class PrototypeDatabase {
   constructor(dbPath = DB_PATH) {
     this.dbPath = dbPath;
@@ -167,6 +183,21 @@ export class PrototypeDatabase {
         updated_at TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS memory_records (
+        id TEXT PRIMARY KEY,
+        scope TEXT NOT NULL,
+        project_id TEXT,
+        category TEXT NOT NULL,
+        text TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        source_type TEXT NOT NULL,
+        source_id TEXT,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
       CREATE TABLE IF NOT EXISTS capability_graph_nodes (
         id TEXT PRIMARY KEY,
         kind TEXT NOT NULL,
@@ -255,6 +286,20 @@ export class PrototypeDatabase {
         FOREIGN KEY(terminal_id) REFERENCES workspace_terminal_sessions(id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS workspace_terminal_events (
+        id TEXT PRIMARY KEY,
+        terminal_id TEXT NOT NULL,
+        project_id TEXT NOT NULL,
+        conversation_id TEXT,
+        event_type TEXT NOT NULL,
+        stream TEXT,
+        content TEXT,
+        metadata_json TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY(terminal_id) REFERENCES workspace_terminal_sessions(id) ON DELETE CASCADE
+      );
+
       CREATE TABLE IF NOT EXISTS workspace_mission_briefs (
         id TEXT PRIMARY KEY,
         project_id TEXT NOT NULL,
@@ -285,14 +330,69 @@ export class PrototypeDatabase {
       CREATE INDEX IF NOT EXISTS idx_conversations_project_updated
       ON conversations(project_id, updated_at DESC);
 
+      CREATE INDEX IF NOT EXISTS idx_memory_records_scope_category_updated
+      ON memory_records(scope, category, updated_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_memory_records_project_updated
+      ON memory_records(project_id, updated_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_memory_records_source_updated
+      ON memory_records(source_type, source_id, updated_at DESC);
+
       CREATE INDEX IF NOT EXISTS idx_workspace_terminals_project_updated
       ON workspace_terminal_sessions(project_id, updated_at DESC);
 
       CREATE INDEX IF NOT EXISTS idx_workspace_terminal_decisions_project_created
       ON workspace_terminal_decisions(project_id, created_at DESC);
 
+      CREATE INDEX IF NOT EXISTS idx_workspace_terminal_events_terminal_created
+      ON workspace_terminal_events(terminal_id, created_at ASC);
+
       CREATE INDEX IF NOT EXISTS idx_workspace_mission_briefs_project_updated
       ON workspace_mission_briefs(project_id, updated_at DESC);
+
+      CREATE TABLE IF NOT EXISTS workspace_browser_sessions (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        run_id TEXT,
+        mode TEXT NOT NULL,
+        status TEXT NOT NULL,
+        current_url TEXT,
+        current_title TEXT,
+        navigation_history_json TEXT,
+        error_message TEXT,
+        metadata_json TEXT,
+        opened_at TEXT NOT NULL,
+        last_activity_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workspace_browser_sessions_project_activity
+      ON workspace_browser_sessions(project_id, last_activity_at DESC);
+
+      CREATE TABLE IF NOT EXISTS mobile_devices (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        fingerprint TEXT,
+        status TEXT NOT NULL,
+        paired_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        revoked_at TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS mobile_audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT NOT NULL,
+        token_hash TEXT,
+        command_type TEXT NOT NULL,
+        params_json TEXT,
+        status TEXT NOT NULL,
+        error_json TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_mobile_audit_log_device_created
+      ON mobile_audit_log(device_id, created_at DESC);
     `);
     this.migrateConversationSchema();
   }
@@ -687,6 +787,64 @@ export class PrototypeDatabase {
     })).reverse();
   }
 
+  insertWorkspaceTerminalEvent(event) {
+    this.db.prepare(`
+      INSERT INTO workspace_terminal_events (
+        id, terminal_id, project_id, conversation_id, event_type, stream,
+        content, metadata_json, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      event.id,
+      event.terminalId,
+      event.projectId,
+      event.conversationId ?? null,
+      event.eventType,
+      event.stream ?? null,
+      event.content ?? "",
+      stringifyJson(event.metadata ?? {}),
+      event.createdAt
+    );
+    return event;
+  }
+
+  listWorkspaceTerminalEvents(projectId, { terminalId = null, conversationId = null, limit = 160 } = {}) {
+    let rows;
+    if (terminalId) {
+      rows = this.db.prepare(`
+        SELECT * FROM workspace_terminal_events
+        WHERE project_id = ? AND terminal_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      `).all(projectId, terminalId, limit);
+    } else if (conversationId) {
+      rows = this.db.prepare(`
+        SELECT * FROM workspace_terminal_events
+        WHERE project_id = ? AND (conversation_id = ? OR conversation_id IS NULL)
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      `).all(projectId, conversationId, limit);
+    } else {
+      rows = this.db.prepare(`
+        SELECT * FROM workspace_terminal_events
+        WHERE project_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      `).all(projectId, limit);
+    }
+    return rows.map((row) => ({
+      id: row.id,
+      terminalId: row.terminal_id,
+      projectId: row.project_id,
+      conversationId: row.conversation_id ?? null,
+      eventType: row.event_type,
+      stream: row.stream,
+      content: row.content ?? "",
+      metadata: parseJson(row.metadata_json, {}),
+      createdAt: row.created_at
+    })).reverse();
+  }
+
   upsertWorkspaceMissionBrief(brief) {
     const existing = brief.id
       ? this.db.prepare(`SELECT * FROM workspace_mission_briefs WHERE id = ?`).get(brief.id)
@@ -767,6 +925,98 @@ export class PrototypeDatabase {
           LIMIT ?
         `).all(projectId, limit);
     return rows.map((row) => this.#workspaceMissionBriefFromRow(row));
+  }
+
+  insertMobileAuditEntry(entry) {
+    this.db.prepare(`
+      INSERT INTO mobile_audit_log (device_id, token_hash, command_type, params_json, status, error_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      entry.deviceId ?? "unknown",
+      entry.tokenHash ?? null,
+      entry.commandType,
+      stringifyJson(entry.params ?? null),
+      entry.status,
+      stringifyJson(entry.error ?? null),
+      entry.createdAt ?? new Date().toISOString()
+    );
+  }
+
+  listMobileAuditLog({ deviceId = null, limit = 100 } = {}) {
+    const rows = deviceId
+      ? this.db.prepare(`SELECT * FROM mobile_audit_log WHERE device_id = ? ORDER BY created_at DESC LIMIT ?`).all(deviceId, limit)
+      : this.db.prepare(`SELECT * FROM mobile_audit_log ORDER BY created_at DESC LIMIT ?`).all(limit);
+    return rows.map((row) => ({
+      id: row.id,
+      deviceId: row.device_id,
+      tokenHash: row.token_hash,
+      commandType: row.command_type,
+      params: parseJson(row.params_json, {}),
+      status: row.status,
+      error: parseJson(row.error_json, null),
+      createdAt: row.created_at
+    }));
+  }
+
+  upsertWorkspaceBrowserSession(session) {
+    const now = session.lastActivityAt ?? new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO workspace_browser_sessions
+        (id, project_id, run_id, mode, status, current_url, current_title, navigation_history_json, error_message, metadata_json, opened_at, last_activity_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        status = excluded.status,
+        current_url = excluded.current_url,
+        current_title = excluded.current_title,
+        navigation_history_json = excluded.navigation_history_json,
+        error_message = excluded.error_message,
+        last_activity_at = excluded.last_activity_at
+    `).run(
+      session.id,
+      session.projectId,
+      session.runId ?? null,
+      session.mode,
+      session.status,
+      session.currentUrl ?? null,
+      session.currentTitle ?? null,
+      stringifyJson(session.navigationHistory ?? []),
+      session.errorMessage ?? null,
+      stringifyJson(session.metadata ?? null),
+      session.openedAt ?? now,
+      now
+    );
+  }
+
+  getWorkspaceBrowserSession(sessionId) {
+    const row = this.db.prepare(`SELECT * FROM workspace_browser_sessions WHERE id = ?`).get(sessionId);
+    return row ? this.#browserSessionFromRow(row) : null;
+  }
+
+  listWorkspaceBrowserSessions(projectId, { limit = 20 } = {}) {
+    const rows = this.db.prepare(`
+      SELECT * FROM workspace_browser_sessions
+      WHERE project_id = ?
+      ORDER BY last_activity_at DESC
+      LIMIT ?
+    `).all(projectId, limit);
+    return rows.map((row) => this.#browserSessionFromRow(row));
+  }
+
+  #browserSessionFromRow(row) {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      runId: row.run_id ?? null,
+      mode: row.mode,
+      status: row.status,
+      currentUrl: row.current_url ?? null,
+      currentTitle: row.current_title ?? null,
+      navigationHistory: parseJson(row.navigation_history_json, []),
+      errorMessage: row.error_message ?? null,
+      metadata: parseJson(row.metadata_json, null),
+      openedAt: row.opened_at,
+      lastActivityAt: row.last_activity_at
+    };
   }
 
   #workspaceTerminalFromRow(row) {
@@ -1261,6 +1511,97 @@ export class PrototypeDatabase {
 
   deleteAppSetting(key) {
     this.db.prepare(`DELETE FROM app_settings WHERE key = ?`).run(key);
+  }
+
+  insertMemoryRecord(record) {
+    this.db.prepare(`
+      INSERT INTO memory_records (
+        id, scope, project_id, category, text, confidence, source_type,
+        source_id, metadata_json, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        scope = excluded.scope,
+        project_id = excluded.project_id,
+        category = excluded.category,
+        text = excluded.text,
+        confidence = excluded.confidence,
+        source_type = excluded.source_type,
+        source_id = excluded.source_id,
+        metadata_json = excluded.metadata_json,
+        updated_at = excluded.updated_at
+    `).run(
+      record.id,
+      record.scope,
+      record.projectId ?? null,
+      record.category,
+      record.text,
+      record.confidence ?? 0.7,
+      record.sourceType,
+      record.sourceId ?? null,
+      stringifyJson(record.metadata ?? {}),
+      record.createdAt,
+      record.updatedAt ?? record.createdAt
+    );
+    return this.getMemoryRecord(record.id);
+  }
+
+  getMemoryRecord(memoryRecordId) {
+    const row = this.db.prepare(`SELECT * FROM memory_records WHERE id = ?`).get(memoryRecordId);
+    return row ? memoryRecordFromRow(row) : null;
+  }
+
+  listMemoryRecords({ scope = null, projectId = null, category = null, limit = 100 } = {}) {
+    const where = [];
+    const params = [];
+    if (scope) {
+      where.push("scope = ?");
+      params.push(scope);
+    }
+    if (projectId) {
+      where.push("project_id = ?");
+      params.push(projectId);
+    }
+    if (category) {
+      where.push("category = ?");
+      params.push(category);
+    }
+    const cappedLimit = Math.max(1, Math.min(Number.parseInt(String(limit), 10) || 100, 500));
+    const sql = `
+      SELECT * FROM memory_records
+      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY updated_at DESC, created_at DESC
+      LIMIT ?
+    `;
+    return this.db.prepare(sql).all(...params, cappedLimit).map(memoryRecordFromRow);
+  }
+
+  searchMemoryRecords({ query = "", scope = null, projectId = null, category = null, limit = 50 } = {}) {
+    const needle = String(query ?? "").trim().toLowerCase();
+    if (!needle) {
+      return this.listMemoryRecords({ scope, projectId, category, limit });
+    }
+    const where = ["LOWER(text) LIKE ?"];
+    const params = [`%${needle}%`];
+    if (scope) {
+      where.push("scope = ?");
+      params.push(scope);
+    }
+    if (projectId) {
+      where.push("project_id = ?");
+      params.push(projectId);
+    }
+    if (category) {
+      where.push("category = ?");
+      params.push(category);
+    }
+    const cappedLimit = Math.max(1, Math.min(Number.parseInt(String(limit), 10) || 50, 500));
+    return this.db.prepare(`
+      SELECT * FROM memory_records
+      WHERE ${where.join(" AND ")}
+      ORDER BY confidence DESC, updated_at DESC
+      LIMIT ?
+    `).all(...params, cappedLimit).map(memoryRecordFromRow);
   }
 
   replaceCapabilityGraphNodes(nodes = []) {

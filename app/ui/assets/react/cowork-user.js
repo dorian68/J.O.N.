@@ -9893,10 +9893,14 @@ var STRINGS = Object.freeze({
 		degraded: "Dégradé",
 		newConversation: "Nouvelle conversation",
 		conversations: "Conversations",
+		workspacePanel: "Workspace",
 		close: "Fermer",
 		collapse: "Réduire",
+		collapseConversations: "Réduire les conversations",
+		collapseTerminals: "Réduire les terminaux",
+		collapseInspector: "Réduire l'inspecteur",
 		openConversations: "Ouvrir les conversations",
-		openInspector: "Ouvrir l’inspecteur",
+		openInspector: "Ouvrir l'inspecteur",
 		conversationsShort: "Conv.",
 		inspectorShort: "Trace",
 		adminConsole: "Console admin",
@@ -9975,6 +9979,38 @@ var STRINGS = Object.freeze({
 		runHistory: "Runs récents",
 		noRuns: "Aucun run enregistré.",
 		openAdmin: "Console admin",
+		pairDevice: "Pair mobile",
+		pairDeviceTitle: "Connecter un mobile",
+		pairDeviceSubtitle: "Scanne le QR avec l'appareil photo de ton téléphone, ou entre le code manuellement.",
+		pairDeviceCode: "Code de pairing",
+		pairDeviceExpires: "Expire dans",
+		pairDeviceExpired: "Expiré — génère un nouveau code",
+		pairDeviceCopy: "Copier le lien",
+		pairDeviceCopied: "Copié !",
+		pairDeviceClose: "Fermer",
+		pairDeviceNew: "Nouveau code",
+		pairDeviceLoading: "Génération…",
+		pairDeviceError: "Erreur de génération",
+		pairDeviceQrHint: "Scannez avec l'appareil photo pour vous connecter automatiquement",
+		pairDeviceLanUrl: "URL LAN",
+		pairDevicePublicUrl: "URL publique",
+		pairDeviceManualFallback: "Ou entrez le code manuellement sur",
+		openSettings: "Paramètres",
+		settingsTitle: "Paramètres JON",
+		settingsTrustedApps: "Applications autorisées",
+		settingsTrustedAppsHint: "JON ouvrira ces applications sans demander ta confirmation.",
+		settingsTrustedBrowsers: "Navigateurs autorisés",
+		settingsTrustedBrowsersHint: "JON pourra lancer ces navigateurs automatiquement.",
+		settingsAllowedDomains: "Domaines autorisés pour la navigation",
+		settingsAllowedDomainsHint: "Un domaine par ligne. JON peut naviguer sur ces sites sans restriction.",
+		settingsAllowedDomainsPlaceholder: "upwork.com\ngoogle.com\ngithub.com",
+		settingsSave: "Enregistrer",
+		settingsSaved: "Enregistré",
+		settingsClose: "Fermer",
+		settingsSaving: "Enregistrement…",
+		browserStartSession: "Démarrer le navigateur",
+		browserStarting: "Ouverture…",
+		browserStartError: "Impossible d'ouvrir le navigateur",
 		progressUnderstood: "Demande comprise",
 		progressUnderstoodDetail: "JON prépare l’action sans exposer la mécanique interne.",
 		progressApprovalNeeded: "Accord nécessaire",
@@ -10012,9 +10048,11 @@ var STRINGS = Object.freeze({
 		terminalSurfaces: "Terminaux attachés",
 		terminalDecisions: "Décisions terminal",
 		terminalAlerts: "Alertes terminal",
+		terminalTranscript: "Sortie terminal",
 		noWorkspaceMission: "Aucun cahier des charges workspace actif.",
 		noTerminals: "Aucun terminal attaché.",
 		noTerminalDecisions: "Aucune décision terminal enregistrée.",
+		noTerminalTranscript: "Aucune sortie terminal capturée.",
 		terminalAgent: "Agent",
 		terminalAutonomy: "Autonomie",
 		terminalAuthorized: "Autorisé",
@@ -10042,7 +10080,111 @@ var STRINGS = Object.freeze({
 		fallback: "fallback",
 		localOnly: "Historique local",
 		localOnlyHint: "Les conversations locales organisent l’UX. Les runs, approvals et preuves restent persistés côté runtime.",
-		openRun: "Ouvrir le run"
+		openRun: "Ouvrir le run",
+		terminalAlertTitle: "Alerte terminal",
+		terminalStartedTitle: "Terminal démarré",
+		terminalCompletionTitle: "Terminal terminé",
+		terminalAutoActionTitle: "JON a agi automatiquement",
+		missionPausedTitle: "Mission en pause",
+		missionPausedHint: "Effectuez l'action puis cliquez sur Continuer dans le panneau de mission.",
+		terminalSuggestedInput: "Suggestion JON",
+		terminalReplyPlaceholder: "Répondre au terminal (entrée envoyée)…",
+		terminalShellPlaceholder: "Tapez une commande et appuyez sur Entrée…",
+		terminalReplySend: "Envoyer",
+		terminalReplySent: "Envoyé",
+		terminalReplySentConfirm: "Réponse envoyée au terminal.",
+		terminalReplyBlocked: "L'entrée nécessite une approbation explicite.",
+		terminalInjectContext: "Injecter le contexte mission",
+		terminalContextInjected: "Contexte mission injecté dans le terminal.",
+		launchCli: "Lancer un agent CLI",
+		attachTerminal: "Attacher un terminal",
+		openTerminals: "Ouvrir les terminaux",
+		newTerminal: "Nouveau terminal",
+		createTerminal: "Créer un terminal",
+		jonPilotHint: "Terminaux et notifications workspace",
+		terminalViewCards: "Vue actuelle",
+		terminalViewSurface: "Surface riche",
+		terminalViewMode: "Vue terminal",
+		terminalFullscreen: "Plein écran",
+		terminalExitFullscreen: "Quitter le plein écran",
+		terminalClosePanel: "Fermer le panneau terminal",
+		terminalOpenPanel: "Ouvrir",
+		terminalWorkspaceTitle: "Surface terminal",
+		terminalWorkspaceLead: "Pilote ici les terminaux workspace sans quitter la conversation.",
+		terminalSurfaceTitle: "Surface terminal riche",
+		terminalSurfaceLead: "Suis une session terminal complète, sa sortie, ses décisions et sa prochaine attente.",
+		terminalSessions: "Sessions",
+		terminalLiveTranscript: "Transcript live",
+		terminalRecentDecisions: "Décisions récentes",
+		terminalNoSurfaceTerminal: "Choisis un terminal pour voir sa session détaillée.",
+		terminalNoTranscript: "Aucune sortie live n'est encore disponible pour ce terminal.",
+		terminalLastPrompt: "Dernière entrée",
+		terminalResolvedCommand: "Commande résolue",
+		terminalWorkingDirectory: "Répertoire",
+		terminalProcess: "Processus",
+		terminalDecision: "Décision",
+		terminalEvent: "Événement",
+		terminalNow: "Maintenant",
+		terminalNextStep: "Prochaine étape",
+		terminalWhatJonNeeds: "Ce que JON attend maintenant",
+		terminalDecisionSummary: "Décision active",
+		terminalTranscriptGrouped: "Transcript regroupé",
+		terminalStdout: "stdout",
+		terminalStderr: "stderr",
+		terminalStdin: "stdin",
+		terminalAwaitingApproval: "JON attend ton accord avant de répondre au terminal.",
+		terminalAwaitingReply: "JON attend une réponse utile pour continuer.",
+		terminalMayInjectContext: "JON peut injecter le contexte mission autorisé.",
+		terminalMonitoring: "JON surveille ce terminal sans intervention immédiate.",
+		terminalRunningStateSummary: "Le terminal travaille encore.",
+		terminalCompletedStateSummary: "Le terminal a terminé sa tâche.",
+		terminalErrorStateSummary: "Le terminal est bloqué et demande une revue.",
+		terminalDecisionRequestApproval: "Accord humain requis",
+		terminalDecisionSuggestReply: "Réponse utilisateur suggérée",
+		terminalDecisionAutoInject: "Injection de contexte possible",
+		terminalDecisionEscalate: "Escalade humaine",
+		terminalDecisionObserve: "Observation seule",
+		terminalInjectContextNow: "Injecter le contexte",
+		terminalEventStart: "démarrage",
+		terminalEventExit: "sortie",
+		terminalEventError: "erreur",
+		terminalEventStop: "arrêt demandé",
+		terminalProcessStarted: "processus démarré",
+		terminalProcessExited: "processus terminé",
+		terminalExitCode: "code de sortie",
+		terminalSignal: "signal",
+		terminalProcessError: "erreur process",
+		availableCliAgents: "CLI détectés",
+		noCliAgentsDetected: "Aucun agent CLI détecté sur cette machine.",
+		terminalBubbleEmpty: "Aucun terminal attaché pour cette conversation.",
+		terminalLabel: "Label",
+		terminalCommand: "Commande",
+		terminalArgs: "Arguments (optionnel)",
+		terminalAutonomyMode: "Mode d'autonomie",
+		terminalLaunchBtn: "Lancer",
+		terminalAttachBtn: "Attacher",
+		terminalStop: "Arrêter",
+		terminalStopped: "Terminal arrêté.",
+		setMissionBrief: "Définir un objectif",
+		missionBriefPlaceholder: "Décris l'objectif de ce workspace...",
+		save: "Enregistrer",
+		missionBriefProgress: "Progression",
+		missionBriefBlockers: "Blocages",
+		terminalCwd: "Répertoire de travail",
+		terminalCwdPlaceholder: "Ex : C:\\mon-projet (optionnel)",
+		terminalRecentOutputHint: "Colle la sortie récente pour aider JON à détecter l'état du terminal.",
+		agentKindCodexCli: "Codex CLI (OpenAI)",
+		agentKindClaudeCode: "Claude Code CLI",
+		agentKindGenericCli: "Terminal générique",
+		agentKindUnknown: "Non identifié",
+		autonomyAssisted: "Assisté — JON demande confirmation",
+		autonomySupervised: "Supervisé — injection de contexte autorisée",
+		autonomyManual: "Manuel — observation seulement",
+		statusAttachedLabel: "Inactif (attaché)",
+		statusRunningLabel: "En cours d'exécution",
+		statusWaitingLabel: "Attend une entrée utilisateur",
+		statusNeedsAttentionLabel: "Attention requise",
+		terminalAuthorizedLabel: "Autoriser JON à interagir avec ce terminal"
 	},
 	en: {
 		appSubtitle: "Local desktop agent",
@@ -10051,8 +10193,12 @@ var STRINGS = Object.freeze({
 		degraded: "Degraded",
 		newConversation: "New conversation",
 		conversations: "Conversations",
+		workspacePanel: "Workspace",
 		close: "Close",
 		collapse: "Collapse",
+		collapseConversations: "Collapse conversations",
+		collapseTerminals: "Collapse terminals",
+		collapseInspector: "Collapse inspector",
 		openConversations: "Open conversations",
 		openInspector: "Open inspector",
 		conversationsShort: "Chats",
@@ -10133,6 +10279,38 @@ var STRINGS = Object.freeze({
 		runHistory: "Recent runs",
 		noRuns: "No saved runs.",
 		openAdmin: "Admin console",
+		pairDevice: "Pair mobile",
+		pairDeviceTitle: "Connect a mobile device",
+		pairDeviceSubtitle: "Scan the QR with your phone camera, or enter the code manually.",
+		pairDeviceCode: "Pairing code",
+		pairDeviceExpires: "Expires in",
+		pairDeviceExpired: "Expired — generate a new code",
+		pairDeviceCopy: "Copy link",
+		pairDeviceCopied: "Copied!",
+		pairDeviceClose: "Close",
+		pairDeviceNew: "New code",
+		pairDeviceLoading: "Generating…",
+		pairDeviceError: "Generation error",
+		pairDeviceQrHint: "Scan with phone camera to connect automatically",
+		pairDeviceLanUrl: "LAN URL",
+		pairDevicePublicUrl: "Public URL",
+		pairDeviceManualFallback: "Or enter code manually at",
+		openSettings: "Settings",
+		settingsTitle: "JON Settings",
+		settingsTrustedApps: "Trusted applications",
+		settingsTrustedAppsHint: "JON will open these apps without asking for confirmation.",
+		settingsTrustedBrowsers: "Trusted browsers",
+		settingsTrustedBrowsersHint: "JON can launch these browsers automatically.",
+		settingsAllowedDomains: "Allowed browsing domains",
+		settingsAllowedDomainsHint: "One domain per line. JON can navigate these sites without restriction.",
+		settingsAllowedDomainsPlaceholder: "upwork.com\ngoogle.com\ngithub.com",
+		settingsSave: "Save",
+		settingsSaved: "Saved",
+		settingsClose: "Close",
+		settingsSaving: "Saving…",
+		browserStartSession: "Start browser",
+		browserStarting: "Opening…",
+		browserStartError: "Failed to open browser",
 		progressUnderstood: "Request understood",
 		progressUnderstoodDetail: "JON prepares the action without exposing internal mechanics.",
 		progressApprovalNeeded: "Approval needed",
@@ -10170,9 +10348,11 @@ var STRINGS = Object.freeze({
 		terminalSurfaces: "Attached terminals",
 		terminalDecisions: "Terminal decisions",
 		terminalAlerts: "Terminal alerts",
+		terminalTranscript: "Terminal output",
 		noWorkspaceMission: "No active workspace brief.",
 		noTerminals: "No attached terminal.",
 		noTerminalDecisions: "No terminal decision recorded.",
+		noTerminalTranscript: "No terminal output captured.",
 		terminalAgent: "Agent",
 		terminalAutonomy: "Autonomy",
 		terminalAuthorized: "Authorized",
@@ -10200,7 +10380,111 @@ var STRINGS = Object.freeze({
 		fallback: "fallback",
 		localOnly: "Local history",
 		localOnlyHint: "Local conversations organize the UX. Runs, approvals and evidence remain persisted by the runtime.",
-		openRun: "Open run"
+		openRun: "Open run",
+		terminalAlertTitle: "Terminal alert",
+		terminalStartedTitle: "Terminal started",
+		terminalCompletionTitle: "Terminal completed",
+		terminalAutoActionTitle: "JON acted automatically",
+		missionPausedTitle: "Mission paused",
+		missionPausedHint: "Complete the action then click Continue in the mission panel.",
+		terminalSuggestedInput: "JON suggestion",
+		terminalReplyPlaceholder: "Reply to terminal (input will be sent)…",
+		terminalShellPlaceholder: "Type a command and press Enter…",
+		terminalReplySend: "Send",
+		terminalReplySent: "Sent",
+		terminalReplySentConfirm: "Reply sent to terminal.",
+		terminalReplyBlocked: "Input requires explicit approval.",
+		terminalInjectContext: "Inject mission context",
+		terminalContextInjected: "Mission context injected into terminal.",
+		launchCli: "Launch CLI agent",
+		attachTerminal: "Attach terminal",
+		openTerminals: "Open terminals",
+		newTerminal: "New terminal",
+		createTerminal: "Create terminal",
+		jonPilotHint: "Workspace terminals & notifications",
+		terminalViewCards: "Current view",
+		terminalViewSurface: "Rich surface",
+		terminalViewMode: "Terminal view",
+		terminalFullscreen: "Fullscreen",
+		terminalExitFullscreen: "Exit fullscreen",
+		terminalClosePanel: "Close terminal panel",
+		terminalOpenPanel: "Open",
+		terminalWorkspaceTitle: "Terminal surface",
+		terminalWorkspaceLead: "Manage workspace terminals here without leaving the conversation.",
+		terminalSurfaceTitle: "Rich terminal surface",
+		terminalSurfaceLead: "Follow one terminal session with live output, decisions, and the next expected step.",
+		terminalSessions: "Sessions",
+		terminalLiveTranscript: "Live transcript",
+		terminalRecentDecisions: "Recent decisions",
+		terminalNoSurfaceTerminal: "Select a terminal to inspect its full session.",
+		terminalNoTranscript: "No live output is available for this terminal yet.",
+		terminalLastPrompt: "Last input",
+		terminalResolvedCommand: "Resolved command",
+		terminalWorkingDirectory: "Working directory",
+		terminalProcess: "Process",
+		terminalDecision: "Decision",
+		terminalEvent: "Event",
+		terminalNow: "Now",
+		terminalNextStep: "Next step",
+		terminalWhatJonNeeds: "What JON needs now",
+		terminalDecisionSummary: "Active decision",
+		terminalTranscriptGrouped: "Grouped transcript",
+		terminalStdout: "stdout",
+		terminalStderr: "stderr",
+		terminalStdin: "stdin",
+		terminalAwaitingApproval: "JON is waiting for your approval before replying to the terminal.",
+		terminalAwaitingReply: "JON is waiting for a useful reply to continue.",
+		terminalMayInjectContext: "JON can inject approved mission context.",
+		terminalMonitoring: "JON is monitoring this terminal without immediate intervention.",
+		terminalRunningStateSummary: "The terminal is still working.",
+		terminalCompletedStateSummary: "The terminal completed its task.",
+		terminalErrorStateSummary: "The terminal is blocked and needs review.",
+		terminalDecisionRequestApproval: "Human approval required",
+		terminalDecisionSuggestReply: "User reply suggested",
+		terminalDecisionAutoInject: "Context injection possible",
+		terminalDecisionEscalate: "Human escalation",
+		terminalDecisionObserve: "Observe only",
+		terminalInjectContextNow: "Inject context",
+		terminalEventStart: "start",
+		terminalEventExit: "exit",
+		terminalEventError: "error",
+		terminalEventStop: "stop requested",
+		terminalProcessStarted: "process started",
+		terminalProcessExited: "process exited",
+		terminalExitCode: "exit code",
+		terminalSignal: "signal",
+		terminalProcessError: "process error",
+		availableCliAgents: "Detected CLI agents",
+		noCliAgentsDetected: "No CLI agent detected on this machine.",
+		terminalBubbleEmpty: "No terminal is attached to this conversation.",
+		terminalLabel: "Label",
+		terminalCommand: "Command",
+		terminalArgs: "Arguments (optional)",
+		terminalAutonomyMode: "Autonomy mode",
+		terminalLaunchBtn: "Launch",
+		terminalAttachBtn: "Attach",
+		terminalStop: "Stop",
+		terminalStopped: "Terminal stopped.",
+		setMissionBrief: "Set objective",
+		missionBriefPlaceholder: "Describe the workspace mission objective...",
+		save: "Save",
+		missionBriefProgress: "Progress",
+		missionBriefBlockers: "Blockers",
+		terminalCwd: "Working directory",
+		terminalCwdPlaceholder: "E.g. C:\\my-project (optional)",
+		terminalRecentOutputHint: "Paste recent terminal output to help JON detect the terminal state.",
+		agentKindCodexCli: "Codex CLI (OpenAI)",
+		agentKindClaudeCode: "Claude Code CLI",
+		agentKindGenericCli: "Generic terminal",
+		agentKindUnknown: "Unidentified",
+		autonomyAssisted: "Assisted — JON asks for confirmation",
+		autonomySupervised: "Supervised — context injection allowed",
+		autonomyManual: "Manual — observe only",
+		statusAttachedLabel: "Idle (attached)",
+		statusRunningLabel: "Running",
+		statusWaitingLabel: "Waiting for user input",
+		statusNeedsAttentionLabel: "Needs attention",
+		terminalAuthorizedLabel: "Authorize JON to interact with this terminal"
 	}
 });
 function normalizeLocale(value) {
@@ -10262,10 +10546,70 @@ var require_react_jsx_runtime_production = /* @__PURE__ */ __commonJSMin(((expor
 	exports.jsxs = jsxProd;
 }));
 //#endregion
-//#region ui/src/main.jsx
+//#region \0vite/preload-helper.js
 var import_jsx_runtime = (/* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_react_jsx_runtime_production();
 })))();
+var scriptRel = "modulepreload";
+var assetsURL = function(dep) {
+	return "/" + dep;
+};
+var seen = {};
+var __vitePreload = function preload(baseModule, deps, importerUrl) {
+	let promise = Promise.resolve();
+	if (deps && deps.length > 0) {
+		const links = document.getElementsByTagName("link");
+		const cspNonceMeta = document.querySelector("meta[property=csp-nonce]");
+		const cspNonce = cspNonceMeta?.nonce || cspNonceMeta?.getAttribute("nonce");
+		function allSettled(promises) {
+			return Promise.all(promises.map((p) => Promise.resolve(p).then((value) => ({
+				status: "fulfilled",
+				value
+			}), (reason) => ({
+				status: "rejected",
+				reason
+			}))));
+		}
+		promise = allSettled(deps.map((dep) => {
+			dep = assetsURL(dep, importerUrl);
+			if (dep in seen) return;
+			seen[dep] = true;
+			const isCss = dep.endsWith(".css");
+			const cssSelector = isCss ? "[rel=\"stylesheet\"]" : "";
+			if (!!importerUrl) for (let i = links.length - 1; i >= 0; i--) {
+				const link = links[i];
+				if (link.href === dep && (!isCss || link.rel === "stylesheet")) return;
+			}
+			else if (document.querySelector(`link[href="${dep}"]${cssSelector}`)) return;
+			const link = document.createElement("link");
+			link.rel = isCss ? "stylesheet" : scriptRel;
+			if (!isCss) link.as = "script";
+			link.crossOrigin = "";
+			link.href = dep;
+			if (cspNonce) link.setAttribute("nonce", cspNonce);
+			document.head.appendChild(link);
+			if (isCss) return new Promise((res, rej) => {
+				link.addEventListener("load", res);
+				link.addEventListener("error", () => rej(/* @__PURE__ */ new Error(`Unable to preload CSS for ${dep}`)));
+			});
+		}));
+	}
+	function handlePreloadError(err) {
+		const e = new Event("vite:preloadError", { cancelable: true });
+		e.payload = err;
+		window.dispatchEvent(e);
+		if (!e.defaultPrevented) throw err;
+	}
+	return promise.then((res) => {
+		for (const item of res || []) {
+			if (item.status !== "rejected") continue;
+			handlePreloadError(item.reason);
+		}
+		return baseModule().catch(handlePreloadError);
+	});
+};
+//#endregion
+//#region ui/src/main.jsx
 var EMPTY_DRAFT = Object.freeze({
 	objective: "",
 	deliverable: "",
@@ -10277,6 +10621,7 @@ var EMPTY_DRAFT = Object.freeze({
 	autoContinue: false
 });
 var CONVERSATION_STORAGE_KEY = "jon.conversations.v1";
+var JON_CONVERSATION_ID = "jon";
 function id(prefix = "msg") {
 	return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
 }
@@ -10546,6 +10891,83 @@ function conversationTurnsToMessages(turns = []) {
 			text: turn.content,
 			createdAt: turn.createdAt
 		};
+		if (turn.kind === "terminal_alert") return {
+			id: turn.id,
+			role: "assistant",
+			kind: "terminal_alert",
+			text: turn.content,
+			terminalAlert: {
+				terminalId: payload.terminalId,
+				terminalLabel: payload.terminalLabel,
+				terminalStatus: payload.terminalStatus,
+				agentKind: payload.agentKind,
+				decisionAction: payload.decisionAction,
+				requiresApproval: payload.requiresApproval,
+				reason: payload.reason,
+				recentOutput: payload.recentOutput,
+				autonomyMode: payload.autonomyMode,
+				missionObjective: payload.missionObjective,
+				suggestedInput: payload.suggestedInput ?? null,
+				suggestionReasoning: payload.suggestionReasoning ?? null,
+				projectId: payload.projectId ?? turn.projectId
+			},
+			tone: payload.requiresApproval ? "warn" : payload.terminalStatus === "error" ? "danger" : "neutral",
+			createdAt: turn.createdAt
+		};
+		if (turn.kind === "terminal_started") return {
+			id: turn.id,
+			role: "assistant",
+			kind: "terminal_started",
+			text: turn.content,
+			terminalEvent: {
+				terminalId: payload.terminalId,
+				terminalLabel: payload.terminalLabel,
+				agentKind: payload.agentKind,
+				autonomyMode: payload.autonomyMode
+			},
+			createdAt: turn.createdAt
+		};
+		if (turn.kind === "terminal_completion") return {
+			id: turn.id,
+			role: "assistant",
+			kind: "terminal_completion",
+			text: turn.content,
+			terminalEvent: {
+				terminalId: payload.terminalId,
+				terminalLabel: payload.terminalLabel,
+				agentKind: payload.agentKind,
+				exitCode: payload.exitCode,
+				recentOutput: payload.recentOutput
+			},
+			createdAt: turn.createdAt
+		};
+		if (turn.kind === "terminal_auto_action") return {
+			id: turn.id,
+			role: "assistant",
+			kind: "terminal_auto_action",
+			text: turn.content,
+			terminalEvent: {
+				terminalId: payload.terminalId,
+				terminalLabel: payload.terminalLabel,
+				injectedInput: payload.injectedInput,
+				reasoning: payload.reasoning,
+				confidence: payload.confidence
+			},
+			createdAt: turn.createdAt
+		};
+		if (turn.kind === "mission_paused") return {
+			id: turn.id,
+			role: "assistant",
+			kind: "mission_paused",
+			text: turn.content,
+			missionPause: {
+				runId: payload.runId,
+				approvalId: payload.approvalId,
+				actionLabel: payload.actionLabel,
+				reason: payload.reason
+			},
+			createdAt: turn.createdAt
+		};
 		return {
 			id: turn.id,
 			role: "assistant",
@@ -10572,6 +10994,435 @@ function conversationTurnsToMessages(turns = []) {
 		};
 	});
 }
+function PairDeviceModal({ t, onClose }) {
+	const [pairingData, setPairingData] = (0, import_react.useState)(null);
+	const [loading, setLoading] = (0, import_react.useState)(false);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [secondsLeft, setSecondsLeft] = (0, import_react.useState)(null);
+	const [copied, setCopied] = (0, import_react.useState)(false);
+	async function generate() {
+		setLoading(true);
+		setError(null);
+		setPairingData(null);
+		try {
+			const data = await api("/api/mobile/pairing/start", { method: "POST" });
+			setPairingData(data);
+			const ttl = Math.round((new Date(data.expiresAt) - Date.now()) / 1e3);
+			setSecondsLeft(Math.max(0, ttl));
+		} catch (err) {
+			setError(err.message);
+		} finally {
+			setLoading(false);
+		}
+	}
+	(0, import_react.useEffect)(() => {
+		generate();
+	}, []);
+	(0, import_react.useEffect)(() => {
+		if (secondsLeft === null || secondsLeft <= 0) return;
+		const id = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1e3);
+		return () => clearInterval(id);
+	}, [secondsLeft]);
+	async function copyLink() {
+		const toCopy = pairingData?.pairingUrl ?? pairingData?.lanUrl ?? `${window.location.origin}/mobile/`;
+		try {
+			await navigator.clipboard.writeText(toCopy);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 1800);
+		} catch {}
+	}
+	const expired = secondsLeft === 0;
+	const mins = secondsLeft !== null ? Math.floor(secondsLeft / 60) : null;
+	const secs = secondsLeft !== null ? String(secondsLeft % 60).padStart(2, "0") : null;
+	const displayUrl = pairingData?.lanUrl ? `${pairingData.lanUrl}/mobile/` : `${window.location.origin}/mobile/`;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "pair-modal-backdrop",
+		onClick: (e) => {
+			if (e.target === e.currentTarget) onClose();
+		},
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "pair-modal",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "pair-modal-header",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "pair-modal-title",
+						children: t.pairDeviceTitle
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ghost icon-only",
+						onClick: onClose,
+						"aria-label": t.pairDeviceClose,
+						children: "✕"
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "pair-modal-subtitle",
+					children: t.pairDeviceSubtitle
+				}),
+				loading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "pair-modal-loading",
+					children: t.pairDeviceLoading
+				}) : error ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "pair-modal-error",
+					children: [
+						t.pairDeviceError,
+						" : ",
+						error
+					]
+				}) : pairingData ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+					pairingData.lanEnabled === false ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "pair-modal-lan-warning",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "⚠ Serveur en mode local uniquement" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+							"Le mobile ne peut pas atteindre ce serveur. Redémarre avec ",
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { children: "COWORK_LAN=1" }),
+							" pour activer l'accès réseau."
+						] })]
+					}) : null,
+					pairingData.qrDataUri ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "pair-modal-qr",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+							src: pairingData.qrDataUri,
+							alt: "QR pairing",
+							className: "pair-qr-img"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "pair-qr-hint",
+							children: t.pairDeviceQrHint
+						})]
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "pair-modal-url-row",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "pair-modal-label",
+								children: t.pairDeviceLanUrl
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+								className: "pair-modal-url",
+								href: displayUrl,
+								target: "_blank",
+								rel: "noreferrer",
+								children: displayUrl
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: "ghost small",
+								onClick: copyLink,
+								children: copied ? t.pairDeviceCopied : t.pairDeviceCopy
+							})
+						]
+					}),
+					pairingData.publicUrl ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "pair-modal-url-row",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "pair-modal-label",
+							children: t.pairDevicePublicUrl
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "pair-modal-url",
+							children: [pairingData.publicUrl, "/mobile/"]
+						})]
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: `pair-modal-code-block ${expired ? "expired" : ""}`,
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "pair-modal-code-label",
+								children: t.pairDeviceCode
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "pair-modal-code",
+								children: pairingData.pairingCode
+							}),
+							!expired && secondsLeft !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+								className: "pair-modal-countdown",
+								children: [
+									t.pairDeviceExpires,
+									" ",
+									mins,
+									":",
+									secs
+								]
+							}) : null,
+							expired ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "pair-modal-expired",
+								children: t.pairDeviceExpired
+							}) : null
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "secondary small",
+						onClick: generate,
+						style: { alignSelf: "flex-start" },
+						children: t.pairDeviceNew
+					})
+				] }) : null
+			]
+		})
+	});
+}
+function SettingsModal({ t, projectId, agentConfiguration, availableApplications, availableBrowsers, project, llmGatewayStatus, onClose }) {
+	const existing = agentConfiguration?.guardrails ?? {};
+	const [trustedApps, setTrustedApps] = (0, import_react.useState)(() => new Set(existing.trustedApplications ?? []));
+	const [trustedBrowsers, setTrustedBrowsers] = (0, import_react.useState)(() => new Set(existing.trustedBrowserIds ?? []));
+	const [domainsText, setDomainsText] = (0, import_react.useState)(() => (project?.allowlistedDomains ?? []).join("\n"));
+	const [saving, setSaving] = (0, import_react.useState)(false);
+	const [saved, setSaved] = (0, import_react.useState)(false);
+	const [saveError, setSaveError] = (0, import_react.useState)(null);
+	function toggleApp(appId) {
+		setTrustedApps((prev) => {
+			const next = new Set(prev);
+			if (next.has(appId)) next.delete(appId);
+			else next.add(appId);
+			return next;
+		});
+		setSaved(false);
+	}
+	function toggleBrowser(browserId) {
+		setTrustedBrowsers((prev) => {
+			const next = new Set(prev);
+			if (next.has(browserId)) next.delete(browserId);
+			else next.add(browserId);
+			return next;
+		});
+		setSaved(false);
+	}
+	async function handleSave() {
+		setSaving(true);
+		setSaved(false);
+		setSaveError(null);
+		try {
+			const domains = domainsText.split("\n").map((d) => d.trim().toLowerCase()).filter(Boolean);
+			await Promise.all([api("/api/agent/config", {
+				method: "PUT",
+				body: JSON.stringify({ guardrails: {
+					...existing,
+					trustedApplications: [...trustedApps],
+					trustedBrowserIds: [...trustedBrowsers]
+				} })
+			}), projectId ? api(`/api/projects/${encodeURIComponent(projectId)}/allowlisted-domains`, {
+				method: "PUT",
+				body: JSON.stringify({ domains })
+			}) : Promise.resolve()]);
+			setSaved(true);
+		} catch {
+			setSaveError("Erreur lors de la sauvegarde.");
+		} finally {
+			setSaving(false);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "pair-modal-backdrop",
+		onClick: (e) => {
+			if (e.target === e.currentTarget) onClose();
+		},
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "pair-modal",
+			style: {
+				maxWidth: "520px",
+				maxHeight: "80vh",
+				overflowY: "auto"
+			},
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "pair-modal-header",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: t.settingsTitle }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ghost icon-only",
+						onClick: onClose,
+						children: "✕"
+					})]
+				}),
+				availableApplications.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					style: { marginBottom: "20px" },
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+							style: {
+								fontSize: "13px",
+								marginBottom: "6px"
+							},
+							children: t.settingsTrustedApps
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							style: {
+								fontSize: "12px",
+								color: "var(--muted)",
+								marginBottom: "10px"
+							},
+							children: t.settingsTrustedAppsHint
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "settings-toggle-list",
+							children: availableApplications.map((app) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+								className: "settings-toggle-row",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "settings-toggle-label",
+									children: app.label ?? app.id
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									type: "checkbox",
+									checked: trustedApps.has(app.id),
+									onChange: () => toggleApp(app.id)
+								})]
+							}, app.id))
+						})
+					]
+				}) : null,
+				availableBrowsers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					style: { marginBottom: "20px" },
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+							style: {
+								fontSize: "13px",
+								marginBottom: "6px"
+							},
+							children: t.settingsTrustedBrowsers
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							style: {
+								fontSize: "12px",
+								color: "var(--muted)",
+								marginBottom: "10px"
+							},
+							children: t.settingsTrustedBrowsersHint
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "settings-toggle-list",
+							children: availableBrowsers.map((browser) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+								className: "settings-toggle-row",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "settings-toggle-label",
+									children: browser.label ?? browser.id
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									type: "checkbox",
+									checked: trustedBrowsers.has(browser.id),
+									onChange: () => toggleBrowser(browser.id)
+								})]
+							}, browser.id))
+						})
+					]
+				}) : null,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					style: { marginBottom: "20px" },
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+							style: {
+								fontSize: "13px",
+								marginBottom: "6px"
+							},
+							children: t.settingsAllowedDomains
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							style: {
+								fontSize: "12px",
+								color: "var(--muted)",
+								marginBottom: "8px"
+							},
+							children: t.settingsAllowedDomainsHint
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+							className: "settings-domains-textarea",
+							value: domainsText,
+							onChange: (e) => {
+								setDomainsText(e.target.value);
+								setSaved(false);
+							},
+							placeholder: t.settingsAllowedDomainsPlaceholder,
+							rows: 5,
+							style: {
+								width: "100%",
+								fontFamily: "monospace",
+								fontSize: "12px",
+								resize: "vertical"
+							}
+						})
+					]
+				}),
+				llmGatewayStatus ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					style: {
+						marginBottom: "20px",
+						padding: "10px 12px",
+						background: "var(--bg-strong)",
+						borderRadius: "8px",
+						border: "1px solid var(--border)"
+					},
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+						style: {
+							fontSize: "12px",
+							fontWeight: 700,
+							marginBottom: "6px",
+							textTransform: "uppercase",
+							letterSpacing: "0.05em",
+							color: "var(--muted)"
+						},
+						children: "Moteur de raisonnement"
+					}), llmGatewayStatus.effectiveMode === "mock_only" || llmGatewayStatus.effectiveMode === "degraded_mock_only" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						style: {
+							fontSize: "12px",
+							color: "var(--warn, orange)",
+							lineHeight: 1.5
+						},
+						children: [
+							"⚠ Mode simulation (hors-ligne) actif — JON ne peut pas raisonner en temps réel sur des missions complexes.",
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("br", {}),
+							"Pour activer un vrai LLM, lancez JON avec ",
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", {
+								style: {
+									background: "var(--bg)",
+									padding: "1px 4px",
+									borderRadius: "4px"
+								},
+								children: "COWORK_LLM_PROVIDER_MODE=openai_compatible"
+							}),
+							" et configurez votre clé API."
+						]
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						style: {
+							fontSize: "12px",
+							color: "var(--success, green)"
+						},
+						children: ["✓ LLM actif — Mode : ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: llmGatewayStatus.effectiveMode })]
+					})]
+				}) : null,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					style: {
+						display: "flex",
+						gap: "8px",
+						alignItems: "center"
+					},
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "primary small",
+							onClick: handleSave,
+							disabled: saving,
+							children: saving ? t.settingsSaving : t.settingsSave
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ghost small",
+							onClick: onClose,
+							children: t.settingsClose
+						}),
+						saved ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							style: {
+								fontSize: "12px",
+								color: "var(--success, green)"
+							},
+							children: [t.settingsSaved, " ✓"]
+						}) : null,
+						saveError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							style: {
+								fontSize: "12px",
+								color: "var(--danger, red)"
+							},
+							children: saveError
+						}) : null
+					]
+				})
+			]
+		})
+	});
+}
 function App() {
 	const [locale, setLocale] = (0, import_react.useState)(() => detectInitialLocale());
 	const t = (0, import_react.useMemo)(() => stringsForLocale(locale), [locale]);
@@ -10594,24 +11445,35 @@ function App() {
 	const [recentActivity, setRecentActivity] = (0, import_react.useState)([]);
 	const [detailsOpen, setDetailsOpen] = (0, import_react.useState)(false);
 	const [historyOpen, setHistoryOpen] = (0, import_react.useState)(false);
-	const [inspectorOpen, setInspectorOpen] = (0, import_react.useState)(false);
+	const [workspacePanel, setWorkspacePanel] = (0, import_react.useState)(null);
+	const [terminalViewMode, setTerminalViewMode] = (0, import_react.useState)("cards");
+	const [terminalRequestedView, setTerminalRequestedView] = (0, import_react.useState)(null);
+	const [terminalOverlayId, setTerminalOverlayId] = (0, import_react.useState)(null);
+	const [terminalOverlayFullscreen, setTerminalOverlayFullscreen] = (0, import_react.useState)(false);
 	const [historyHydratedProjectId, setHistoryHydratedProjectId] = (0, import_react.useState)(null);
 	const [conversationSessions, setConversationSessions] = (0, import_react.useState)(() => {
 		return sortConversations(loadStoredConversations());
 	});
 	const [activeConversationId, setActiveConversationId] = (0, import_react.useState)(null);
+	const [jonQueue, setJonQueue] = (0, import_react.useState)([]);
+	const [jonUnread, setJonUnread] = (0, import_react.useState)(0);
+	const [pairModalOpen, setPairModalOpen] = (0, import_react.useState)(false);
+	const [settingsOpen, setSettingsOpen] = (0, import_react.useState)(false);
 	const selectedProjectIdRef = (0, import_react.useRef)(null);
 	const selectedRunIdRef = (0, import_react.useRef)(null);
+	const activeConversationIdRef = (0, import_react.useRef)(null);
+	const terminalViewPreferenceRef = (0, import_react.useRef)(null);
 	const transcriptRef = (0, import_react.useRef)(null);
 	const composerInputRef = (0, import_react.useRef)(null);
 	const project = (0, import_react.useMemo)(() => currentProject(dashboard, selectedProjectId), [dashboard, selectedProjectId]);
 	const runs = (0, import_react.useMemo)(() => latestRuns(dashboard, selectedProjectId), [dashboard, selectedProjectId]);
+	const configuredTerminalWorkspaceView = dashboard?.agentConfiguration?.guardrails?.terminalWorkspaceView ?? "cards";
 	const availableBrowsers = dashboard?.desktopActionSupport?.availableBrowsers ?? [];
 	const pendingApprovals = runDetail?.pendingApprovals ?? [];
 	const run = runDetail?.run ?? null;
 	const activeConversation = conversationSessions.find((conversation) => conversation.id === activeConversationId) ?? null;
 	const activeConversationBackendId = conversationBackendId(activeConversation);
-	const hasConversation = messages.length > 0 || Boolean(selectedRunId);
+	const hasConversation = messages.length > 0 || Boolean(selectedRunId) || activeConversationId === JON_CONVERSATION_ID;
 	const hasStreamingMessage = messages.some((message) => message.streaming);
 	const activityEvents = (0, import_react.useMemo)(() => buildActivityEvents(runDetail, recentActivity, run), [
 		recentActivity,
@@ -10700,10 +11562,34 @@ function App() {
 		selectedRunIdRef.current = selectedRunId;
 	}, [selectedRunId]);
 	(0, import_react.useEffect)(() => {
+		activeConversationIdRef.current = activeConversationId;
+		if (activeConversationId === JON_CONVERSATION_ID) setJonUnread(0);
+	}, [activeConversationId]);
+	(0, import_react.useEffect)(() => {
+		if (!configuredTerminalWorkspaceView) return;
+		if (terminalViewPreferenceRef.current == null || terminalViewPreferenceRef.current !== configuredTerminalWorkspaceView) {
+			terminalViewPreferenceRef.current = configuredTerminalWorkspaceView;
+			setTerminalViewMode(configuredTerminalWorkspaceView);
+		}
+	}, [configuredTerminalWorkspaceView]);
+	(0, import_react.useEffect)(() => {
 		if (!selectedProjectId || historyHydratedProjectId === selectedProjectId) return;
 		setHistoryHydratedProjectId(selectedProjectId);
 	}, [historyHydratedProjectId, selectedProjectId]);
 	async function selectConversation(conversationId) {
+		if (conversationId === JON_CONVERSATION_ID) {
+			setActiveConversationId(JON_CONVERSATION_ID);
+			setMessages(jonQueue);
+			setJonQueue([]);
+			setSelectedRunId(null);
+			setRunDetail(null);
+			setRecentActivity([]);
+			setPreflight(null);
+			setConfirmedDraft(null);
+			setFeedback(null);
+			selectedRunIdRef.current = null;
+			return;
+		}
 		const conversation = conversationSessions.find((candidate) => candidate.id === conversationId);
 		if (!conversation) return;
 		setActiveConversationId(conversation.id);
@@ -10802,7 +11688,6 @@ function App() {
 			return () => window.clearInterval(poller);
 		}
 		const stream = new EventSource("/api/events");
-		stream.onopen = () => setLiveStatus("live");
 		stream.onmessage = (message) => {
 			setLiveStatus("live");
 			let event;
@@ -10821,6 +11706,100 @@ function App() {
 					selectedRunIdRef.current = runId;
 					setSelectedRunId(runId);
 				}
+				const pushJonMessage = (msg) => {
+					const full = {
+						id: id(),
+						createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+						...msg
+					};
+					if (activeConversationIdRef.current === JON_CONVERSATION_ID) setMessages((prev) => [...prev, full].slice(-32));
+					else {
+						setJonQueue((prev) => [...prev, full].slice(-32));
+						setJonUnread((n) => n + 1);
+					}
+				};
+				if (event.type === "workspace.terminal.conversation_alert") {
+					const payload = event.payload ?? {};
+					pushJonMessage({
+						role: "assistant",
+						kind: "terminal_alert",
+						text: payload.alertText ?? `Terminal ${payload.terminalLabel ?? ""} : ${payload.terminalStatus ?? ""}`,
+						terminalAlert: {
+							terminalId: payload.terminalId,
+							terminalLabel: payload.terminalLabel,
+							terminalStatus: payload.terminalStatus,
+							agentKind: payload.agentKind,
+							decisionAction: payload.decisionAction,
+							requiresApproval: payload.requiresApproval,
+							reason: payload.reason,
+							recentOutput: payload.recentOutput,
+							autonomyMode: payload.autonomyMode,
+							missionObjective: payload.missionObjective,
+							suggestedInput: payload.suggestedInput ?? null,
+							suggestionReasoning: payload.suggestionReasoning ?? null,
+							projectId: payload.projectId
+						},
+						tone: payload.requiresApproval ? "warn" : payload.terminalStatus === "error" ? "danger" : "neutral"
+					});
+				}
+				if (event.type === "workspace.terminal.conversation_started") {
+					const payload = event.payload ?? {};
+					pushJonMessage({
+						role: "assistant",
+						kind: "terminal_started",
+						text: payload.startText ?? `Terminal ${payload.terminalLabel ?? ""} démarré.`,
+						terminalEvent: {
+							terminalId: payload.terminalId,
+							terminalLabel: payload.terminalLabel,
+							agentKind: payload.agentKind,
+							autonomyMode: payload.autonomyMode
+						}
+					});
+				}
+				if (event.type === "workspace.terminal.conversation_completion") {
+					const payload = event.payload ?? {};
+					pushJonMessage({
+						role: "assistant",
+						kind: "terminal_completion",
+						text: `Terminal **${payload.terminalLabel ?? ""}** terminé.`,
+						terminalEvent: {
+							terminalId: payload.terminalId,
+							terminalLabel: payload.terminalLabel,
+							agentKind: payload.agentKind ?? null,
+							exitCode: null,
+							recentOutput: null
+						}
+					});
+				}
+				if (event.type === "workspace.terminal.auto_action") {
+					const payload = event.payload ?? {};
+					pushJonMessage({
+						role: "assistant",
+						kind: "terminal_auto_action",
+						text: `JON a répondu au terminal **${payload.terminalLabel ?? ""}** : \`${payload.injectedInput ?? ""}\``,
+						terminalEvent: {
+							terminalId: payload.terminalId,
+							terminalLabel: payload.terminalLabel,
+							injectedInput: payload.injectedInput,
+							reasoning: null,
+							confidence: null
+						}
+					});
+				}
+				if (event.type === "mission.paused_for_manual_action") {
+					const payload = event.payload ?? {};
+					pushJonMessage({
+						role: "assistant",
+						kind: "mission_paused",
+						text: `⏸ **JON est en pause** — action manuelle requise : **${payload.actionLabel ?? ""}**`,
+						missionPause: {
+							runId: payload.runId,
+							approvalId: payload.approvalId,
+							actionLabel: payload.actionLabel,
+							reason: null
+						}
+					});
+				}
 				setRecentActivity((current) => [{
 					...event,
 					id: event.id ?? id("activity"),
@@ -10829,7 +11808,8 @@ function App() {
 			}
 			refreshDashboard({ preferActive: Boolean(event.payload?.runId) }).catch(() => setLiveStatus("degraded"));
 		};
-		stream.onerror = () => setLiveStatus("degraded");
+		stream.onerror = () => setLiveStatus("reconnecting");
+		stream.onopen = () => setLiveStatus("live");
 		const poller = window.setInterval(() => {
 			refreshDashboard().catch(() => setLiveStatus("degraded"));
 		}, 15e3);
@@ -10934,7 +11914,7 @@ function App() {
 		};
 		setDraft((current) => ({
 			...current,
-			objective
+			objective: ""
 		}));
 		setFeedback(null);
 		setPreflight(null);
@@ -11007,6 +11987,10 @@ function App() {
 					updatedAt: response.conversation.updatedAt ?? (/* @__PURE__ */ new Date()).toISOString()
 				};
 			})));
+			if (response.autoLaunchedRunId) {
+				selectedRunIdRef.current = response.autoLaunchedRunId;
+				setSelectedRunId(response.autoLaunchedRunId);
+			}
 			updateMessage(assistantMessageId, {
 				turn: response.turn,
 				uiBlocks: response.turn?.uiBlocks ?? [],
@@ -11094,6 +12078,33 @@ function App() {
 			}));
 		}
 	}
+	async function sendTerminalInput(projectId, terminalId, input, { approved = false } = {}) {
+		if (!input?.trim() || !projectId || !terminalId) return;
+		try {
+			await api(`/api/projects/${projectId}/workspace/terminals/${encodeURIComponent(terminalId)}/input`, {
+				method: "POST",
+				body: JSON.stringify({
+					input: input.trim(),
+					approved
+				})
+			});
+			appendMessage({
+				role: "user",
+				kind: "terminal_reply",
+				text: `[Terminal reply → ${input.trim()}]`,
+				meta: t.terminalReplySent
+			});
+			await refreshDashboard();
+		} catch (error) {
+			appendMessage({
+				role: "assistant",
+				kind: "error",
+				text: error.message,
+				tone: "danger",
+				meta: t.error
+			});
+		}
+	}
 	async function resolveApproval(approval, decision) {
 		setBusy((current) => ({
 			...current,
@@ -11129,6 +12140,51 @@ function App() {
 			}));
 		}
 	}
+	function openTerminalWorkspace(view = null) {
+		setTerminalRequestedView(view);
+		setWorkspacePanel("terminals");
+	}
+	function openTraceWorkspace() {
+		setWorkspacePanel("trace");
+	}
+	function toggleTerminalSidebar() {
+		setWorkspacePanel((current) => {
+			const next = current === "terminals" ? null : "terminals";
+			if (!next) {
+				setTerminalRequestedView(null);
+				setTerminalOverlayId(null);
+				setTerminalOverlayFullscreen(false);
+			}
+			return next;
+		});
+	}
+	function toggleInspectorSidebar() {
+		setWorkspacePanel((current) => current === "trace" ? null : "trace");
+	}
+	function openBrowserWorkspace() {
+		setWorkspacePanel("browser");
+	}
+	function toggleBrowserSidebar() {
+		setWorkspacePanel((current) => current === "browser" ? null : "browser");
+	}
+	function openTerminalOverlay(terminalId) {
+		setTerminalOverlayId(terminalId);
+		setTerminalOverlayFullscreen(false);
+	}
+	function closeTerminalOverlay() {
+		setTerminalOverlayId(null);
+		setTerminalOverlayFullscreen(false);
+	}
+	async function stopWorkspaceTerminal(terminalId) {
+		if (!selectedProjectId) return;
+		try {
+			await api(`/api/projects/${selectedProjectId}/workspace/terminals/${encodeURIComponent(terminalId)}/stop`, {
+				method: "POST",
+				body: JSON.stringify({})
+			});
+			refreshDashboard();
+		} catch {}
+	}
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "react-cowork-shell",
 		children: [
@@ -11157,14 +12213,26 @@ function App() {
 							})]
 						}),
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-							className: `live-pill ${liveStatus}`,
-							children: liveStatus === "live" ? t.live : liveStatus === "connecting" ? t.connecting : t.degraded
+							className: `live-pill ${liveStatus === "reconnecting" ? "degraded" : liveStatus}`,
+							children: liveStatus === "live" ? t.live : liveStatus === "connecting" ? t.connecting : liveStatus === "reconnecting" ? t.reconnecting ?? "…" : t.degraded
 						}),
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 							type: "button",
 							className: "ghost small",
 							onClick: startNewMission,
 							children: t.new
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: "ghost small",
+							onClick: () => setSettingsOpen(true),
+							children: ["⚙ ", t.openSettings]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: "ghost small",
+							onClick: () => setPairModalOpen(true),
+							children: ["📱 ", t.pairDevice]
 						}),
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
 							className: "secondary small link-button",
@@ -11174,12 +12242,26 @@ function App() {
 					]
 				})]
 			}),
+			pairModalOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PairDeviceModal, {
+				t,
+				onClose: () => setPairModalOpen(false)
+			}) : null,
+			settingsOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SettingsModal, {
+				t,
+				projectId: selectedProjectId,
+				agentConfiguration: dashboard?.agentConfiguration ?? null,
+				availableApplications: dashboard?.desktopActionSupport?.availableApplications ?? [],
+				availableBrowsers: dashboard?.desktopActionSupport?.availableBrowsers ?? [],
+				project,
+				llmGatewayStatus: dashboard?.llmGatewayStatus ?? null,
+				onClose: () => setSettingsOpen(false)
+			}) : null,
 			feedback ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: `react-feedback ${feedback.tone ?? ""}`,
 				children: feedback.text
 			}) : null,
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
-				className: `react-cowork-main ${historyOpen ? "history-open" : "history-collapsed"} ${inspectorOpen ? "inspector-open" : "inspector-collapsed"}`,
+				className: `react-cowork-main ${historyOpen ? "history-open" : "history-collapsed"} ${workspacePanel ? "workspace-open" : "workspace-collapsed"} ${workspacePanel === "terminals" && terminalViewMode === "surface" ? "terminal-surface-open" : ""}`,
 				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ConversationSidebar, {
 						conversations: conversationSessions,
@@ -11188,71 +12270,130 @@ function App() {
 						onNew: startNewMission,
 						open: historyOpen,
 						onToggle: () => setHistoryOpen((current) => !current),
+						jonUnread,
+						jonHasAlert: jonUnread > 0,
 						locale,
 						t
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 						className: "conversation-surface",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							className: "conversation-thread",
-							ref: transcriptRef,
-							"aria-live": "polite",
-							children: [
-								!hasConversation ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyConversation, { t }) : null,
-								selectedRunId && run ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RunReviewIntro, {
-									run,
-									t
-								}) : null,
-								messages.map((message) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, {
-									message,
-									onStartMission: startMission,
-									onClarificationAnswer: stageClarificationAnswer,
-									busy,
-									t
-								}, message.id)),
-								busy.reviewing && !hasStreamingMessage ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ThinkingMessage, {
-									text: t.thinking,
-									t
-								}) : null,
-								busy.starting ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ThinkingMessage, {
-									text: t.launching,
-									t
-								}) : null,
-								run ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RunProgressMessage, {
-									run,
-									runDetail,
-									liveStatus,
-									pendingApprovals,
-									events: activityEvents,
-									t
-								}) : null,
-								pendingApprovals.map((approval) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalMessage, {
-									approval,
-									busy: busy.approvalId === approval.id,
-									onResolve: resolveApproval,
-									t
-								}, approval.id)),
-								runDetail?.review?.outcomeSummary && ["completed", "failed"].includes(run?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OutcomeMessage, {
-									run,
-									runDetail,
-									t
-								}) : null
-							]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, {
-							draft,
-							busy,
-							project,
-							onDraftChange: updateDraft,
-							onReview: reviewMission,
-							detailsOpen,
-							setDetailsOpen,
-							availableBrowsers,
-							modes: dashboard?.missionEntry?.modes ?? [],
-							inputRef: composerInputRef,
-							t
-						})]
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "conversation-thread",
+								ref: transcriptRef,
+								"aria-live": "polite",
+								children: [
+									!hasConversation ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyConversation, { t }) : null,
+									activeConversationId === JON_CONVERSATION_ID ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkspaceTerminalMessage, {
+										workspace: dashboard?.workspace ?? null,
+										availableCliAgents: dashboard?.desktopActionSupport?.availableCliAgents ?? [],
+										onOpenTerminals: () => openTerminalWorkspace(null),
+										onNewTerminal: () => openTerminalWorkspace("launch"),
+										onAttachTerminal: () => openTerminalWorkspace("attach"),
+										t
+									}) : null,
+									selectedRunId && run ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RunReviewIntro, {
+										run,
+										t
+									}) : null,
+									messages.map((message) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, {
+										message,
+										onStartMission: startMission,
+										onClarificationAnswer: stageClarificationAnswer,
+										onTerminalInput: sendTerminalInput,
+										busy,
+										t
+									}, message.id)),
+									busy.reviewing && !hasStreamingMessage ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ThinkingMessage, {
+										text: t.thinking,
+										t
+									}) : null,
+									busy.starting ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ThinkingMessage, {
+										text: t.launching,
+										t
+									}) : null,
+									run ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RunProgressMessage, {
+										run,
+										runDetail,
+										liveStatus,
+										pendingApprovals,
+										events: activityEvents,
+										t
+									}) : null,
+									pendingApprovals.map((approval) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalMessage, {
+										approval,
+										busy: busy.approvalId === approval.id,
+										onResolve: resolveApproval,
+										t
+									}, approval.id)),
+									runDetail?.review?.outcomeSummary && ["completed", "failed"].includes(run?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OutcomeMessage, {
+										run,
+										runDetail,
+										t
+									}) : null
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, {
+								draft,
+								busy,
+								project,
+								onDraftChange: updateDraft,
+								onReview: reviewMission,
+								detailsOpen,
+								setDetailsOpen,
+								availableBrowsers,
+								modes: dashboard?.missionEntry?.modes ?? [],
+								inputRef: composerInputRef,
+								t
+							}),
+							terminalOverlayId ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TerminalOverlay, {
+								terminalId: terminalOverlayId,
+								terminals: dashboard?.workspace?.terminals ?? [],
+								terminalEvents: dashboard?.workspace?.terminalEvents ?? [],
+								terminalDecisions: dashboard?.workspace?.decisions ?? [],
+								workspace: dashboard?.workspace ?? null,
+								projectId: selectedProjectId,
+								onInput: sendTerminalInput,
+								onStop: stopWorkspaceTerminal,
+								onClose: closeTerminalOverlay,
+								onSelectTerminal: setTerminalOverlayId,
+								fullscreen: terminalOverlayFullscreen,
+								onToggleFullscreen: () => setTerminalOverlayFullscreen((f) => !f),
+								t,
+								locale
+							}) : null
+						]
 					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActivityPanel, {
+					!workspacePanel ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WorkspaceRail, {
+						onOpenTerminals: () => openTerminalWorkspace(null),
+						onOpenTrace: openTraceWorkspace,
+						onCreateTerminal: () => openTerminalWorkspace("launch"),
+						onOpenBrowser: openBrowserWorkspace,
+						workspace: dashboard?.workspace ?? null,
+						run,
+						t
+					}) : null,
+					workspacePanel === "terminals" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TerminalSidebar, {
+						projectId: selectedProjectId,
+						conversationId: activeConversationBackendId,
+						workspace: dashboard?.workspace ?? null,
+						onTerminalInput: sendTerminalInput,
+						onRefresh: refreshDashboard,
+						open: true,
+						onToggle: toggleTerminalSidebar,
+						onOpenTrace: openTraceWorkspace,
+						requestedView: terminalRequestedView,
+						onViewHandled: () => setTerminalRequestedView(null),
+						availableCliAgents: dashboard?.desktopActionSupport?.availableCliAgents ?? [],
+						onRequestOpenView: openTerminalWorkspace,
+						viewMode: terminalViewMode,
+						onViewModeChange: setTerminalViewMode,
+						onOpenOverlay: openTerminalOverlay,
+						activeOverlayId: terminalOverlayId,
+						t,
+						locale
+					}) : null,
+					workspacePanel === "trace" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActivityPanel, {
 						run,
 						runDetail,
 						events: activityEvents,
@@ -11262,38 +12403,71 @@ function App() {
 						conversation: activeConversation,
 						conversationId: activeConversationBackendId,
 						onOpenRun: openRun,
-						open: inspectorOpen,
-						onToggle: () => setInspectorOpen((current) => !current),
+						open: true,
+						onToggle: toggleInspectorSidebar,
+						onOpenTerminals: () => openTerminalWorkspace(null),
 						pendingApprovals,
 						liveStatus,
 						locale,
 						t
-					})
+					}) : null,
+					workspacePanel === "browser" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowserSurfacePanel, {
+						projectId: selectedProjectId,
+						dashboard,
+						onToggle: toggleBrowserSidebar,
+						t
+					}) : null
 				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TokenStatusBar, {
+				projectId: selectedProjectId,
+				dashboard,
+				t
 			})
 		]
 	});
 }
-function ConversationSidebar({ conversations, activeConversationId, onSelect, onNew, open, onToggle, locale, t }) {
+function ConversationSidebar({ conversations, activeConversationId, onSelect, onNew, open, onToggle, jonUnread, jonHasAlert, locale, t }) {
 	if (!open) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
 		className: "conversation-sidebar collapsed",
 		"aria-label": t.conversations,
 		"data-testid": "conversation-sidebar",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
-			type: "button",
-			className: "side-rail-button",
-			onClick: onToggle,
-			"aria-label": t.openConversations,
-			title: t.openConversations,
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "≡" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.conversationsShort })]
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-			type: "button",
-			className: "side-rail-button subtle",
-			onClick: onNew,
-			"aria-label": t.newConversation,
-			title: t.newConversation,
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "+" })
-		})]
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: `side-rail-button ${activeConversationId === JON_CONVERSATION_ID ? "active-button" : ""} ${jonHasAlert ? "jon-rail-alert" : ""}`,
+				onClick: () => onSelect(JON_CONVERSATION_ID),
+				"aria-label": "JON",
+				title: "JON",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: jonHasAlert ? "jon-rail-icon-alert" : "",
+						children: "◈"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "JON" }),
+					jonUnread > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "rail-count-badge warn",
+						children: jonUnread
+					}) : null
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: "side-rail-button",
+				onClick: onToggle,
+				"aria-label": t.openConversations,
+				title: t.openConversations,
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "≡" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.conversationsShort })]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "side-rail-button subtle",
+				onClick: onNew,
+				"aria-label": t.newConversation,
+				title: t.newConversation,
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "+" })
+			})
+		]
 	});
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
 		className: "conversation-sidebar open",
@@ -11316,10 +12490,33 @@ function ConversationSidebar({ conversations, activeConversationId, onSelect, on
 						type: "button",
 						className: "ghost small",
 						onClick: onToggle,
+						"aria-label": t.collapseConversations,
+						title: t.collapseConversations,
 						children: t.collapse
 					})]
 				})]
 			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: `jon-conversation-item ${activeConversationId === JON_CONVERSATION_ID ? "selected" : ""}`,
+				onClick: () => onSelect(JON_CONVERSATION_ID),
+				"data-testid": "jon-conversation-item",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: `jon-conversation-bubble ${jonHasAlert ? "has-alert" : ""}`,
+						children: "◈"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "jon-conversation-info",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "JON" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.jonPilotHint })]
+					}),
+					jonUnread > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "jon-unread-badge",
+						children: jonUnread
+					}) : null
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "conversation-separator" }),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 				className: "side-panel-hint",
 				children: t.localOnlyHint
@@ -11339,6 +12536,66 @@ function ConversationSidebar({ conversations, activeConversationId, onSelect, on
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(conversation.updatedAt ?? conversation.createdAt, locale) })
 					]
 				}, conversation.id))]
+			})
+		]
+	});
+}
+function WorkspaceRail({ onOpenTerminals, onOpenTrace, onCreateTerminal, onOpenBrowser, workspace, run, t }) {
+	const activeCount = (workspace?.terminals ?? []).filter((terminal) => [
+		"running",
+		"waiting_for_input",
+		"needs_attention"
+	].includes(terminal.status)).length;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+		className: "workspace-rail collapsed",
+		"aria-label": t.workspacePanel ?? t.terminalSurfaces,
+		"data-testid": "workspace-rail",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: "side-rail-button",
+				onClick: onOpenTerminals,
+				"aria-label": t.openTerminals,
+				title: t.openTerminals,
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⌁" }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "Term." }),
+					activeCount > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "rail-count-badge warn",
+						children: activeCount
+					}) : null
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: "side-rail-button",
+				onClick: onOpenTrace,
+				"aria-label": t.openInspector,
+				title: t.openInspector,
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "◎" }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.inspectorShort }),
+					run ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `rail-status-dot ${statusTone(run.status)}`,
+						title: run.status
+					}) : null
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				className: "side-rail-button",
+				onClick: onOpenBrowser,
+				"aria-label": "Browser",
+				title: "Browser workspace",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⊡" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "Nav." })]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				className: "side-rail-button subtle",
+				onClick: onCreateTerminal,
+				"aria-label": t.newTerminal,
+				title: t.newTerminal,
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "+" })
 			})
 		]
 	});
@@ -11416,7 +12673,1051 @@ function terminalStatusTone(status) {
 	if (status === "completed") return "ok";
 	return "neutral";
 }
-function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, pendingApprovals, liveStatus, locale, t }) {
+function terminalEventTone(event) {
+	if (event.eventType === "process.error" || event.stream === "stderr") return "danger";
+	if (event.eventType === "process.input" || event.eventType === "process.stop_requested") return "warn";
+	if (event.eventType === "process.started" || event.eventType === "process.exit") return "ok";
+	return "neutral";
+}
+function terminalEventHeading(event, t) {
+	if (event.eventType === "process.output") {
+		const streamLabel = event.stream === "stdout" ? t.terminalStdout : event.stream === "stderr" ? t.terminalStderr : event.stream === "stdin" ? t.terminalStdin : event.stream;
+		const baseLabel = streamLabel ? `${t.terminalTranscript} · ${streamLabel}` : t.terminalTranscript;
+		return event.count && event.count > 1 ? `${baseLabel} · x${event.count}` : baseLabel;
+	}
+	if (event.eventType === "process.input") return event.count && event.count > 1 ? `${t.terminalLastPrompt} · x${event.count}` : t.terminalLastPrompt;
+	if (event.eventType === "process.started") return `${t.terminalEvent} · ${t.terminalEventStart}`;
+	if (event.eventType === "process.exit") return `${t.terminalEvent} · ${t.terminalEventExit}`;
+	if (event.eventType === "process.error") return `${t.terminalEvent} · ${t.terminalEventError}`;
+	if (event.eventType === "process.stop_requested") return `${t.terminalEvent} · ${t.terminalEventStop}`;
+	return event.eventType || t.terminalEvent;
+}
+function terminalEventContent(event, t) {
+	if (event.content) return event.content;
+	if (event.eventType === "process.started") {
+		const pid = event.metadata?.snapshot?.pid;
+		return pid ? `pid ${pid}` : t.terminalProcessStarted;
+	}
+	if (event.eventType === "process.exit") {
+		const exitCode = event.metadata?.exitCode;
+		const signal = event.metadata?.signal;
+		if (exitCode != null) return `${t.terminalExitCode} ${exitCode}`;
+		if (signal) return `${t.terminalSignal} ${signal}`;
+		return t.terminalProcessExited;
+	}
+	if (event.eventType === "process.error") return event.metadata?.message ?? t.terminalProcessError;
+	return "";
+}
+function activeTerminalProcess(terminal, workspace = null) {
+	return (workspace?.liveProcesses ?? []).find((candidate) => candidate.terminalId === terminal?.id) ?? terminal?.metadata?.process ?? null;
+}
+function groupTerminalEvents(events = []) {
+	const ordered = [...events].sort((left, right) => String(left.createdAt ?? "").localeCompare(String(right.createdAt ?? "")));
+	const groups = [];
+	for (const event of ordered) {
+		const previous = groups.at(-1);
+		const mergeOutput = previous && event.eventType === "process.output" && previous.eventType === "process.output" && previous.stream === event.stream;
+		const mergeInput = previous && event.eventType === "process.input" && previous.eventType === "process.input";
+		if (mergeOutput || mergeInput) {
+			previous.count += 1;
+			previous.updatedAt = event.createdAt;
+			previous.content = [previous.content, event.content].filter(Boolean).join("\n");
+			continue;
+		}
+		groups.push({
+			...event,
+			count: 1,
+			updatedAt: event.createdAt
+		});
+	}
+	return groups;
+}
+function terminalExpectation(terminal, latestDecision, missionObjective, t) {
+	if (latestDecision?.action === "request_human_approval") return {
+		tone: "warn",
+		title: t.terminalWhatJonNeeds,
+		detail: t.terminalAwaitingApproval,
+		next: latestDecision.reason || missionObjective || "",
+		canInject: false
+	};
+	if (latestDecision?.action === "suggest_user_reply") return {
+		tone: "warn",
+		title: t.terminalWhatJonNeeds,
+		detail: t.terminalAwaitingReply,
+		next: latestDecision.reason || terminal.recentOutput || "",
+		canInject: false
+	};
+	if (latestDecision?.action === "auto_inject_context") return {
+		tone: "ok",
+		title: t.terminalWhatJonNeeds,
+		detail: t.terminalMayInjectContext,
+		next: missionObjective || latestDecision.reason || "",
+		canInject: Boolean(missionObjective)
+	};
+	if (terminal.status === "error") return {
+		tone: "danger",
+		title: t.terminalWhatJonNeeds,
+		detail: t.terminalErrorStateSummary,
+		next: latestDecision?.reason || terminal.recentOutput || "",
+		canInject: false
+	};
+	if (terminal.status === "completed") return {
+		tone: "ok",
+		title: t.terminalWhatJonNeeds,
+		detail: t.terminalCompletedStateSummary,
+		next: latestDecision?.reason || "",
+		canInject: false
+	};
+	if (terminal.status === "running") return {
+		tone: "neutral",
+		title: t.terminalWhatJonNeeds,
+		detail: t.terminalRunningStateSummary,
+		next: latestDecision?.reason || terminal.recentOutput || "",
+		canInject: false
+	};
+	return {
+		tone: "neutral",
+		title: t.terminalWhatJonNeeds,
+		detail: t.terminalMonitoring,
+		next: latestDecision?.reason || "",
+		canInject: false
+	};
+}
+function XtermView({ projectId, terminalId, interactive = true }) {
+	const containerRef = import_react.useRef(null);
+	import_react.useEffect(() => {
+		if (!containerRef.current || !projectId || !terminalId) return;
+		let term;
+		let source;
+		let fitAddon;
+		let ro;
+		let disposed = false;
+		Promise.all([__vitePreload(() => import("./xterm.js"), []), __vitePreload(() => import("./addon-fit.js"), [])]).then(([xtermMod, fitMod]) => {
+			if (disposed || !containerRef.current) return;
+			const Terminal = xtermMod.Terminal;
+			const FitAddon = fitMod.FitAddon;
+			term = new Terminal({
+				cursorBlink: interactive,
+				fontSize: 13,
+				fontFamily: "Consolas, 'Courier New', monospace",
+				theme: {
+					background: "#0d1117",
+					foreground: "#e6edf3",
+					cursor: "#58a6ff"
+				},
+				disableStdin: !interactive
+			});
+			fitAddon = new FitAddon();
+			term.loadAddon(fitAddon);
+			term.open(containerRef.current);
+			fitAddon.fit();
+			source = new EventSource(`/api/projects/${encodeURIComponent(projectId)}/workspace/terminals/${encodeURIComponent(terminalId)}/stream`);
+			source.addEventListener("pty.data", (e) => {
+				try {
+					const { chunk } = JSON.parse(e.data);
+					term.write(atob(chunk));
+				} catch {}
+			});
+			source.addEventListener("pty.exit", () => {
+				term.write("\r\n\x1B[90m[process exited]\x1B[0m\r\n");
+				source.close();
+			});
+			if (interactive) {
+				term.onData((data) => {
+					fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/terminals/${encodeURIComponent(terminalId)}/input`, {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({
+							input: data,
+							raw: true,
+							approved: true
+						})
+					}).catch(() => {});
+				});
+				term.onResize(({ cols, rows }) => {
+					fetch(`/api/projects/${encodeURIComponent(projectId)}/workspace/terminals/${encodeURIComponent(terminalId)}/resize`, {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({
+							cols,
+							rows
+						})
+					}).catch(() => {});
+				});
+			}
+			ro = new ResizeObserver(() => {
+				try {
+					fitAddon.fit();
+				} catch {}
+			});
+			ro.observe(containerRef.current);
+		}).catch(() => {});
+		return () => {
+			disposed = true;
+			if (source) source.close();
+			if (ro) ro.disconnect();
+			if (term) term.dispose();
+		};
+	}, [
+		projectId,
+		terminalId,
+		interactive
+	]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		ref: containerRef,
+		className: "xterm-container"
+	});
+}
+function TerminalSurfaceView({ terminal, terminals = [], terminalEvents = [], terminalDecisions = [], workspace, projectId, onSelectTerminal, onInput, onStop, t, locale }) {
+	const [reply, setReply] = import_react.useState("");
+	const [replySent, setReplySent] = import_react.useState(false);
+	const [busy, setBusy] = import_react.useState(false);
+	const transcriptRef = import_react.useRef(null);
+	import_react.useEffect(() => {
+		setReply("");
+		setReplySent(false);
+	}, [terminal?.id]);
+	import_react.useEffect(() => {
+		if (transcriptRef.current) transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+	}, [terminalEvents.length]);
+	if (!terminal) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "terminal-surface-empty",
+		"data-testid": "terminal-surface-view",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: t.terminalSurfaceTitle }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: t.terminalNoSurfaceTerminal })]
+	});
+	terminalStatusTone(terminal.status);
+	const isInteractiveShell = terminal.agentKind === "generic_cli";
+	const isPipeTerminal = terminal.metadata?.terminalType === "pipe";
+	const canReply = terminal.status === "waiting_for_input" || terminal.status === "needs_attention" || isInteractiveShell && terminal.status === "running" || isPipeTerminal && (terminal.status === "running" || terminal.status === "attached");
+	const canStop = ![
+		"detached",
+		"completed",
+		"error"
+	].includes(terminal.status);
+	const processSnapshot = activeTerminalProcess(terminal, workspace);
+	const launchMetadata = terminal.metadata?.launch ?? {};
+	const missionObjective = workspace?.missionBrief?.objective ?? null;
+	const events = terminalEvents.filter((event) => event.terminalId === terminal.id).slice(0, 80).reverse();
+	const expectation = terminalExpectation(terminal, terminalDecisions.filter((decision) => decision.terminalId === terminal.id).slice(0, 6).at(-1) ?? null, missionObjective, t);
+	const groupedEvents = groupTerminalEvents(events);
+	async function handleReply() {
+		if (!reply.trim() || busy) return;
+		setBusy(true);
+		try {
+			await onInput(projectId, terminal.id, reply, { approved: true });
+			setReply("");
+			if (!isInteractiveShell) setReplySent(true);
+		} finally {
+			setBusy(false);
+		}
+	}
+	async function handleStop() {
+		if (busy || !canStop) return;
+		setBusy(true);
+		try {
+			await onStop(terminal.id);
+		} finally {
+			setBusy(false);
+		}
+	}
+	async function handleInjectContext() {
+		if (!missionObjective || busy) return;
+		setBusy(true);
+		try {
+			await onInput(projectId, terminal.id, missionObjective, { approved: true });
+			setReplySent(false);
+		} finally {
+			setBusy(false);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "vsc-terminal",
+		"data-testid": "terminal-surface-view",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "vsc-terminal-tabs",
+				children: terminals.map((candidate) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: `vsc-terminal-tab ${candidate.id === terminal.id ? "active" : ""}`,
+					onClick: () => onSelectTerminal(candidate.id),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `vsc-tab-dot ${terminalStatusTone(candidate.status)}` }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: candidate.label }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "vsc-tab-kind",
+							children: candidate.agentKind
+						})
+					]
+				}, candidate.id))
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: `vsc-terminal-jon-bar ${expectation.tone}`,
+				"data-testid": "terminal-surface-current-state",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "vsc-jon-icon",
+						children: "⌁"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "vsc-jon-title",
+						children: expectation.title
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+						className: "vsc-jon-detail",
+						children: expectation.detail
+					}),
+					missionObjective ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "vsc-jon-mission",
+						children: missionObjective
+					}) : null,
+					expectation.next && expectation.next !== missionObjective ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "vsc-jon-next",
+						children: expectation.next
+					}) : null
+				]
+			}),
+			terminal.metadata?.terminalType === "pty" || terminal.metadata?.terminalType === "pipe" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(XtermView, {
+				projectId,
+				terminalId: terminal.id,
+				interactive: terminal.metadata?.terminalType === "pty"
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				ref: transcriptRef,
+				className: "vsc-terminal-body",
+				"data-testid": "terminal-transcript-grouped",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "vsc-term-meta",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "vsc-term-meta-item",
+							children: ["$ ", terminal.command || launchMetadata.command || terminal.agentKind]
+						}),
+						terminal.cwd || launchMetadata.cwd ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "vsc-term-meta-item",
+							children: terminal.cwd || launchMetadata.cwd
+						}) : null,
+						processSnapshot?.pid ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "vsc-term-meta-item",
+							children: ["pid ", processSnapshot.pid]
+						}) : null,
+						terminal.authorized ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "vsc-term-meta-item vsc-term-ok",
+							children: t.terminalAuthorized
+						}) : null
+					]
+				}), groupedEvents.length === 0 ? terminal.recentOutput ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "vsc-term-line neutral",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", {
+						className: "vsc-term-pre",
+						children: terminal.recentOutput
+					})
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "vsc-term-empty",
+					children: t.terminalNoTranscript
+				}) : groupedEvents.map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: `vsc-term-line ${terminalEventTone(event)}`,
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "vsc-term-type",
+						children: terminalEventHeading(event, t)
+					}), terminalEventContent(event, t) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", {
+						className: "vsc-term-pre",
+						children: terminalEventContent(event, t)
+					}) : null]
+				}, event.id))]
+			}),
+			terminal.metadata?.terminalType !== "pty" ? canReply ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "vsc-terminal-prompt",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "vsc-prompt-glyph",
+						children: "$"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+						type: "text",
+						className: "terminal-reply-input vsc-prompt-input",
+						placeholder: isInteractiveShell ? t.terminalShellPlaceholder ?? t.terminalReplyPlaceholder : t.terminalReplyPlaceholder,
+						value: reply,
+						onChange: (event) => setReply(event.target.value),
+						onKeyDown: (event) => {
+							if (event.key === "Enter" && !event.shiftKey) {
+								event.preventDefault();
+								handleReply();
+							}
+						},
+						disabled: busy
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "vsc-prompt-send",
+						onClick: handleReply,
+						disabled: busy || !reply.trim(),
+						children: busy ? t.sending : t.terminalReplySend
+					}),
+					canStop ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "vsc-prompt-stop",
+						onClick: handleStop,
+						disabled: busy,
+						children: t.terminalStop
+					}) : null,
+					expectation.canInject ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "vsc-prompt-inject",
+						onClick: handleInjectContext,
+						disabled: busy,
+						children: t.terminalInjectContextNow
+					}) : null
+				]
+			}) : canStop ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "vsc-terminal-actions",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: handleStop,
+					disabled: busy,
+					children: t.terminalStop
+				}), expectation.canInject ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "secondary small",
+					onClick: handleInjectContext,
+					disabled: busy,
+					children: t.terminalInjectContextNow
+				}) : null]
+			}) : null : canStop ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "vsc-terminal-actions",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: handleStop,
+					disabled: busy,
+					children: t.terminalStop
+				})
+			}) : null,
+			replySent ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "terminal-alert-sent vsc-reply-sent",
+				children: t.terminalReplySentConfirm
+			}) : null
+		]
+	});
+}
+function parseCliArgs(raw) {
+	const args = [];
+	let current = "";
+	let inQuote = null;
+	for (const char of String(raw ?? "")) if (inQuote) if (char === inQuote) inQuote = null;
+	else current += char;
+	else if (char === "\"" || char === "'") inQuote = char;
+	else if (char === " " || char === "	") {
+		if (current) {
+			args.push(current);
+			current = "";
+		}
+	} else current += char;
+	if (current) args.push(current);
+	return args;
+}
+function TerminalOverlay({ terminalId, terminals, terminalEvents, terminalDecisions, workspace, projectId, onInput, onStop, onClose, onSelectTerminal, fullscreen, onToggleFullscreen, t, locale }) {
+	const terminal = terminals.find((term) => term.id === terminalId) ?? null;
+	const tone = terminal ? terminalStatusTone(terminal.status) : "neutral";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: `terminal-overlay ${fullscreen ? "fullscreen" : "split"}`,
+		"data-testid": "terminal-overlay",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "terminal-overlay-bar",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "terminal-overlay-bar-left",
+				children: terminal ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `mini-badge ${tone}`,
+						children: terminalStatusLabel(terminal.status, t)
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+						className: "terminal-overlay-label",
+						children: terminal.label
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "terminal-kind",
+						children: terminal.agentKind
+					})
+				] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+					className: "terminal-overlay-label",
+					children: t.terminalSurfaceTitle
+				})
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "terminal-overlay-bar-right",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: onToggleFullscreen,
+					title: fullscreen ? t.terminalExitFullscreen : t.terminalFullscreen,
+					"aria-label": fullscreen ? t.terminalExitFullscreen : t.terminalFullscreen,
+					children: fullscreen ? "⊡" : "⊞"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: onClose,
+					title: t.terminalClosePanel,
+					"aria-label": t.terminalClosePanel,
+					children: "✕"
+				})]
+			})]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "terminal-overlay-body",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TerminalSurfaceView, {
+				terminal,
+				terminals,
+				terminalEvents,
+				terminalDecisions,
+				workspace,
+				projectId,
+				onSelectTerminal,
+				onInput,
+				onStop,
+				t,
+				locale
+			})
+		})]
+	});
+}
+function TerminalSidebar({ projectId, conversationId, workspace, onTerminalInput, onRefresh, open, onToggle, onOpenTrace, requestedView, onViewHandled, availableCliAgents = [], onRequestOpenView, viewMode, onViewModeChange, onOpenOverlay, activeOverlayId, t, locale }) {
+	const [showLaunch, setShowLaunch] = import_react.useState(false);
+	const [showAttach, setShowAttach] = import_react.useState(false);
+	const [showMission, setShowMission] = import_react.useState(false);
+	const [launchCommand, setLaunchCommand] = import_react.useState(availableCliAgents[0]?.command ?? "");
+	const [launchLabel, setLaunchLabel] = import_react.useState("");
+	const [launchArgs, setLaunchArgs] = import_react.useState("");
+	const [launchCwd, setLaunchCwd] = import_react.useState("");
+	const [launchAutonomy, setLaunchAutonomy] = import_react.useState("assisted");
+	const [launchError, setLaunchError] = import_react.useState(null);
+	const [launchBusy, setLaunchBusy] = import_react.useState(false);
+	const [attachLabel, setAttachLabel] = import_react.useState("");
+	const [attachKind, setAttachKind] = import_react.useState("generic_cli");
+	const [attachStatus, setAttachStatus] = import_react.useState("attached");
+	const [attachOutput, setAttachOutput] = import_react.useState("");
+	const [attachAuthorized, setAttachAuthorized] = import_react.useState(true);
+	const [attachAutonomy, setAttachAutonomy] = import_react.useState("assisted");
+	const [attachError, setAttachError] = import_react.useState(null);
+	const [attachBusy, setAttachBusy] = import_react.useState(false);
+	const [missionObjective, setMissionObjective] = import_react.useState("");
+	const [missionBusy, setMissionBusy] = import_react.useState(false);
+	const missionBrief = workspace?.missionBrief ?? null;
+	const terminals = workspace?.terminals ?? [];
+	const activeCount = terminals.filter((terminal) => [
+		"running",
+		"waiting_for_input",
+		"needs_attention"
+	].includes(terminal.status)).length;
+	const prevObjectiveRef = import_react.useRef(null);
+	import_react.useEffect(() => {
+		if (missionBrief?.objective && missionBrief.objective !== prevObjectiveRef.current) {
+			prevObjectiveRef.current = missionBrief.objective;
+			setMissionObjective(missionBrief.objective);
+		}
+	}, [missionBrief?.objective]);
+	import_react.useEffect(() => {
+		if (availableCliAgents.length === 0) {
+			setLaunchCommand("");
+			return;
+		}
+		if (!availableCliAgents.some((agent) => agent.command === launchCommand)) setLaunchCommand(availableCliAgents[0].command);
+	}, [availableCliAgents, launchCommand]);
+	import_react.useEffect(() => {
+		if (!open || !requestedView) return;
+		setShowLaunch(requestedView === "launch");
+		setShowAttach(requestedView === "attach");
+		setShowMission(requestedView === "mission");
+		if (requestedView === "launch") setLaunchError(null);
+		if (requestedView === "attach") setAttachError(null);
+		onViewHandled?.();
+	}, [
+		open,
+		requestedView,
+		onViewHandled
+	]);
+	async function handleLaunch() {
+		if (!projectId || !launchCommand || launchBusy) return;
+		setLaunchBusy(true);
+		setLaunchError(null);
+		try {
+			const response = await api(`/api/projects/${projectId}/workspace/terminal-processes`, {
+				method: "POST",
+				body: JSON.stringify({
+					command: launchCommand,
+					args: launchArgs.trim() ? parseCliArgs(launchArgs) : [],
+					label: launchLabel.trim() || launchCommand,
+					cwd: launchCwd.trim() || void 0,
+					autonomyMode: launchAutonomy,
+					conversationId: conversationId ?? void 0,
+					authorized: true
+				})
+			});
+			setShowLaunch(false);
+			setLaunchLabel("");
+			setLaunchArgs("");
+			setLaunchCwd("");
+			await onRefresh();
+			if (response?.terminal?.id) onOpenOverlay?.(response.terminal.id);
+		} catch (error) {
+			setLaunchError(error.message);
+		} finally {
+			setLaunchBusy(false);
+		}
+	}
+	async function handleAttach() {
+		if (!projectId || !attachLabel.trim() || attachBusy) return;
+		setAttachBusy(true);
+		setAttachError(null);
+		try {
+			const response = await api(`/api/projects/${projectId}/workspace/terminals`, {
+				method: "POST",
+				body: JSON.stringify({
+					label: attachLabel.trim(),
+					agentKind: attachKind,
+					status: attachStatus,
+					recentOutput: attachOutput.trim(),
+					authorized: attachAuthorized,
+					autonomyMode: attachAutonomy,
+					conversationId: conversationId ?? void 0,
+					processRunning: attachStatus === "running" || attachStatus === "waiting_for_input"
+				})
+			});
+			setShowAttach(false);
+			setAttachLabel("");
+			setAttachOutput("");
+			await onRefresh();
+			if (response?.terminal?.id) onOpenOverlay?.(response.terminal.id);
+		} catch (error) {
+			setAttachError(error.message);
+		} finally {
+			setAttachBusy(false);
+		}
+	}
+	async function handleMissionSave() {
+		if (!projectId || !missionObjective.trim() || missionBusy) return;
+		setMissionBusy(true);
+		try {
+			await api(`/api/projects/${projectId}/workspace/mission-brief`, {
+				method: "POST",
+				body: JSON.stringify({
+					objective: missionObjective.trim(),
+					status: "active"
+				})
+			});
+			setShowMission(false);
+			await onRefresh();
+		} catch {} finally {
+			setMissionBusy(false);
+		}
+	}
+	const launchForm = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "workspace-form",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalCommand }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+					value: launchCommand,
+					onChange: (e) => setLaunchCommand(e.target.value),
+					disabled: availableCliAgents.length === 0,
+					children: [availableCliAgents.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+						value: "",
+						children: t.noCliAgentsDetected
+					}) : null, availableCliAgents.map((agent) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+						value: agent.command,
+						children: agent.label
+					}, agent.id))]
+				})]
+			}),
+			availableCliAgents.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "workspace-form-hint",
+				children: [
+					t.availableCliAgents,
+					": ",
+					availableCliAgents.map((agent) => agent.label).join(", ")
+				]
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "workspace-form-error",
+				children: t.noCliAgentsDetected
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalLabel }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					type: "text",
+					value: launchLabel,
+					onChange: (e) => setLaunchLabel(e.target.value),
+					placeholder: launchCommand
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalArgs }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					type: "text",
+					value: launchArgs,
+					onChange: (e) => setLaunchArgs(e.target.value),
+					placeholder: "--no-ansi --print \"hello world\""
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalCwd }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					type: "text",
+					value: launchCwd,
+					onChange: (e) => setLaunchCwd(e.target.value),
+					placeholder: t.terminalCwdPlaceholder
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalAutonomyMode }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+					value: launchAutonomy,
+					onChange: (e) => setLaunchAutonomy(e.target.value),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "assisted",
+							children: t.autonomyAssisted
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "supervised_autonomy",
+							children: t.autonomySupervised
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "manual_only",
+							children: t.autonomyManual
+						})
+					]
+				})]
+			}),
+			launchError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "workspace-form-error",
+				children: launchError
+			}) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "workspace-form-actions",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "small",
+					onClick: handleLaunch,
+					disabled: launchBusy || availableCliAgents.length === 0 || !launchCommand,
+					children: launchBusy ? t.sending : t.terminalLaunchBtn
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: () => {
+						setShowLaunch(false);
+						setLaunchError(null);
+					},
+					children: t.hide
+				})]
+			})
+		]
+	});
+	const attachForm = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "workspace-form",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalLabel }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					type: "text",
+					value: attachLabel,
+					onChange: (e) => setAttachLabel(e.target.value),
+					placeholder: t.terminalLabel
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalAgent }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+					value: attachKind,
+					onChange: (e) => setAttachKind(e.target.value),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "codex_cli",
+							children: t.agentKindCodexCli
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "claude_code_cli",
+							children: t.agentKindClaudeCode
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "generic_cli",
+							children: t.agentKindGenericCli
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "unknown",
+							children: t.agentKindUnknown
+						})
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.status }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+					value: attachStatus,
+					onChange: (e) => setAttachStatus(e.target.value),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "attached",
+							children: t.statusAttachedLabel
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "running",
+							children: t.statusRunningLabel
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "waiting_for_input",
+							children: t.statusWaitingLabel
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "needs_attention",
+							children: t.statusNeedsAttentionLabel
+						})
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalAutonomyMode }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+					value: attachAutonomy,
+					onChange: (e) => setAttachAutonomy(e.target.value),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "assisted",
+							children: t.autonomyAssisted
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "supervised_autonomy",
+							children: t.autonomySupervised
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+							value: "manual_only",
+							children: t.autonomyManual
+						})
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalTranscript }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+					rows: 3,
+					value: attachOutput,
+					onChange: (e) => setAttachOutput(e.target.value),
+					placeholder: t.terminalRecentOutputHint
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+				className: "workspace-field checkbox",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					type: "checkbox",
+					checked: attachAuthorized,
+					onChange: (e) => setAttachAuthorized(e.target.checked)
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalAuthorizedLabel })]
+			}),
+			attachError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "workspace-form-error",
+				children: attachError
+			}) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "workspace-form-actions",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "small",
+					onClick: handleAttach,
+					disabled: attachBusy || !attachLabel.trim(),
+					children: attachBusy ? t.sending : t.terminalAttachBtn
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: () => {
+						setShowAttach(false);
+						setAttachError(null);
+					},
+					children: t.hide
+				})]
+			})
+		]
+	});
+	if (!open) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+		className: "terminal-sidebar collapsed",
+		"aria-label": t.terminalSurfaces,
+		"data-testid": "terminal-sidebar",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+			type: "button",
+			className: "side-rail-button",
+			onClick: onToggle,
+			"aria-label": t.terminalSurfaces,
+			title: t.terminalSurfaces,
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⌁" }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: "Term." }),
+				activeCount > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "rail-count-badge warn",
+					children: activeCount
+				}) : null
+			]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			type: "button",
+			className: "side-rail-button subtle",
+			title: t.newTerminal,
+			"aria-label": t.newTerminal,
+			onClick: () => {
+				if (onRequestOpenView) onRequestOpenView("launch");
+				else onToggle();
+			},
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "+" })
+		})]
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+		className: "terminal-sidebar open",
+		"aria-label": t.terminalSurfaces,
+		"data-testid": "terminal-sidebar",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "side-panel-header",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "eyebrow",
+					children: "Workspace AI"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: t.terminalSurfaces })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "side-panel-actions",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ghost small",
+						onClick: onOpenTrace,
+						children: t.runInspector
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ghost small",
+						onClick: onToggle,
+						"aria-label": t.collapseTerminals,
+						title: t.collapseTerminals,
+						children: t.collapse
+					})]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "terminal-sidebar-mission",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "activity-section-header",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+						className: "sidebar-section-label",
+						children: t.workspaceMission
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ghost tiny",
+						onClick: () => setShowMission(!showMission),
+						children: showMission ? t.hide : missionBrief ? t.options : t.setMissionBrief
+					})]
+				}), showMission ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "workspace-form",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+						className: "workspace-form-textarea",
+						placeholder: t.missionBriefPlaceholder,
+						value: missionObjective,
+						onChange: (e) => setMissionObjective(e.target.value),
+						rows: 3
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "workspace-form-actions",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "small",
+							onClick: handleMissionSave,
+							disabled: missionBusy || !missionObjective.trim(),
+							children: missionBusy ? t.sending : t.save
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ghost small",
+							onClick: () => setShowMission(false),
+							children: t.hide
+						})]
+					})]
+				}) : missionBrief ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "terminal-mission-card",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "terminal-mission-objective",
+							children: missionBrief.objective
+						}),
+						missionBrief.blockers?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+							className: "terminal-mission-meta warn",
+							children: [
+								t.missionBriefBlockers,
+								": ",
+								missionBrief.blockers[0]
+							]
+						}) : null,
+						missionBrief.nextSteps?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+							className: "terminal-mission-meta",
+							children: [
+								t.nextSteps,
+								": ",
+								missionBrief.nextSteps[0]
+							]
+						}) : null
+					]
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "muted small-muted",
+					children: t.noWorkspaceMission
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "terminal-sidebar-actions",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: `terminal-action-btn ${showLaunch ? "active" : ""}`,
+					onClick: () => {
+						setShowLaunch(!showLaunch);
+						setShowAttach(false);
+						setLaunchError(null);
+					},
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "↗" }),
+						" ",
+						t.launchCli
+					]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: `terminal-action-btn ${showAttach ? "active" : ""}`,
+					onClick: () => {
+						setShowAttach(!showAttach);
+						setShowLaunch(false);
+						setAttachError(null);
+					},
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⊕" }),
+						" ",
+						t.attachTerminal
+					]
+				})]
+			}),
+			showLaunch ? launchForm : null,
+			showAttach ? attachForm : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "terminal-sidebar-list",
+				"data-testid": "terminal-list",
+				children: [terminals.length === 0 && !showLaunch && !showAttach ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "terminal-empty-state",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: t.noTerminals }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.terminalWorkspaceLead })]
+				}) : null, terminals.slice(0, 20).map((terminal) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: `terminal-row-item ${terminal.id === activeOverlayId ? "active" : ""}`,
+					onClick: () => onOpenOverlay?.(terminal.id),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `terminal-row-dot ${terminalStatusTone(terminal.status)}` }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "terminal-row-label",
+							children: terminal.label
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "mini-badge neutral",
+							children: terminal.agentKind
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: `mini-badge ${terminalStatusTone(terminal.status)}`,
+							children: terminalStatusLabel(terminal.status, t)
+						})
+					]
+				}, terminal.id))]
+			})
+		]
+	});
+}
+function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, onOpenTerminals, pendingApprovals, liveStatus, locale, t }) {
 	const linkedRunIds = new Set([
 		...Array.isArray(conversation?.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : [],
 		conversation?.metadata?.latestRunId,
@@ -11437,10 +13738,11 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 	const calls = scopedRunDetail?.llmCalls ?? [];
 	const browserState = browserStateFromEvidence(evidence);
 	const browserActionTypes = (browserState?.recentActions ?? []).map((action) => action.action).filter(Boolean).slice(-6);
-	const workspaceMission = workspace?.missionBrief ?? null;
-	const workspaceTerminals = workspace?.terminals ?? [];
+	workspace?.missionBrief;
+	workspace?.terminals;
 	const workspaceDecisions = workspace?.decisions ?? [];
-	const workspaceAlerts = workspace?.alerts ?? [];
+	workspace?.alerts;
+	const workspaceTerminalEvents = workspace?.terminalEvents ?? [];
 	const traceItems = runTraceItems({
 		scopedRun,
 		events: scopedEvents,
@@ -11479,15 +13781,26 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 					children: t.sessionInspector
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: t.runInspector })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "side-panel-actions",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-						className: `mini-badge ${liveStatus === "live" ? "ok" : "warn"}`,
-						children: liveStatus === "live" ? t.live : t.degraded
-					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
-						type: "button",
-						className: "ghost small",
-						onClick: onToggle,
-						children: t.collapse
-					})]
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: `mini-badge ${liveStatus === "live" ? "ok" : "warn"}`,
+							children: liveStatus === "live" ? t.live : t.degraded
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ghost small",
+							onClick: onOpenTerminals,
+							children: t.terminalSurfaces
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ghost small",
+							onClick: onToggle,
+							"aria-label": t.collapseInspector,
+							title: t.collapseInspector,
+							children: t.collapse
+						})
+					]
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
@@ -11537,72 +13850,11 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 					})
 				]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.workspaceMission }), workspaceMission ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "activity-card",
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: workspaceMission.objective }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
-							t.status,
-							": ",
-							workspaceMission.status
-						] }),
-						workspaceMission.nextSteps?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
-							t.nextSteps,
-							": ",
-							workspaceMission.nextSteps.slice(0, 2).join(" · ")
-						] }) : null
-					]
-				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-					className: "muted",
-					children: t.noWorkspaceMission
-				})]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalSurfaces }),
-					workspaceTerminals.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noTerminals
-					}) : null,
-					workspaceTerminals.slice(0, 6).map((terminal) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-						className: "activity-card compact",
-						children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: terminal.label }),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-									className: `mini-badge ${terminalStatusTone(terminal.status)}`,
-									children: terminalStatusLabel(terminal.status, t)
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-									className: "inline-separator",
-									children: "·"
-								}),
-								t.terminalAgent,
-								": ",
-								terminal.agentKind
-							] }),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
-								t.terminalAutonomy,
-								": ",
-								terminal.autonomyMode,
-								" · ",
-								t.terminalAuthorized,
-								": ",
-								terminal.authorized ? "yes" : "no"
-							] }),
-							terminal.lastPrompt ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: terminal.lastPrompt }) : null
-						]
-					}, terminal.id))
-				]
-			}),
-			workspaceAlerts.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+			workspace?.alerts?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 				className: "activity-section",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalAlerts }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
 					className: "run-trace-list",
-					children: workspaceAlerts.map((alert) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+					children: workspace.alerts.map((alert) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
 						className: alert.requiresApproval ? "warn" : "neutral",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
 							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: alert.action }),
@@ -11742,6 +13994,20 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 				className: "activity-section",
 				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalTranscript }),
+					workspaceTerminalEvents.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noTerminalTranscript
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "activity-timeline compact",
+						children: workspaceTerminalEvents.slice(-6).reverse().map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [event.eventType, event.stream ? ` · ${event.stream}` : ""] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: event.content ? event.content.slice(0, 180) : formatDate(event.createdAt, locale) })] }, event.id))
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runHistory }),
 					visibleRuns.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 						className: "muted",
@@ -11778,15 +14044,7 @@ function EmptyConversation({ t }) {
 				children: t.jonDesktop
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", { children: t.emptyTitle }),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: t.emptySubtitle }),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-				className: "example-row",
-				children: [
-					"Ouvre mon navigateur et cherche les dernières informations sur un sujet.",
-					"Observe la fenêtre active et dis-moi ce qui manque.",
-					"Fais une recherche puis capture une preuve exploitable."
-				].map((example) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: example }, example))
-			})
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: t.emptySubtitle })
 		]
 	});
 }
@@ -11802,9 +14060,9 @@ function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, 
 					value: draft.objective,
 					onChange: (event) => onDraftChange({ objective: event.target.value }),
 					onKeyDown: (event) => {
-						if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+						if (event.key === "Enter" && !event.shiftKey) {
 							event.preventDefault();
-							onReview();
+							if (!disabled && draft.objective.trim()) onReview();
 						}
 					},
 					placeholder: t.composerPlaceholder,
@@ -11888,7 +14146,125 @@ function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, 
 		]
 	});
 }
-function Message({ message, onStartMission, onClarificationAnswer, busy, t }) {
+function TerminalEventMessage({ message, t }) {
+	const ev = message.terminalEvent ?? {};
+	const kindMeta = {
+		terminal_started: {
+			icon: "⌁",
+			labelKey: "terminalStartedTitle",
+			tone: "neutral"
+		},
+		terminal_completion: {
+			icon: "✓",
+			labelKey: "terminalCompletionTitle",
+			tone: "ok"
+		},
+		terminal_auto_action: {
+			icon: "⚡",
+			labelKey: "terminalAutoActionTitle",
+			tone: "neutral"
+		}
+	}[message.kind] ?? {
+		icon: "⌁",
+		labelKey: "terminalAlertTitle",
+		tone: "neutral"
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+		className: `react-message assistant terminal-event-message ${kindMeta.tone}`,
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "react-avatar",
+			children: kindMeta.icon
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "react-bubble terminal-event-bubble",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "chat-meta",
+					children: t[kindMeta.labelKey] ?? kindMeta.labelKey
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: ev.terminalLabel ?? ev.terminalId ?? "Terminal" }),
+				ev.agentKind ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "mini-badge neutral",
+					style: { marginLeft: "6px" },
+					children: ev.agentKind
+				}) : null,
+				ev.recentOutput ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", {
+					className: "terminal-output-snippet",
+					children: ev.recentOutput
+				}) : null,
+				ev.injectedInput ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "terminal-alert-reason",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "mini-badge ok",
+							children: "→"
+						}),
+						" ",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { children: ev.injectedInput }),
+						ev.reasoning ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							style: {
+								marginLeft: "6px",
+								opacity: .7
+							},
+							children: ["— ", ev.reasoning]
+						}) : null
+					]
+				}) : null,
+				ev.exitCode != null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: "mini-badge neutral",
+					children: ["exit ", ev.exitCode]
+				}) : null
+			]
+		})]
+	});
+}
+function MissionPausedMessage({ message, t }) {
+	const pause = message.missionPause ?? {};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+		className: "react-message assistant terminal-event-message warn",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "react-avatar",
+			children: "⏸"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "react-bubble terminal-event-bubble",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "chat-meta",
+					children: t.missionPausedTitle ?? "Mission en pause"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: pause.actionLabel ?? "Action manuelle requise" }),
+				pause.reason ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					style: {
+						marginTop: "4px",
+						opacity: .8
+					},
+					children: pause.reason
+				}) : null,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					style: {
+						marginTop: "6px",
+						fontSize: "0.82em",
+						opacity: .7
+					},
+					children: t.missionPausedHint ?? "Effectuez l'action puis cliquez sur Continuer dans le panneau de mission."
+				})
+			]
+		})]
+	});
+}
+function Message({ message, onStartMission, onClarificationAnswer, onTerminalInput, busy, t }) {
+	if (message.kind === "terminal_alert") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TerminalAlertMessage, {
+		message,
+		onTerminalInput,
+		t
+	});
+	if (message.kind === "terminal_started" || message.kind === "terminal_completion" || message.kind === "terminal_auto_action") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TerminalEventMessage, {
+		message,
+		t
+	});
+	if (message.kind === "mission_paused") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MissionPausedMessage, {
+		message,
+		t
+	});
 	if (message.kind === "turn") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TurnMessage, {
 		message,
 		onStartMission,
@@ -11924,6 +14300,248 @@ function Message({ message, onStartMission, onClarificationAnswer, busy, t }) {
 				message.eventType ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 					className: "mini-badge",
 					children: message.eventType
+				}) : null
+			]
+		})]
+	});
+}
+function WorkspaceTerminalMessage({ workspace, availableCliAgents = [], onOpenTerminals, onNewTerminal, onAttachTerminal, t }) {
+	const terminals = Array.isArray(workspace?.terminals) ? workspace.terminals : [];
+	if (!(terminals.length > 0 || availableCliAgents.length > 0)) return null;
+	const activeCount = terminals.filter((terminal) => [
+		"running",
+		"waiting_for_input",
+		"needs_attention"
+	].includes(terminal.status)).length;
+	const waitingCount = terminals.filter((terminal) => ["waiting_for_input", "needs_attention"].includes(terminal.status)).length;
+	const leadingTerminals = terminals.slice(0, 3);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+		className: "react-message assistant workspace-terminal-message",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "react-avatar",
+			children: "⌁"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "react-bubble workspace-terminal-bubble",
+			"data-testid": "workspace-terminal-bubble",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "workspace-terminal-bubble-head",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "chat-meta",
+						children: t.terminalWorkspaceTitle
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: t.terminalWorkspaceLead })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "bubble-icon-button",
+						onClick: onNewTerminal,
+						"aria-label": t.createTerminal,
+						title: t.createTerminal,
+						children: "+"
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "pill-row",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "mini-badge neutral",
+							children: [
+								terminals.length,
+								" terminal",
+								terminals.length > 1 ? "s" : ""
+							]
+						}),
+						activeCount > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "mini-badge ok",
+							children: [
+								activeCount,
+								" ",
+								t.terminalRunning
+							]
+						}) : null,
+						waitingCount > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "mini-badge warn",
+							children: [
+								waitingCount,
+								" ",
+								t.terminalWaiting
+							]
+						}) : null
+					]
+				}),
+				availableCliAgents.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "workspace-terminal-agent-row",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.availableCliAgents }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "workspace-terminal-agent-list",
+						children: availableCliAgents.map((agent) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "mini-badge neutral",
+							children: agent.label
+						}, agent.id))
+					})]
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "terminal-alert-reason",
+					children: t.noCliAgentsDetected
+				}),
+				leadingTerminals.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "workspace-terminal-mini-list",
+					children: leadingTerminals.map((terminal) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "workspace-terminal-mini-card",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: terminal.label }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+							terminalStatusLabel(terminal.status, t),
+							" · ",
+							terminal.agentKind
+						] })]
+					}, terminal.id))
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "terminal-alert-reason",
+					children: t.terminalBubbleEmpty
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "workspace-terminal-actions",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "secondary small",
+						onClick: onOpenTerminals,
+						children: t.openTerminals
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ghost small",
+						onClick: onAttachTerminal,
+						children: t.attachTerminal
+					})]
+				})
+			]
+		})]
+	});
+}
+function TerminalAlertMessage({ message, onTerminalInput, t }) {
+	const alert = message.terminalAlert ?? {};
+	const [replyInput, setReplyInput] = import_react.useState(alert.suggestedInput ?? "");
+	const [replySent, setReplySent] = import_react.useState(false);
+	const [busy, setBusy] = import_react.useState(false);
+	const tone = {
+		waiting_for_input: "warn",
+		needs_attention: "warn",
+		error: "danger",
+		completed: "ok",
+		running: "neutral"
+	}[alert.terminalStatus] ?? "neutral";
+	const [contextInjected, setContextInjected] = import_react.useState(false);
+	async function handleSendReply() {
+		if (!replyInput.trim() || busy) return;
+		setBusy(true);
+		try {
+			await onTerminalInput?.(alert.projectId, alert.terminalId, replyInput, { approved: true });
+			setReplySent(true);
+			setReplyInput("");
+		} finally {
+			setBusy(false);
+		}
+	}
+	async function handleInjectContext() {
+		if (!alert.missionObjective || busy || contextInjected) return;
+		setBusy(true);
+		try {
+			await onTerminalInput?.(alert.projectId, alert.terminalId, alert.missionObjective, { approved: true });
+			setContextInjected(true);
+		} finally {
+			setBusy(false);
+		}
+	}
+	const showInjectContext = alert.autonomyMode === "supervised_autonomy" && alert.decisionAction === "auto_inject_context" && alert.missionObjective && !contextInjected;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+		className: `react-message assistant terminal-alert-message ${tone}`,
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "react-avatar",
+			children: "⌁"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "react-bubble terminal-alert-bubble",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "chat-meta",
+					children: t.terminalAlertTitle
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "terminal-alert-header",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `mini-badge ${tone}`,
+						children: t[`terminal${alert.terminalStatus === "waiting_for_input" ? "Waiting" : alert.terminalStatus === "error" ? "Error" : "Running"}`] ?? alert.terminalStatus
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: alert.terminalLabel ?? alert.agentKind })]
+				}),
+				alert.reason ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "terminal-alert-reason",
+					children: alert.reason
+				}) : null,
+				alert.recentOutput ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("pre", {
+					className: "terminal-output-snippet",
+					children: alert.recentOutput
+				}) : null,
+				alert.suggestedInput ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "terminal-alert-reason",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "mini-badge ok",
+							children: t.terminalSuggestedInput ?? "Suggestion JON"
+						}),
+						" ",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { children: alert.suggestedInput }),
+						alert.suggestionReasoning ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							style: {
+								marginLeft: "6px",
+								opacity: .7
+							},
+							children: ["— ", alert.suggestionReasoning]
+						}) : null
+					]
+				}) : null,
+				alert.decisionAction ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "terminal-alert-action",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "mini-badge neutral",
+						children: alert.decisionAction
+					})
+				}) : null,
+				showInjectContext ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "terminal-inject-row",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "small warn",
+						onClick: handleInjectContext,
+						disabled: busy,
+						children: busy ? t.sending : t.terminalInjectContext
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "terminal-inject-hint",
+						children: alert.missionObjective
+					})]
+				}) : null,
+				contextInjected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "terminal-alert-sent",
+					children: t.terminalContextInjected
+				}) : null,
+				(alert.terminalStatus === "waiting_for_input" || alert.terminalStatus === "needs_attention") && !replySent && !showInjectContext ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "terminal-reply-row",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+						type: "text",
+						className: "terminal-reply-input",
+						placeholder: t.terminalReplyPlaceholder,
+						value: replyInput,
+						onChange: (e) => setReplyInput(e.target.value),
+						onKeyDown: (e) => {
+							if (e.key === "Enter" && !e.shiftKey) {
+								e.preventDefault();
+								handleSendReply();
+							}
+						},
+						disabled: busy
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "small",
+						onClick: handleSendReply,
+						disabled: busy || !replyInput.trim(),
+						children: busy ? t.sending : t.terminalReplySend
+					})]
+				}) : null,
+				replySent ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "terminal-alert-sent",
+					children: t.terminalReplySentConfirm
 				}) : null
 			]
 		})]
@@ -12468,6 +15086,378 @@ function OutcomeMessage({ run, runDetail, t }) {
 				}, item.id))
 			]
 		})]
+	});
+}
+function fmtK(n) {
+	if (!n && n !== 0) return "—";
+	if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
+	return String(n);
+}
+function fmtUsd(n) {
+	if (!n && n !== 0) return "—";
+	if (n < .001) return "<$0.001";
+	return `$${n.toFixed(3)}`;
+}
+function usagePercent(used, budget) {
+	if (!Number.isFinite(used) || !Number.isFinite(budget) || budget <= 0) return 0;
+	return Math.max(0, Math.min(100, Math.round(used / budget * 100)));
+}
+function usageColor(used, budget) {
+	if (!budget || budget <= 0) return "";
+	const pct = used / budget;
+	if (pct >= .8) return "token-bar-danger";
+	if (pct >= .5) return "token-bar-warn";
+	return "token-bar-ok";
+}
+function BrowserSurfacePanel({ projectId, dashboard, onToggle, t }) {
+	const [state, setState] = (0, import_react.useState)(null);
+	const [loading, setLoading] = (0, import_react.useState)(false);
+	const [starting, setStarting] = (0, import_react.useState)(false);
+	const [startError, setStartError] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		if (!projectId) {
+			setState(null);
+			return;
+		}
+		let cancelled = false;
+		setLoading(true);
+		api(`/api/projects/${encodeURIComponent(projectId)}/workspace/browser`).then((data) => {
+			if (!cancelled) {
+				setState(data);
+				setLoading(false);
+			}
+		}).catch(() => {
+			if (!cancelled) setLoading(false);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [projectId, dashboard]);
+	async function handleStartBrowser() {
+		if (!projectId || starting) return;
+		setStarting(true);
+		setStartError(null);
+		try {
+			await api(`/api/projects/${encodeURIComponent(projectId)}/workspace/browser/open`, {
+				method: "POST",
+				body: JSON.stringify({})
+			});
+			setState(await api(`/api/projects/${encodeURIComponent(projectId)}/workspace/browser`));
+		} catch (err) {
+			setStartError(t.browserStartError);
+		} finally {
+			setStarting(false);
+		}
+	}
+	const active = state?.activeSession ?? null;
+	const recent = state?.recentSessions ?? [];
+	function statusBadge(status) {
+		if (status === "active") return "ok";
+		if (status === "navigating") return "warn";
+		if (status === "error") return "danger";
+		return "muted";
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+		className: "browser-surface-panel open",
+		"aria-label": "Browser workspace",
+		"data-testid": "browser-surface-panel",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "side-panel-header",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "eyebrow",
+					children: "Workspace AI"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+					className: "side-panel-title",
+					children: "Navigateur"
+				})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost icon-only",
+					onClick: onToggle,
+					"aria-label": "Fermer",
+					children: "✕"
+				})]
+			}),
+			loading && !state ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "browser-panel-loading",
+				children: "Chargement…"
+			}) : null,
+			active ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "browser-panel-active",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "browser-panel-status-row",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `browser-status-dot ${statusBadge(active.status)}` }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "browser-status-label",
+								children: active.status
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "browser-mode-badge",
+								children: active.mode === "workspace_browser" ? "workspace" : active.mode
+							})
+						]
+					}),
+					active.currentUrl ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "browser-panel-url",
+						title: active.currentUrl,
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "browser-url-title",
+							children: active.currentTitle || active.currentUrl
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "browser-url-text",
+							children: active.currentUrl
+						})]
+					}) : null,
+					active.hasScreenshot && active.screenshotBase64 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "browser-panel-screenshot",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+							src: `data:image/png;base64,${active.screenshotBase64}`,
+							alt: "Capture navigateur",
+							className: "browser-screenshot-img"
+						})
+					}) : null,
+					active.navigationHistory?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "browser-panel-history",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "browser-history-label",
+							children: "Historique récent"
+						}), active.navigationHistory.slice(-5).reverse().map((nav, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "browser-history-entry",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "browser-history-title",
+								children: nav.title || nav.url
+							})
+						}, i))]
+					}) : null
+				]
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "browser-panel-inactive",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Aucune session browser active." }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "browser-panel-hint",
+						children: [
+							"JON ouvrira un navigateur automatiquement lors d",
+							"'",
+							"une mission web."
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "primary small",
+						onClick: handleStartBrowser,
+						disabled: starting,
+						style: { marginTop: "12px" },
+						children: starting ? t.browserStarting : t.browserStartSession
+					}),
+					startError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "browser-panel-error",
+						children: startError
+					}) : null
+				]
+			}),
+			recent.length > 0 && !active ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "browser-panel-recent",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "browser-history-label",
+					children: "Sessions récentes"
+				}), recent.slice(0, 3).map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "browser-recent-entry",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `browser-status-dot muted` }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "browser-recent-url",
+							children: s.currentUrl ?? "—"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "browser-recent-status",
+							children: s.status
+						})
+					]
+				}, s.id))]
+			}) : null
+		]
+	});
+}
+function TokenStatusBar({ projectId, dashboard, t }) {
+	const [usage, setUsage] = (0, import_react.useState)(null);
+	const [expanded, setExpanded] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		if (!projectId) {
+			setUsage(null);
+			return;
+		}
+		let cancelled = false;
+		const load = () => {
+			api(`/api/projects/${encodeURIComponent(projectId)}/token-usage`).then((data) => {
+				if (!cancelled) setUsage(data);
+			}).catch(() => {});
+		};
+		load();
+		const timer = setInterval(load, 5e3);
+		return () => {
+			cancelled = true;
+			clearInterval(timer);
+		};
+	}, [projectId, dashboard]);
+	const session = usage?.session ?? null;
+	const activeRun = usage?.activeRun ?? null;
+	const budgets = usage?.budgets ?? null;
+	const llmDashboard = dashboard?.llmDashboard ?? null;
+	const topStages = (llmDashboard?.topTokenDrivers?.length ? llmDashboard.topTokenDrivers : llmDashboard?.stageBreakdown ?? []).slice(0, 3);
+	const sessionTokenColor = session && budgets ? usageColor(session.totalTokens, budgets.perSessionTokens) : "";
+	const sessionCostColor = session && budgets ? usageColor(session.estimatedCost, budgets.perSessionUsd) : "";
+	const runTokenColor = activeRun && budgets ? usageColor(activeRun.totalTokens, budgets.perRunTokens) : "";
+	const runCostColor = activeRun && budgets ? usageColor(activeRun.estimatedCost, budgets.perRunUsd) : "";
+	const sessionTokenPct = usagePercent(session?.totalTokens, budgets?.perSessionTokens);
+	const sessionCostPct = usagePercent(session?.estimatedCost, budgets?.perSessionUsd);
+	const runTokenPct = usagePercent(activeRun?.totalTokens, budgets?.perRunTokens);
+	const totalCalls = session?.callCount ?? llmDashboard?.callCount ?? 0;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "token-status-bar",
+		"aria-label": "Token usage",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+			type: "button",
+			className: "token-dashboard-toggle",
+			"aria-expanded": expanded,
+			onClick: () => setExpanded((value) => !value),
+			onKeyDown: (event) => {
+				if (event.key === "Escape") setExpanded(false);
+			},
+			title: "Token dashboard",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "token-dashboard-title",
+					children: t?.tokens ?? "tokens"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: `token-dashboard-pill ${sessionTokenColor}`,
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "token-bar-label",
+						children: "session"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [fmtK(session?.totalTokens), budgets ? `/${fmtK(budgets.perSessionTokens)}` : ""] })]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "token-mini-meter",
+					"aria-hidden": "true",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `token-mini-meter-fill ${sessionTokenColor}`,
+						style: { width: `${sessionTokenPct}%` }
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: `token-bar-value ${sessionCostColor}`,
+					children: [fmtUsd(session?.estimatedCost), budgets ? `/${fmtUsd(budgets.perSessionUsd)}` : ""]
+				}),
+				activeRun ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: `token-dashboard-pill active ${runTokenColor}`,
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "token-bar-label",
+						children: "run"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [fmtK(activeRun.totalTokens), budgets ? `/${fmtK(budgets.perRunTokens)}` : ""] })]
+				}) : null,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "token-dashboard-caret",
+					"aria-hidden": "true",
+					children: expanded ? "▾" : "▴"
+				})
+			]
+		}), expanded ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+			className: "token-dashboard-popover",
+			"aria-label": "Token usage details",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "token-dashboard-header",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Token dashboard" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [totalCalls, " calls"] })]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "token-dashboard-grid",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "token-detail-label",
+								children: "Session tokens"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+								className: sessionTokenColor,
+								children: fmtK(session?.totalTokens)
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "token-detail-meter",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: `token-detail-meter-fill ${sessionTokenColor}`,
+									style: { width: `${sessionTokenPct}%` }
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [sessionTokenPct, "% budget"] })
+						] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "token-detail-label",
+								children: "Coût session"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+								className: sessionCostColor,
+								children: fmtUsd(session?.estimatedCost)
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "token-detail-meter",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: `token-detail-meter-fill ${sessionCostColor}`,
+									style: { width: `${sessionCostPct}%` }
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [sessionCostPct, "% budget"] })
+						] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "token-detail-label",
+								children: "Run actif"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+								className: runTokenColor,
+								children: activeRun ? fmtK(activeRun.totalTokens) : "—"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "token-detail-meter",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: `token-detail-meter-fill ${runTokenColor}`,
+									style: { width: `${runTokenPct}%` }
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: activeRun ? `${runTokenPct}% budget` : "aucun run" })
+						] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "token-detail-label",
+								children: "Coût run"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+								className: runCostColor,
+								children: activeRun ? fmtUsd(activeRun.estimatedCost) : "—"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: budgets ? `${fmtUsd(budgets.perRunUsd)} max` : "budget non défini" })
+						] })
+					]
+				}),
+				topStages.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "token-stage-list",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "token-detail-label",
+						children: "Postes principaux"
+					}), topStages.map((stage, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "token-stage-row",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: stage.label ?? stage.stageLabel ?? stage.stage }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: fmtK(stage.totalTokens) }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: fmtUsd(stage.estimatedCost) })
+						]
+					}, `${stage.label ?? stage.stage ?? stage.stageLabel ?? "stage"}-${index}`))]
+				}) : null
+			]
+		}) : null]
 	});
 }
 (0, import_client.createRoot)(document.getElementById("cowork-user-root")).render(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(App, {}));

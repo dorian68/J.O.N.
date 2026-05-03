@@ -1,0 +1,34 @@
+{
+  "prompt_id": "task.window_description",
+  "family": "task",
+  "purpose": "Describe the visible content of a desktop window using a screenshot, OCR text, and accessibility summary.",
+  "owner": "runtime",
+  "status": "released",
+  "environment": "prototype",
+  "version": "1.0.0",
+  "compatible_model_aliases": ["vision_fallback", "primary_reasoning", "utility_structuring", "mock_offline"],
+  "input_contract": {
+    "windowTitle": "string|null",
+    "ocrText": "string",
+    "accessibilitySummary": "string",
+    "hasScreenshot": "string"
+  },
+  "output_contract": {
+    "type": "structured",
+    "schema": "window_description_v1"
+  },
+  "benchmark_links": [
+    "computer-control-spec"
+  ],
+  "change_notes": "Describes the visible content of a desktop window combining screenshot vision, OCR text, and accessibility tree summary.",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are describing the visible content of a desktop window for a supervised cowork agent. If a screenshot is provided, use it as your primary source. Supplement with OCR text and accessibility summary when useful. Be factual and specific. Do not invent content not visible in the sources. Return a concise structured description that the agent can use to report back to the user and plan next steps."
+    },
+    {
+      "role": "user",
+      "content": "Window title: {{windowTitle}}\nOCR text extracted from screenshot: {{ocrText}}\nAccessibility summary: {{accessibilitySummary}}\nScreenshot attached: {{hasScreenshot}}\nReturn description (a detailed human-readable paragraph describing what is visible), keyElements (array of short strings naming the most important visible UI elements, text blocks, or interactive controls), and pageType (one of: browser_page, desktop_app, dialog, terminal, file_manager, unknown)."
+    }
+  ]
+}

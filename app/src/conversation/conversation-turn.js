@@ -8,6 +8,7 @@ export const CONVERSATION_INTENT_TYPES = Object.freeze([
   "desktop_action",
   "long_mission",
   "report_generation",
+  "workspace_cli",
   "ambiguous",
   "out_of_scope"
 ]);
@@ -19,6 +20,7 @@ export const CONVERSATION_ACTIONS = Object.freeze([
   "prepare_mission_preflight",
   "start_bounded_run_after_confirmation",
   "generate_structured_response",
+  "launch_workspace_cli",
   "refuse"
 ]);
 
@@ -147,6 +149,37 @@ function greetingIntent(text) {
   ]);
 }
 
+function workspaceCliIntent(text) {
+  return containsAny(text, [
+    /\b(lance|lancer|d[ée]marre|d[ée]marrer|start|open|ouvre|ouvrir|utilise|utiliser|use)\b[\s\S]{0,60}\b(codex|claude code|claude cli|terminal|shell|powershell|bash)\b/i,
+    /\b(codex|claude code|claude cli)\b[\s\S]{0,60}\b(pour|pour faire|to|and|afin de)\b/i,
+    /\b(terminal|shell|console)\b[\s\S]{0,40}\b(codex|claude|cli|workspace)\b/i,
+    /\b(workspace|espace de travail)\b[\s\S]{0,60}\b(terminal|cli|codex|claude)\b/i
+  ]);
+}
+
+const ALLOWED_CLI_COMMANDS = new Set(["codex", "claude", "powershell", "pwsh", "bash", "cmd", "sh", "zsh"]);
+
+function normalizeWorkspaceCliRequest(value, availableCliAgents = []) {
+  if (!isObject(value)) return null;
+  const rawCommand = cleanText(value.command, 200).trim().toLowerCase();
+  if (!rawCommand) return null;
+  const baseCommand = rawCommand.split(/[\s/\\]/).at(-1).replace(/\.exe$/i, "");
+  if (!ALLOWED_CLI_COMMANDS.has(baseCommand)) return null;
+  // Verify the command is actually available when a catalog is provided
+  if (availableCliAgents.length > 0) {
+    const knownCommands = new Set(availableCliAgents.map((a) => String(a.command ?? "").toLowerCase()));
+    if (!knownCommands.has(baseCommand) && !knownCommands.has(rawCommand)) return null;
+  }
+  return {
+    command: baseCommand,
+    args: Array.isArray(value.args) ? value.args.map((a) => cleanText(String(a ?? ""), 500)).filter(Boolean).slice(0, 20) : [],
+    label: cleanText(value.label, 120) || baseCommand,
+    cwd: value.cwd ? cleanText(value.cwd, 500) : null,
+    autonomyMode: ["assisted", "supervised_autonomy"].includes(value.autonomyMode) ? value.autonomyMode : "assisted"
+  };
+}
+
 const BANNED_VISIBLE_REPLY_PATTERNS = Object.freeze([
   /\bbefore acting\b/i,
   /\bi will qualify this request\b/i,
@@ -193,6 +226,9 @@ function polishVisibleReply(text) {
 function naturalFallbackReply({ action, intentType, message, requiresClarification, clarificationQuestion }) {
   if (requiresClarification) {
     return clarificationQuestion || "Tu peux préciser la cible ?";
+  }
+  if (action === "launch_workspace_cli") {
+    return "Je lance le terminal dans l’espace de travail.";
   }
   if (action === "prepare_mission_preflight" || action === "start_bounded_run_after_confirmation") {
     if (/\b(ouvre|ouvrir|open|launch|lance|d[ée]marre|start)\b/i.test(message)) {
@@ -327,6 +363,36 @@ export function buildDeterministicConversationTurn(input = {}) {
       safetyNotes: ["Report preview is generated as controlled UI blocks and a local artifact, not arbitrary inline HTML."]
     };
   }
+  if (workspaceCliIntent(lower)) {
+    const availableCliAgents = Array.isArray(input.availableCliAgents) ? input.availableCliAgents : [];
+    const cliAgent = availableCliAgents.find((a) =>
+      /\bcodex\b/i.test(lower) ? a.command === "codex"
+      : /\bclaude\b/i.test(lower) ? a.command === "claude"
+      : /\bpowershell\b/i.test(lower) ? (a.command === "powershell" || a.command === "pwsh")
+      : /\bbash\b/i.test(lower) ? a.command === "bash"
+      : false
+    ) ?? availableCliAgents[0] ?? null;
+    if (cliAgent) {
+      return {
+        intentType: "workspace_cli",
+        action: "launch_workspace_cli",
+        reply: `Je lance ${cliAgent.label} dans l’espace de travail.`,
+        requiresClarification: false,
+        clarificationQuestion: "",
+        capabilityRequests: [],
+        missionDraft: null,
+        workspaceCliRequest: {
+          command: cliAgent.command,
+          args: [],
+          label: cliAgent.label,
+          cwd: null,
+          autonomyMode: "assisted"
+        },
+        uiBlocks: [],
+        safetyNotes: ["Workspace CLI terminal launched in assisted mode; user approval required for input."]
+      };
+    }
+  }
   if (desktopActionIntent(lower)) {
     return {
       intentType: "desktop_action",
@@ -419,6 +485,10 @@ export function validateConversationTurnOutput(output, context = {}) {
       category: "malformed_output"
     });
   }
+  const workspaceCliRequest = action === "launch_workspace_cli"
+    ? normalizeWorkspaceCliRequest(output.workspaceCliRequest, Array.isArray(output._availableCliAgents) ? output._availableCliAgents : [])
+    : null;
+
   return {
     intentType,
     action,
@@ -427,6 +497,7 @@ export function validateConversationTurnOutput(output, context = {}) {
     clarificationQuestion: requiresClarification ? clarificationQuestion : "",
     capabilityRequests,
     missionDraft,
+    workspaceCliRequest,
     uiBlocks: normalizeUiBlocks(output.uiBlocks, { fallbackText: "" }),
     safetyNotes: cleanList(output.safetyNotes, 8, 260),
     confidence: cleanText(output.confidence, 24) || "medium"

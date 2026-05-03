@@ -120,6 +120,34 @@ export function buildDeterministicCapabilityDescriptionOutput(input = {}) {
   };
 }
 
+export function buildDeterministicWindowDescriptionOutput(input = {}) {
+  const title = String(input.windowTitle ?? input.title ?? "").trim();
+  const pageUrl = String(input.pageUrl ?? input.url ?? "").trim();
+  const ocrText = String(input.ocrText ?? "").replace(/\s+/g, " ").trim();
+  const accessibilitySummary = typeof input.accessibilitySummary === "string"
+    ? input.accessibilitySummary
+    : JSON.stringify(input.accessibilitySummary ?? null);
+  const sourceText = [
+    title && `title: ${title}`,
+    pageUrl && `url: ${pageUrl}`,
+    ocrText && `visible text: ${ocrText.slice(0, 360)}`,
+    accessibilitySummary && accessibilitySummary !== "null" && `structured state: ${accessibilitySummary.slice(0, 360)}`
+  ].filter(Boolean).join("; ");
+  const keyElements = [];
+  if (title) keyElements.push(title);
+  if (pageUrl) keyElements.push(pageUrl);
+  if (ocrText) {
+    keyElements.push(...ocrText.split(/[.;|]/).map((entry) => entry.trim()).filter(Boolean).slice(0, 4));
+  }
+  return {
+    description: sourceText
+      ? `Deterministic visual fallback from available screen context: ${sourceText}.`
+      : "Deterministic visual fallback: no visible screen context was available.",
+    keyElements: Array.from(new Set(keyElements)).slice(0, 8),
+    pageType: pageUrl ? "browser_page" : "unknown"
+  };
+}
+
 export function buildDeterministicFallbackOutput(callType, input = {}) {
   switch (callType) {
     case LLM_CALL_TYPE.CONVERSATION_TURN:
@@ -142,6 +170,8 @@ export function buildDeterministicFallbackOutput(callType, input = {}) {
       return buildDeterministicEvaluationOutput(input);
     case LLM_CALL_TYPE.AMBIGUITY_NOTE:
       return buildDeterministicAmbiguityOutput(input);
+    case LLM_CALL_TYPE.WINDOW_DESCRIPTION:
+      return buildDeterministicWindowDescriptionOutput(input);
     default:
       throw new Error(`Unsupported deterministic fallback for call type: ${callType}`);
   }

@@ -1,0 +1,11 @@
+{
+  "name": "JON Mobile",
+  "short_name": "JON",
+  "description": "Companion app pour JON workspace AI",
+  "start_url": "/mobile/",
+  "display": "standalone",
+  "background_color": "#07080e",
+  "theme_color": "#07080e",
+  "orientation": "portrait",
+  "icons": []
+}

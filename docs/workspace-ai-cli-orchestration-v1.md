@@ -163,28 +163,62 @@ Chaque décision d'orchestration terminal doit enregistrer :
 
 ## 11. Implémenté maintenant
 
-Ce lot doit livrer une première fondation réelle :
+### 11.1 Workspace backend
 
-- modèle persistant de sessions terminal attachées,
-- détection heuristique d'état terminal,
-- classification minimale Codex CLI / Claude Code CLI / generic CLI,
-- journal de décisions d'orchestration,
-- mission brief workspace persistant,
-- API workspace,
-- affichage dans l'inspecteur de session,
-- tests de persistance, détection, policy de décision et affichage minimal.
+- Modèle persistant de sessions terminal attachées (`workspace_terminal_sessions` SQLite).
+- Détection heuristique d'état terminal avec priorité correcte `exitCode → text patterns` (bug exitCode=0 corrigé).
+- Classification Codex CLI / Claude Code CLI / generic CLI / unknown.
+- Journal de décisions d'orchestration (`workspace_terminal_decisions`) avec `evaluateTerminalIntervention`.
+- Mission brief workspace persistant (`workspace_mission_briefs`) avec objectif, progression, blockers, next steps.
+- API workspace complète : `GET /workspace`, `POST /mission-brief`, `POST /terminals`, `POST /terminal-processes`, `PATCH /terminals/:id`, `POST /terminals/:id/input`, `POST /terminals/:id/stop`.
+- **Bridge terminal → conversation** : quand un terminal passe à `waiting_for_input`, `needs_attention` ou `error`, JON injecte automatiquement un tour de conversation `kind: "terminal_alert"` dans la conversation active.
+- SSE event `workspace.terminal.conversation_alert` diffusé à tous les abonnés.
+- Superviseur de processus CLI gouverné par allowlist (`CliTerminalSupervisor`).
+- Catalogue local des CLI réellement détectés sur la machine (`codex`, `claude` si présents) pour éviter de proposer des lancements cassés côté UI.
+- Lancement sans shell (sécurisé), capture persistée `stdout` / `stderr` / `stdin` / exit.
+- Écriture contrôlée dans `stdin` avec approval explicite ou autonomie supervisée.
+- Blocage des entrées contenant secrets ou credentials.
+- Modes d'autonomie : `assisted`, `supervised_autonomy`, `manual_only`.
 
-## 12. Partiellement implémenté maintenant
+### 11.2 Frontend workspace
 
-- La supervision terminal est fondée sur télémétrie attachée et sortie récente, pas encore sur PTY natif complet.
-- L'injection automatique de contexte est décidée et journalisée comme recommandation, mais n'écrit pas encore dans un terminal réel.
-- Le suivi de mission globale est structuré, mais pas encore alimenté par un évaluateur LLM continu.
+- Conversation principale SSE streaming avec `TerminalAlertMessage` en ligne dans le thread.
+- Bulle terminal dédiée dans le fil principal pour exposer les surfaces terminales workspace, les agents CLI détectés et une création rapide de terminal sans passer par la trace.
+- Carte terminal alert avec : badge statut, label terminal, sortie récente, action de décision JON.
+- Champ de réponse direct depuis la conversation vers le terminal (assisté uniquement avec `approved: true`).
+- Une seule colonne workspace à droite : rail réduit par défaut, puis ouverture soit de `Terminal`, soit de `Trace`, dans la même colonne.
+- Vue terminal à deux niveaux :
+  - `cards` : vue actuelle compacte par cartes terminal.
+  - `surface` : vraie surface terminal plus riche avec sélecteur de session, transcript live regroupé, métadonnées de process, décision active et indication claire de ce que JON attend maintenant.
+- Le mode terminal par défaut est désormais gouverné par `agentConfiguration.guardrails.terminalWorkspaceView` et pilotable depuis la console admin.
+- ActivityPanel : trace/run inspector secondaire avec surfaces terminales, alertes, décisions, transcript, mission brief, browser strategy.
+- Streaming de réponse avec curseur, UiBlocks (table, chart, metrics, artifacts, evidence).
 
-## 13. Différé
+### 11.3 Tests
 
-- Attachement PTY temps réel robuste.
-- Lecture/écriture contrôlée dans les terminaux Codex CLI / Claude Code CLI.
-- Évaluation LLM continue de l'avancement global.
+- `workspace-terminal-orchestration` : persistance, détection, policy, processus réel stdin/stdout, input approuvé, completion.
+- `cli-terminal-supervisor` : allowlist, spawn, output, input, exit.
+
+## 12. Partiellement implémenté
+
+- La supervision terminal peut lancer et suivre des processus CLI pipe-based, mais pas encore un vrai PTY interactif complet. La sortie ANSI est strippée côté superviseur (`stripAnsi`) et le terminal reçoit `NO_COLOR=1 TERM=dumb` pour minimiser le bruit.
+- L'attachement de terminaux externes (déjà ouverts par l'utilisateur) passe par `POST /api/projects/:id/workspace/terminals` avec `status`, `recentOutput`, et `processRunning` dans le payload. Le backend détecte l'état heuristiquement. L'utilisateur doit ensuite patcher l'état via `PATCH /api/projects/:id/workspace/terminals/:id` au fil des changements. Il n'y a pas encore de PTY bidirectionnel pour des terminaux ouverts hors de JON.
+- Le suivi de mission globale est structuré (mission brief) et mis à jour automatiquement à chaque transition terminale significative (`#updateMissionBriefFromTerminalEvent`) : blockers, progress et next steps sont recalculés heuristiquement. L'évaluation LLM continue (lecture réelle de l'avancement) reste différée.
+- Le bridge terminal → conversation injecte dans la conversation la plus récente du projet ; si aucune conversation n'existe, seul l'événement SSE est émis.
+
+## 13. Finalisé depuis v1
+
+- **Stripping ANSI** : sortie terminal nettoyée avant persistance et alertes.
+- **Mission brief auto-update** : blockers, progress et next steps mis à jour automatiquement sur chaque transition terminale significative.
+- **Bouton "Injecter contexte"** : exposé dans `TerminalAlertMessage` quand `autonomyMode === "supervised_autonomy"` et `decisionAction === "auto_inject_context"`. Envoie l'objectif de mission dans le terminal avec `approved: true`.
+- **Restauration des alertes terminal depuis l'historique** : `conversationTurnsToMessages` reconnaît désormais `kind: "terminal_alert"` et reconstruit le composant à partir des turns backend au rechargement de page.
+- **`missionObjective` et `autonomyMode` dans les payloads SSE** : l'alerte SSE et le turn DB embarquent ces champs pour permettre l'inject context côté UI.
+
+## 14. Différé
+
+- Attachement PTY temps réel robuste (vrai terminal interactif bidirectionnel).
+- Détection automatique de terminaux externes déjà ouverts par l'utilisateur.
+- Évaluation LLM continue de l'avancement global par rapport au cahier des charges.
 - Handoff multi-agent long avec reprise automatique complète.
-- Packaging/signing production.
-- Validation utilisateur longue sur missions multi-terminal.
+- Packaging / signing production.
+- Mise à jour automatique du mission brief quand un run se termine.

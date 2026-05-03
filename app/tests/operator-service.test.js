@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { APPROVAL_DECISION } from "../src/config.js";
+import { APPROVAL_DECISION, EVENT_ACTOR } from "../src/config.js";
 import { FakeWindowProvider } from "../src/computer/fake-window-provider.js";
 import { OperatorService } from "../src/service/operator-service.js";
+import { createEvent } from "../src/runtime/events.js";
 
 const FIXTURE_ONLY_REAL_SURFACES = Object.freeze({
   research: {
@@ -28,6 +29,35 @@ async function waitForPendingApproval(service, { timeoutMs = 4000 } = {}) {
     await sleep(100);
   }
   throw new Error("Timed out while waiting for a pending approval.");
+}
+
+async function waitForRunLifecycleStage(service, runId, lifecycleStage, { timeoutMs = 4000 } = {}) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const detail = await service.getRunDetail(runId);
+    if (detail?.run?.lifecycleStage === lifecycleStage) {
+      return detail;
+    }
+    await sleep(100);
+  }
+  throw new Error(`Timed out while waiting for run ${runId} to reach ${lifecycleStage}.`);
+}
+
+async function waitForRunApprovalOrSettlement(service, runId, { timeoutMs = 4000 } = {}) {
+  const terminalStatuses = new Set(["completed", "failed", "stopped"]);
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const pendingApproval = service.listPendingApprovals(runId)[0] ?? null;
+    const detail = await service.getRunDetail(runId);
+    if (pendingApproval || terminalStatuses.has(detail?.run?.status)) {
+      return {
+        pendingApproval,
+        detail
+      };
+    }
+    await sleep(100);
+  }
+  throw new Error(`Timed out while waiting for run ${runId} to request approval or settle.`);
 }
 
 async function waitForMissionChainWithApprovals(service, rootRunId, { timeoutMs = 15000 } = {}) {
@@ -142,6 +172,7 @@ export async function run() {
     const launch = await service.startScenario(project.id, "computer");
 
     const pendingApproval = await waitForPendingApproval(service);
+    assert.equal(pendingApproval.runId, launch.runId);
     assert.equal(pendingApproval.category, "local_focus");
 
     const pausedDetail = await service.getRunDetail(launch.runId);
@@ -149,6 +180,20 @@ export async function run() {
     assert.equal(pausedDetail.pendingApprovals.length, 1);
     assert.equal(pausedDetail.review.operatorState.code, "blocked_approval");
     assert.equal(pausedDetail.pendingApprovals[0].evidenceId != null, true);
+
+    const concurrentLaunch = await service.startScenario(project.id, "computer");
+    assert.notEqual(concurrentLaunch.runId, launch.runId);
+    assert.equal(service.listActiveRunIds().includes(launch.runId), true);
+    assert.equal(service.listActiveRunIds().includes(concurrentLaunch.runId), true);
+    const queuedDetail = await waitForRunLifecycleStage(service, concurrentLaunch.runId, "queued_surface_lock");
+    assert.equal(queuedDetail.run.status, "paused");
+    assert.equal(queuedDetail.pendingApprovals.length, 0);
+    assert.equal(queuedDetail.review.operatorState.code, "queued");
+    assert.equal(queuedDetail.events.some((event) => event.type === "run.queued" && event.payload?.lockName === "desktop"), true);
+    assert.equal(service.listActiveRunSurfaces(project.id).some((entry) => entry.runId === launch.runId && entry.surface === "desktop"), true);
+    assert.equal(service.hasActiveRunOnSurface(project.id, "desktop"), true);
+    assert.equal(service.hasActiveRunOnSurface(project.id, "browser"), false);
+
     await assert.rejects(
       () => service.waitForRun(launch.runId, { timeoutMs: 30 }),
       (error) => error.code === "RUN_WAIT_TIMEOUT" && error.runId === launch.runId
@@ -169,6 +214,16 @@ export async function run() {
     const manifest = await service.readEvidenceManifest(launch.runId, observationEvidence.id);
     assert.equal(manifest.evidence.label, "Computer control observation evidence");
     assert.equal(manifest.content.payload.verification.validated, true);
+
+    const concurrentGate = await waitForRunApprovalOrSettlement(service, concurrentLaunch.runId);
+    if (concurrentGate.pendingApproval) {
+      assert.equal(concurrentGate.pendingApproval.runId, concurrentLaunch.runId);
+      assert.equal(concurrentGate.pendingApproval.category, "local_focus");
+      await service.resolveApproval(concurrentGate.pendingApproval.id, APPROVAL_DECISION.APPROVED_ONCE, "Controlled approval for queued service test.");
+    }
+    const concurrentDetail = await service.waitForRun(concurrentLaunch.runId);
+    assert.equal(concurrentDetail.run.status, "completed");
+    assert.equal(concurrentDetail.events.some((event) => event.type === "run.dequeued" && event.payload?.lockName === "desktop"), true);
 
     const preview = await service.previewMission(project.id, {
       objective: "Compare the controlled candidate pages and prepare a decision note for the operator.",
@@ -240,6 +295,16 @@ export async function run() {
     assert.equal(clarifiedConversation.missionDraft.parameters.browserLaunch.browserId, "edge");
     const resolvedConversation = service.runtimeHandle.database.getConversation(browserConversation.conversation.id);
     assert.equal(resolvedConversation.metadata?.pendingClarification, null);
+    assert.equal(resolvedConversation.summary.split("\n").length >= 2, true);
+    const memoryRecords = service.listUserMemoryRecords({ projectId: project.id, limit: 20 });
+    assert.equal(memoryRecords.some((record) => record.category === "tool" && record.metadata?.toolId === "browser"), true);
+    const memorySearch = service.searchUserMemoryRecords({
+      query: "browser",
+      projectId: project.id
+    });
+    assert.equal(memorySearch.length >= 1, true);
+    const startupMemory = service.getStartupMemoryContext(project.id);
+    assert.equal(startupMemory.memoryRecords.length >= 1, true);
 
     const appChoiceConversation = await service.handleConversationTurn(project.id, {
       message: "Ouvre mon éditeur de notes."
@@ -288,6 +353,91 @@ export async function run() {
     const browserManifest = await service.readEvidenceManifest(browserMissionLaunch.runId, browserEvidence.id);
     assert.equal(browserManifest.content.payload.verification.validated, true);
     assert.equal(browserMissionDetail.run.metadata?.verificationSummary?.overallStatus, "pass");
+
+    const upworkPreview = await service.previewMission(project.id, {
+      objective: "Ouvrir Upwork et lister 5 postes autour de Excel.",
+      deliverable: "Liste de 5 postes Excel sur Upwork",
+      parameters: {
+        website: "Upwork",
+        searchQuery: "Excel",
+        resultCount: 5,
+        application: "Google Chrome"
+      }
+    });
+    assert.equal(upworkPreview.missionDraft.parameters.browserLaunch.browserId, "chrome");
+    assert.equal(upworkPreview.missionDraft.parameters.browserLaunch.targetSite, "Upwork");
+    assert.equal(upworkPreview.missionDraft.parameters.browserLaunch.resultType, "jobs");
+    assert.equal(upworkPreview.missionDraft.parameters.browserLaunch.searchUrl.includes("google.com/search"), true);
+    assert.equal(upworkPreview.preflight.understanding.chosenExecutionFrame, "computer_observation");
+    assert.equal(upworkPreview.preflight.understanding.computerActionType, "launch_browser_search");
+    assert.equal(upworkPreview.preflight.understanding.selectedBrowser?.id, "chrome");
+    assert.equal(upworkPreview.preflight.understanding.requiresClarification, false);
+
+    const upworkConversation = service.createConversation(project.id, { title: "Upwork Excel jobs" });
+    const upworkMissionLaunch = await service.startMission(project.id, {
+      conversationId: upworkConversation.id,
+      missionSpec: {
+        objective: "Ouvrir Upwork et lister 5 postes autour de Excel.",
+        deliverable: "Liste de 5 postes Excel sur Upwork",
+        parameters: {
+          website: "Upwork",
+          searchQuery: "Excel",
+          resultCount: 5,
+          application: "Google Chrome"
+        }
+      },
+      preflight: upworkPreview.preflight
+    });
+    service.runtimeHandle.database.insertEvent(upworkMissionLaunch.runId, createEvent(
+      "llm.degraded_mode.activated",
+      EVENT_ACTOR.SYSTEM,
+      "Desktop planning degraded to deterministic fallback.",
+      { strategy: "deterministic_desktop_plan_fallback" }
+    ));
+    const upworkGate = await waitForRunApprovalOrSettlement(service, upworkMissionLaunch.runId);
+    if (upworkGate.pendingApproval) {
+      assert.equal(upworkGate.pendingApproval.category, "local_app_launch");
+      await service.resolveApproval(upworkGate.pendingApproval.id, APPROVAL_DECISION.APPROVED_ONCE, "Allow Chrome launch for Upwork regression.");
+    }
+    const upworkMissionDetail = await service.waitForRun(upworkMissionLaunch.runId);
+    assert.equal(upworkMissionDetail.run.status, "failed");
+    assert.equal(upworkMissionDetail.run.lifecycleStage, "failed_incomplete_deliverable");
+    assert.equal(upworkMissionDetail.run.metadata?.computerActionType, "launch_browser_search");
+    assert.equal(upworkMissionDetail.run.metadata?.selectedBrowser?.id, "chrome");
+    assert.equal(upworkMissionDetail.run.summary.includes("requested 5 results were not extracted"), true);
+    assert.equal(upworkMissionDetail.run.metadata?.verificationSummary?.overallStatus, "fail");
+    assert.equal(upworkMissionDetail.run.metadata?.orchestrationRecovery?.status, "ready_for_retry");
+    assert.equal(upworkMissionDetail.run.metadata?.orchestrationRecovery?.enabled, true);
+    assert.equal(upworkMissionDetail.run.metadata?.orchestrationRecovery?.retryPlan?.action, "extract_structured_rows");
+    assert.equal(upworkMissionDetail.review.outcomeSummary.capabilityRecovery?.status, "ready_for_retry");
+    const recoveryCandidate = service.getCapabilityCandidate(upworkMissionDetail.run.metadata.orchestrationRecovery.candidateId);
+    assert.equal(recoveryCandidate?.status, "enabled");
+    assert.equal(recoveryCandidate?.artifactKind, "web_data_adapter.v1");
+    const recoveryGraph = await service.getCapabilityGraph({ refreshIfEmpty: false });
+    assert.equal(recoveryGraph.nodes.some((node) =>
+      node.sourceKind === "mcp_server"
+      && node.payload?.serverId === "jon_generated_capabilities"
+      && node.payload?.description?.includes(recoveryCandidate.id)
+    ), true);
+    const upworkEvidence = upworkMissionDetail.evidence.find((entry) => entry.label === "Desktop browser launch evidence");
+    assert.equal(Boolean(upworkEvidence), true);
+    const upworkManifest = await service.readEvidenceManifest(upworkMissionLaunch.runId, upworkEvidence.id);
+    assert.equal(upworkManifest.content.payload.launchResult.url.includes("google.com/search"), true);
+    assert.equal(upworkManifest.content.payload.launchResult.url.includes("Upwork"), true);
+    assert.equal(upworkManifest.content.payload.launchResult.url.includes("Excel"), true);
+    assert.equal(service.computerProvider.listVisibleWindows().some((windowState) =>
+      String(windowState.processName ?? "").toLowerCase() === "excel"
+      || windowState.title === "Microsoft Excel"
+    ), false);
+    const degradedTurns = service.listConversationTurns(project.id, {
+      conversationId: upworkConversation.id,
+      limit: 10
+    });
+    assert.equal(degradedTurns.some((turn) => turn.payload?.intentType === "degraded_mode_notice" && turn.content.includes("Mode dégradé")), true);
+    assert.equal(degradedTurns.some((turn) =>
+      turn.payload?.intentType === "mission_recovery"
+      && turn.payload?.action === "capability_ready_for_retry"
+    ), true);
 
     const browserSearchPreview = await service.previewMission(project.id, {
       objective: "Open Edge, search for release readiness, then capture a screenshot of the visible result.",

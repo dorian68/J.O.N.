@@ -32,6 +32,14 @@ export function getRealSurfaceScenarioCatalog() {
       requiredLogs: [
         "app/.runtime-data/logs/llm-runtime.jsonl"
       ],
+      minimumTraceability: {
+        runId: false,
+        artifactIds: 0,
+        evidenceIds: 0,
+        llmCallIds: 1,
+        reasoningSnapshotIds: 0,
+        logPaths: 1
+      },
       passCriteria: [
         "live-success uses providerAlias=openai_compatible with empty fallbackChain",
         "provider-unavailable reports errorCategory=provider_unavailable",
@@ -57,6 +65,14 @@ export function getRealSurfaceScenarioCatalog() {
       requiredLogs: [
         "stdout dry-run JSON showing loopback operatorBaseUrl"
       ],
+      minimumTraceability: {
+        runId: false,
+        artifactIds: 0,
+        evidenceIds: 0,
+        llmCallIds: 0,
+        reasoningSnapshotIds: 0,
+        logPaths: 1
+      },
       passCriteria: [
         "Dry-run output reports a loopback-only operatorBaseUrl",
         "The wrapper launches the current operator surface without changing business behavior",
@@ -89,6 +105,14 @@ export function getRealSurfaceScenarioCatalog() {
       requiredLogs: [
         "app/.runtime-data/logs/llm-runtime.jsonl"
       ],
+      minimumTraceability: {
+        runId: true,
+        artifactIds: 2,
+        evidenceIds: 2,
+        llmCallIds: 2,
+        reasoningSnapshotIds: 2,
+        logPaths: 1
+      },
       passCriteria: [
         "The run stays inside browser-first / DOM-first behavior",
         "At least two sources are traceable through events, evidence, artifacts, and reasoning snapshots",
@@ -118,10 +142,214 @@ export function getRealSurfaceScenarioCatalog() {
       requiredLogs: [
         "app/.runtime-data/logs/llm-runtime.jsonl"
       ],
+      minimumTraceability: {
+        runId: true,
+        artifactIds: 0,
+        evidenceIds: 2,
+        llmCallIds: 1,
+        reasoningSnapshotIds: 1,
+        logPaths: 1
+      },
       passCriteria: [
         "The run obtains explicit focus approval before focus changes",
         "The correct local surface is evidenced and verified",
         "No generalized desktop actuation occurs"
+      ]
+    },
+    {
+      id: "real_web_canvas_interaction",
+      label: "Real web canvas interaction",
+      surfaceType: "real_web_canvas",
+      executionMode: "manual_operator_run",
+      objective: "Validate browser perception and proof capture on an allowlisted page where essential state is rendered in canvas rather than exposed as ordinary DOM text.",
+      surfaceComplexityTags: ["canvas", "visual_state", "dom_gap", "screenshot_evidence"],
+      preconditions: [
+        "The page is public, allowlisted, low-risk, and does not require login.",
+        "The operator has defined the expected canvas-visible state before the run.",
+        "No game, payment, credential, or anti-bot flow is used."
+      ],
+      commands: [
+        "npm run operator:server",
+        "Launch one bounded browser autonomy run against the allowlisted canvas page"
+      ],
+      requiredArtifacts: [],
+      requiredEvidence: [
+        "Canvas-visible before/after screenshot evidence",
+        "A visual description or OCR/perception note explaining why DOM-only extraction is insufficient"
+      ],
+      requiredLogs: [
+        "app/.runtime-data/logs/llm-runtime.jsonl"
+      ],
+      minimumTraceability: {
+        runId: true,
+        artifactIds: 0,
+        evidenceIds: 2,
+        llmCallIds: 1,
+        reasoningSnapshotIds: 1,
+        logPaths: 1
+      },
+      passCriteria: [
+        "The run explicitly detects that the target state is visual/canvas-backed",
+        "The final answer cites screenshot evidence rather than pretending DOM text was available",
+        "No hidden or synthetic canvas state is inferred without proof"
+      ]
+    },
+    {
+      id: "real_web_pdf_extraction",
+      label: "Real web PDF extraction",
+      surfaceType: "real_web_pdf",
+      executionMode: "manual_operator_run",
+      objective: "Validate extraction and citation behavior on an allowlisted public PDF opened through the browser surface.",
+      surfaceComplexityTags: ["pdf", "download_or_inline_viewer", "citation", "long_document"],
+      preconditions: [
+        "The PDF is public, allowlisted, and safe to download or view inline.",
+        "The operator has selected a PDF with at least two pages and visible headings.",
+        "No copyrighted full-text reproduction is requested."
+      ],
+      commands: [
+        "npm run operator:server",
+        "Launch one bounded PDF review mission through the operator surface"
+      ],
+      requiredArtifacts: [
+        "Short extraction summary or decision note"
+      ],
+      requiredEvidence: [
+        "PDF URL/source evidence",
+        "Page-level screenshot or extraction proof"
+      ],
+      requiredLogs: [
+        "app/.runtime-data/logs/llm-runtime.jsonl"
+      ],
+      minimumTraceability: {
+        runId: true,
+        artifactIds: 1,
+        evidenceIds: 2,
+        llmCallIds: 1,
+        reasoningSnapshotIds: 1,
+        logPaths: 1
+      },
+      passCriteria: [
+        "The output identifies the PDF source and page/section evidence used",
+        "The run does not quote excessive PDF text",
+        "The operator can trace each extracted claim to persisted evidence"
+      ]
+    },
+    {
+      id: "real_web_dropdown_form_preparation",
+      label: "Real web dropdown form preparation",
+      surfaceType: "real_web_form",
+      executionMode: "manual_operator_run",
+      objective: "Validate supervised form preparation on an allowlisted real page with selects, dependent dropdowns, and explicit stop-before-submit behavior.",
+      surfaceComplexityTags: ["form", "select", "dependent_dropdown", "approval", "no_submit"],
+      preconditions: [
+        "The form is public or a test/staging form explicitly owned by the operator.",
+        "The operator has approved test values that do not submit real transactions.",
+        "Submission, payment, publication, or account mutation is out of scope."
+      ],
+      commands: [
+        "npm run operator:server",
+        "Launch one bounded form-preparation run and stop before submit"
+      ],
+      requiredArtifacts: [],
+      requiredEvidence: [
+        "Pre-edit approval context evidence",
+        "Post-edit stop-before-submit evidence"
+      ],
+      requiredLogs: [
+        "app/.runtime-data/logs/llm-runtime.jsonl"
+      ],
+      minimumTraceability: {
+        runId: true,
+        artifactIds: 0,
+        evidenceIds: 2,
+        llmCallIds: 1,
+        reasoningSnapshotIds: 1,
+        logPaths: 1
+      },
+      passCriteria: [
+        "Each non-read field change has an explicit approval record or trusted test-mode policy",
+        "Dependent dropdown state is verified after selection",
+        "The run stops before submit and records proof of that boundary"
+      ]
+    },
+    {
+      id: "real_web_network_error_recovery",
+      label: "Real web network error recovery",
+      surfaceType: "real_web_resilience",
+      executionMode: "manual_operator_run",
+      objective: "Validate that browser missions classify and recover from real navigation failures without hallucinating completed work.",
+      surfaceComplexityTags: ["network_error", "timeout", "retry", "blocked_navigation", "honest_failure"],
+      preconditions: [
+        "The operator selects an allowlisted URL with a known temporary failure, timeout, or blocked route.",
+        "The expected behavior is retry/classify/report, not bypass.",
+        "No authentication or anti-bot bypass is attempted."
+      ],
+      commands: [
+        "npm run operator:server",
+        "Launch one bounded browser mission against the failing allowlisted route"
+      ],
+      requiredArtifacts: [
+        "Failure/recovery note"
+      ],
+      requiredEvidence: [
+        "Navigation failure evidence",
+        "Retry or blocker-classification evidence"
+      ],
+      requiredLogs: [
+        "app/.runtime-data/logs/llm-runtime.jsonl"
+      ],
+      minimumTraceability: {
+        runId: true,
+        artifactIds: 1,
+        evidenceIds: 2,
+        llmCallIds: 1,
+        reasoningSnapshotIds: 1,
+        logPaths: 1
+      },
+      passCriteria: [
+        "The run reports the failure class and does not claim task completion",
+        "At least one retry or alternate observation is evidenced",
+        "The final recommendation is a safe handoff or bounded next step"
+      ]
+    },
+    {
+      id: "desktop_app_variety_matrix",
+      label: "Desktop app variety matrix",
+      surfaceType: "real_local_desktop_matrix",
+      executionMode: "manual_operator_run",
+      objective: "Validate governed desktop autonomy across several local app classes instead of one controlled fake window.",
+      surfaceComplexityTags: ["desktop", "app_matrix", "accessibility", "ocr", "recovery"],
+      preconditions: [
+        "The operator explicitly allowlists each target app/window.",
+        "The matrix includes at least a text editor, a file manager, and one browser window.",
+        "No credential entry, payment, destructive file operation, or privileged OS change is attempted."
+      ],
+      commands: [
+        "npm run validation:advanced-desktop -- --real-matrix",
+        "npm run operator:server"
+      ],
+      requiredArtifacts: [
+        "Desktop matrix validation summary"
+      ],
+      requiredEvidence: [
+        "One evidence record per app class",
+        "Accessibility/OCR/perception notes for each app class"
+      ],
+      requiredLogs: [
+        "app/.runtime-data/logs/llm-runtime.jsonl"
+      ],
+      minimumTraceability: {
+        runId: true,
+        artifactIds: 1,
+        evidenceIds: 3,
+        llmCallIds: 1,
+        reasoningSnapshotIds: 1,
+        logPaths: 1
+      },
+      passCriteria: [
+        "Each app class has a persisted observation or action proof",
+        "The run records which perception channel was used for each app",
+        "Recovery or honest stop behavior is evidenced for at least one non-ideal app state"
       ]
     }
   ];
@@ -130,4 +358,3 @@ export function getRealSurfaceScenarioCatalog() {
 export function getRealSurfaceScenario(scenarioId) {
   return getRealSurfaceScenarioCatalog().find((scenario) => scenario.id === scenarioId) ?? null;
 }
-

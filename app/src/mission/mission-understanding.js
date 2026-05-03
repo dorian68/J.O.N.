@@ -100,7 +100,8 @@ const UNSUPPORTED_PATTERNS = Object.freeze([
 
 const BROWSER_LAUNCH_PATTERNS = Object.freeze([
   /\b(open|launch|start|ouvrir|ouvre|lance)\b[\s\S]{0,80}\b(browser|web browser|navigateur|chrome|edge|firefox|brave)\b/i,
-  /\b(browser|web browser|navigateur)\b[\s\S]{0,40}\b(open|launch|start|ouvrir|ouvre|lance)\b/i
+  /\b(open|launch|start|ouvrir|ouvre|lance)\b[\s\S]{0,80}\b(site|website|web|page|url|https?:\/\/|www\.)\b/i,
+  /\b(browser|web browser|navigateur|site|website)\b[\s\S]{0,40}\b(open|launch|start|ouvrir|ouvre|lance)\b/i
 ]);
 
 const BROWSER_SEARCH_PATTERNS = Object.freeze([
@@ -126,6 +127,70 @@ const BROWSER_ALIASES = Object.freeze({
   firefox: ["firefox", "mozilla firefox"],
   brave: ["brave", "brave browser"]
 });
+
+function normalizeBrowserIdHint(value) {
+  const hint = String(value ?? "").trim().toLowerCase();
+  if (!hint) {
+    return "";
+  }
+  for (const [browserId, aliases] of Object.entries(BROWSER_ALIASES)) {
+    if (aliases.some((alias) => hint === alias || hint.includes(alias))) {
+      return browserId;
+    }
+  }
+  return Object.hasOwn(BROWSER_ALIASES, hint) ? hint : "";
+}
+
+function normalizePreferredLaunchUrl(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(raw)) {
+    return `https://${raw}`;
+  }
+  return raw;
+}
+
+function normalizeSiteHint(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return {
+      raw: "",
+      host: "",
+      targetSite: ""
+    };
+  }
+  const candidate = normalizePreferredLaunchUrl(raw);
+  try {
+    const parsed = /^https?:\/\//i.test(candidate) ? new URL(candidate) : null;
+    return {
+      raw,
+      host: parsed?.hostname ?? "",
+      targetSite: parsed?.hostname?.replace(/^www\./i, "") ?? raw
+    };
+  } catch {
+    return {
+      raw,
+      host: "",
+      targetSite: raw
+    };
+  }
+}
+
+function looksLikeSearchUrl(value) {
+  try {
+    const parsed = new URL(String(value ?? ""));
+    return /(^|\.)google\./i.test(parsed.hostname)
+      || /(^|\.)bing\./i.test(parsed.hostname)
+      || /duckduckgo\.com$/i.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
 
 function normalizeBrowserCatalog(browsers = []) {
   if (!Array.isArray(browsers)) {
@@ -206,6 +271,46 @@ function browserChoiceSummary(browser) {
   };
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function parameterTextEntries(parameters = {}) {
+  if (!isPlainObject(parameters)) {
+    return [];
+  }
+  const browserLaunch = isPlainObject(parameters.browserLaunch) ? parameters.browserLaunch : {};
+  const computerAction = isPlainObject(parameters.computerAction) ? parameters.computerAction : {};
+  const applicationLaunch = isPlainObject(parameters.applicationLaunch) ? parameters.applicationLaunch : {};
+  return [
+    browserLaunch.browserId,
+    browserLaunch.browserLabel,
+    browserLaunch.searchQuery,
+    browserLaunch.url,
+    browserLaunch.searchUrl,
+    browserLaunch.targetSite,
+    browserLaunch.website,
+    browserLaunch.resultType,
+    browserLaunch.resultCount,
+    computerAction.type,
+    applicationLaunch.applicationId,
+    applicationLaunch.applicationLabel,
+    parameters.browserId,
+    parameters.browser,
+    parameters.application,
+    parameters.website,
+    parameters.site,
+    parameters.targetSite,
+    parameters.url,
+    parameters.searchUrl,
+    parameters.searchQuery,
+    parameters.query,
+    parameters.resultType,
+    parameters.resultCount,
+    parameters.computerActionType
+  ];
+}
+
 function buildBrowserChoiceRequest({ clarificationQuestion = "", clarificationOptions = [] } = {}) {
   if (!Array.isArray(clarificationOptions) || clarificationOptions.length === 0) {
     return null;
@@ -234,7 +339,8 @@ function normalizeSearchText(input = {}) {
     input.objective,
     input.deliverable,
     ...(Array.isArray(input.constraints) ? input.constraints : typeof input.constraints === "string" ? input.constraints.split(/\r?\n/) : []),
-    ...(Array.isArray(input.forbiddenActions) ? input.forbiddenActions : typeof input.forbiddenActions === "string" ? input.forbiddenActions.split(/\r?\n/) : [])
+    ...(Array.isArray(input.forbiddenActions) ? input.forbiddenActions : typeof input.forbiddenActions === "string" ? input.forbiddenActions.split(/\r?\n/) : []),
+    ...parameterTextEntries(input.parameters)
   ]
     .map((entry) => String(entry ?? "").toLowerCase())
     .join("\n");
@@ -245,7 +351,8 @@ function normalizeMissionText(input = {}) {
     input.objective,
     input.deliverable,
     ...(Array.isArray(input.constraints) ? input.constraints : typeof input.constraints === "string" ? input.constraints.split(/\r?\n/) : []),
-    ...(Array.isArray(input.forbiddenActions) ? input.forbiddenActions : typeof input.forbiddenActions === "string" ? input.forbiddenActions.split(/\r?\n/) : [])
+    ...(Array.isArray(input.forbiddenActions) ? input.forbiddenActions : typeof input.forbiddenActions === "string" ? input.forbiddenActions.split(/\r?\n/) : []),
+    ...parameterTextEntries(input.parameters)
   ]
     .map((entry) => String(entry ?? "").trim())
     .filter(Boolean)
@@ -274,12 +381,26 @@ function extractSearchQuery(text, preferredQuery = "") {
   return "";
 }
 
-function buildSearchUrl(query, text) {
+function buildSearchUrl(query, text, { targetSite = "", resultType = "", launchUrl = "" } = {}) {
   const normalizedQuery = String(query ?? "").trim();
-  if (!normalizedQuery) {
+  const siteHint = normalizeSiteHint(targetSite || launchUrl);
+  const parts = [];
+  if (siteHint.host) {
+    parts.push(`site:${siteHint.host}`);
+  } else if (siteHint.targetSite) {
+    parts.push(siteHint.targetSite);
+  }
+  if (normalizedQuery) {
+    parts.push(normalizedQuery);
+  }
+  if (resultType && !parts.some((part) => part.toLowerCase().includes(String(resultType).toLowerCase()))) {
+    parts.push(resultType);
+  }
+  const finalQuery = parts.join(" ").trim();
+  if (!finalQuery) {
     return null;
   }
-  const encoded = encodeURIComponent(normalizedQuery);
+  const encoded = encodeURIComponent(finalQuery);
   if (/\bbing\b/i.test(text)) {
     return `https://www.bing.com/search?q=${encoded}`;
   }
@@ -356,17 +477,45 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
     parameters: input.missionSpec?.parameters ?? input.parameters ?? {}
   });
   const browserCatalog = normalizeBrowserCatalog(input.availableBrowsers ?? []);
-  const preferredBrowserId = input.missionSpec?.parameters?.browserLaunch?.browserId
-    ?? input.parameters?.browserLaunch?.browserId
+  const parameters = input.missionSpec?.parameters ?? input.parameters ?? {};
+  const preferredBrowserId = normalizeBrowserIdHint(
+    parameters?.browserLaunch?.browserId
+      ?? parameters?.browserLaunch?.browserLabel
+      ?? parameters?.browserId
+      ?? parameters?.browser
+      ?? parameters?.application
+  );
+  const preferredSearchQuery = parameters?.browserLaunch?.searchQuery
+    ?? parameters?.searchQuery
+    ?? parameters?.query
     ?? "";
-  const preferredSearchQuery = input.missionSpec?.parameters?.browserLaunch?.searchQuery
-    ?? input.parameters?.browserLaunch?.searchQuery
+  const preferredResultType = parameters?.browserLaunch?.resultType
+    ?? parameters?.resultType
+    ?? parameters?.itemType
     ?? "";
-  const preferredLaunchUrl = input.missionSpec?.parameters?.browserLaunch?.url
-    ?? input.parameters?.browserLaunch?.url
+  const preferredTargetSite = parameters?.browserLaunch?.targetSite
+    ?? parameters?.targetSite
+    ?? parameters?.browserLaunch?.website
+    ?? parameters?.website
+    ?? parameters?.site
     ?? "";
-  const forcedActionType = input.missionSpec?.parameters?.computerAction?.type
-    ?? input.parameters?.computerAction?.type
+  const preferredLaunchUrl = normalizePreferredLaunchUrl(parameters?.browserLaunch?.url
+    ?? parameters?.url
+    ?? parameters?.launchUrl
+    ?? parameters?.browserLaunchUrl
+    ?? parameters?.targetUrl
+    ?? "");
+  const preferredLaunchUrlIsSearch = looksLikeSearchUrl(preferredLaunchUrl);
+  const preferredSearchUrl = (preferredLaunchUrlIsSearch ? preferredLaunchUrl : "")
+    || normalizePreferredLaunchUrl(parameters?.browserLaunch?.searchUrl ?? parameters?.searchUrl ?? "");
+  const preferredResultCount = input.missionSpec?.parameters?.browserLaunch?.resultCount
+    ?? input.parameters?.browserLaunch?.resultCount
+    ?? parameters?.resultCount
+    ?? parameters?.limit
+    ?? parameters?.maxResults
+    ?? null;
+  const forcedActionType = parameters?.computerAction?.type
+    ?? parameters?.computerActionType
     ?? "";
   const applicationLaunchRequested = Boolean(
     input.missionSpec?.parameters?.applicationLaunch?.applicationId
@@ -381,6 +530,12 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
   const launchRequested = Boolean(
     inferred.browserLaunchIntent
     || detectBrowserLaunchIntent(searchText)
+    || preferredBrowserId
+    || preferredSearchQuery
+    || preferredLaunchUrl
+    || preferredSearchUrl
+    || preferredResultType
+    || preferredResultCount
     || ["launch_browser", "launch_browser_search"].includes(normalizedForcedActionType)
   );
   const browserScopedActionRequested = Boolean(
@@ -389,6 +544,7 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
     || preferredBrowserId
     || preferredSearchQuery
     || preferredLaunchUrl
+    || preferredSearchUrl
   );
   const explicitBrowser = browserScopedActionRequested
     ? findExplicitBrowserChoice(searchText, browserCatalog, preferredBrowserId)
@@ -398,12 +554,18 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
     : null;
   const searchRequested = Boolean(
     (launchRequested || normalizedForcedActionType === "launch_browser_search")
-    && (detectBrowserSearchIntent(searchText) || preferredSearchQuery || preferredLaunchUrl)
+    && (detectBrowserSearchIntent(searchText) || preferredSearchQuery || preferredSearchUrl || preferredResultCount || preferredResultType)
   );
   const searchQuery = searchRequested
     ? extractSearchQuery(missionText, preferredSearchQuery)
     : "";
-  const launchUrl = preferredLaunchUrl || (searchRequested ? buildSearchUrl(searchQuery, missionText) : null);
+  const launchUrl = searchRequested
+    ? preferredSearchUrl || buildSearchUrl(searchQuery, missionText, {
+      targetSite: preferredTargetSite,
+      resultType: preferredResultType,
+      launchUrl: preferredLaunchUrl
+    })
+    : preferredLaunchUrl || null;
   const captureRequested = detectScreenshotIntent(searchText)
     || ["capture_browser_window", "capture_active_window"].includes(normalizedForcedActionType);
   const clarificationOptions = browserScopedActionRequested && !selectedBrowser && browserCatalog.length > 1
@@ -414,6 +576,7 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
     searchRequested,
     searchQuery,
     launchUrl,
+    resultType: String(preferredResultType ?? "").trim(),
     captureRequested,
     desktopAutonomyRequested,
     forcedActionType: normalizedForcedActionType || null,
@@ -904,6 +1067,20 @@ export function inferMissionMode(input = {}) {
     scores.computer += 5;
   }
   if (input.parameters?.applicationLaunch?.applicationId) {
+    scores.computer += 5;
+  }
+  if (
+    input.parameters?.browserLaunch?.browserId
+    || input.parameters?.browserLaunch?.searchQuery
+    || input.parameters?.browserLaunch?.url
+    || input.parameters?.browserLaunch?.searchUrl
+    || input.parameters?.browserLaunch?.targetSite
+    || input.parameters?.browserLaunch?.resultType
+    || input.parameters?.browserLaunch?.resultCount
+  ) {
+    scores.computer += 5;
+  }
+  if (input.parameters?.computerAction?.type && String(input.parameters.computerAction.type).startsWith("launch_browser")) {
     scores.computer += 5;
   }
   if (browserLaunchIntent && browserSearchIntent) {

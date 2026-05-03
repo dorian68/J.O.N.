@@ -10,6 +10,8 @@ import {
 import { createId, nowIso } from "../utils/ids.js";
 import { captureDomSnapshot, inspectLocator, listInteractiveElements, rankCandidates } from "./dom-strategy.js";
 
+const INTERACTIVE_SELECTOR = "a[href], button, input, select, textarea, [role='button'], [role='link']";
+
 function hostnameFor(url) {
   const parsed = new URL(url);
   return parsed.hostname;
@@ -50,6 +52,7 @@ export class BrowserController {
     this.headless = options.headless ?? DEFAULT_HEADLESS;
     this.channel = options.channel ?? DEFAULT_BROWSER_CHANNEL;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.userDataDir = options.userDataDir ?? null;
     this.browser = null;
     this.context = null;
     this.targets = new Map();
@@ -62,25 +65,34 @@ export class BrowserController {
   async openBrowserSession({ allowlistedHosts = [], headless = this.headless } = {}) {
     this.allowlistedHosts = allowlistedHosts;
     this.sessionId = createId("browser_session");
-    this.browser = await this.#launchBrowser(headless);
-    this.context = await this.browser.newContext({
-      viewport: { width: 1440, height: 980 }
-    });
-    const page = await this.context.newPage();
+    if (this.userDataDir) {
+      await this.#launchPersistentContext(headless);
+    } else {
+      this.browser = await this.#launchBrowser(headless);
+      this.context = await this.browser.newContext({
+        viewport: { width: 1440, height: 980 }
+      });
+    }
+    const existingPages = this.context.pages();
+    const page = existingPages[0] ?? await this.context.newPage();
     const targetId = this.#attachPage(page);
-    await page.goto("about:blank");
+    if (page.url() === "about:blank" || !page.url()) {
+      await page.goto("about:blank");
+    }
     this.activeTargetId = targetId;
     this.#recordTargetAction(targetId, "open_browser_session", {
       headless,
-      allowlistedHosts
+      allowlistedHosts,
+      persistent: Boolean(this.userDataDir)
     }, {
-      url: "about:blank"
+      url: page.url()
     });
     return {
       sessionId: this.sessionId,
       targetId,
       headless,
-      allowlistedHosts
+      allowlistedHosts,
+      persistent: Boolean(this.userDataDir)
     };
   }
 
@@ -91,6 +103,10 @@ export class BrowserController {
     this.activeTargetId = null;
     this.sessionId = null;
     this.recentActions = [];
+  }
+
+  isOpen() {
+    return Boolean(this.context) && this.targets.size > 0;
   }
 
   listTargets() {
@@ -237,6 +253,39 @@ export class BrowserController {
     }
   }
 
+  async waitForPageStable(targetId, { timeoutMs = 3000, settleMs = 120 } = {}) {
+    const page = this.#getPage(targetId);
+    const startedAt = Date.now();
+    const observedStates = [];
+    for (const state of ["domcontentloaded", "load", "networkidle"]) {
+      const remainingMs = Math.max(250, timeoutMs - (Date.now() - startedAt));
+      try {
+        await page.waitForLoadState(state, {
+          timeout: Math.min(remainingMs, state === "networkidle" ? 900 : 1200)
+        });
+        observedStates.push(state);
+      } catch {
+        // Dynamic pages often never reach every Playwright load state. Keep the
+        // latest observable URL/title instead of treating that as failure.
+      }
+    }
+    await page.waitForTimeout(settleMs).catch(() => {});
+    const result = {
+      targetId,
+      url: page.url(),
+      title: await page.title().catch(() => page.url()),
+      observedStates,
+      waitedMs: Date.now() - startedAt
+    };
+    await this.#refreshTargetMeta(targetId, {
+      loadingState: observedStates.at(-1) ?? "stable_poll",
+      lastResult: result,
+      lastError: null
+    });
+    this.#recordTargetAction(targetId, "wait_for_page_stable", { timeoutMs, settleMs }, result);
+    return result;
+  }
+
   async captureDomSnapshotForTarget(targetId) {
     const page = this.#getPage(targetId);
     const snapshot = await captureDomSnapshot(page);
@@ -329,6 +378,36 @@ export class BrowserController {
       return result;
     } catch (error) {
       this.#recordTargetAction(targetId, "click_element", { selectorSpec }, null, error?.message ?? String(error));
+      throw error;
+    }
+  }
+
+  async clickInteractiveCandidate(targetId, candidate) {
+    if (!Number.isInteger(candidate?.index)) {
+      throw new Error("Resolved browser candidate does not include a stable interactive index.");
+    }
+    const page = this.#getPage(targetId);
+    const locator = page.locator(INTERACTIVE_SELECTOR).nth(candidate.index);
+    try {
+      await locator.click({ timeout: this.timeoutMs });
+      const result = {
+        found: true,
+        index: candidate.index,
+        text: candidate.text ?? candidate.ariaLabel ?? candidate.label ?? "",
+        role: candidate.role ?? null,
+        testId: candidate.testId ?? null,
+        id: candidate.id ?? null,
+        visible: await locator.isVisible().catch(() => false),
+        enabled: await locator.isEnabled().catch(() => false)
+      };
+      await this.#refreshTargetMeta(targetId, {
+        lastResult: result,
+        lastError: null
+      });
+      this.#recordTargetAction(targetId, "click_interactive_candidate", { candidate }, result);
+      return result;
+    } catch (error) {
+      this.#recordTargetAction(targetId, "click_interactive_candidate", { candidate }, null, error?.message ?? String(error));
       throw error;
     }
   }
@@ -452,6 +531,93 @@ export class BrowserController {
     return Object.fromEntries(entries);
   }
 
+  async extractStructuredRows(targetId, artifact) {
+    const page = this.#getPage(targetId);
+    const result = await page.evaluate((candidateArtifact) => {
+      const textFor = (element) => (element?.textContent ?? "").replace(/\s+/g, " ").trim();
+      const plan = candidateArtifact?.extractionPlan ?? {};
+      const fields = Array.isArray(plan.fields) && plan.fields.length > 0 ? plan.fields : ["title", "url", "summary"];
+      const rowSelectors = Array.isArray(plan.rowSelectors) && plan.rowSelectors.length > 0
+        ? plan.rowSelectors
+        : ["[data-capability-row]", "[data-result]", "article", "li", "tr"];
+      const fieldSelectors = plan.fieldSelectors ?? {};
+      const rows = [];
+      const seen = new Set();
+      for (const selector of rowSelectors) {
+        for (const element of Array.from(document.querySelectorAll(selector))) {
+          const key = textFor(element).slice(0, 300);
+          if (!key || seen.has(key)) {
+            continue;
+          }
+          seen.add(key);
+          const row = {};
+          for (const field of fields) {
+            if (field === "url") {
+              const link = element.querySelector("a[href]");
+              if (link?.href) {
+                row.url = link.href;
+              }
+              continue;
+            }
+            const selectors = Array.isArray(fieldSelectors[field]) ? fieldSelectors[field] : [];
+            let value = "";
+            for (const fieldSelector of selectors) {
+              const target = element.querySelector(fieldSelector);
+              value = textFor(target);
+              if (value) {
+                break;
+              }
+            }
+            if (!value) {
+              const dataTarget = element.querySelector(`[data-field="${field}"]`);
+              value = textFor(dataTarget);
+            }
+            if (value) {
+              row[field] = value.slice(0, 500);
+            }
+          }
+          if (!row.summary) {
+            row.summary = textFor(element).slice(0, 500);
+          }
+          if (row.title || row.url || row.summary) {
+            rows.push(row);
+          }
+          if (rows.length >= (plan.maxRows ?? 25)) {
+            break;
+          }
+        }
+        if (rows.length >= (plan.maxRows ?? 25)) {
+          break;
+        }
+      }
+      const minimumRows = Number.isFinite(Number(plan.minimumRows)) ? Number(plan.minimumRows) : 1;
+      return {
+        status: rows.length >= minimumRows ? "pass" : "fail",
+        rowCount: rows.length,
+        minimumRows,
+        rows,
+        url: window.location.href,
+        title: document.title
+      };
+    }, artifact);
+    await this.#refreshTargetMeta(targetId, {
+      lastResult: result,
+      lastError: null
+    });
+    this.#recordTargetAction(targetId, "extract_structured_rows", {
+      artifactKind: artifact?.artifactKind ?? null,
+      candidateId: artifact?.candidateId ?? null
+    }, {
+      status: result.status,
+      rowCount: result.rowCount,
+      minimumRows: result.minimumRows
+    });
+    return {
+      ...result,
+      extractedAt: nowIso()
+    };
+  }
+
   async openLinkInNewTab(targetId, selectorSpec) {
     const page = this.#getPage(targetId);
     const locator = this.#locator(page, selectorSpec).first();
@@ -535,6 +701,13 @@ export class BrowserController {
     }
   }
 
+  async captureScreenshotBase64(targetId, { width = 480 } = {}) {
+    const page = this.#getPage(targetId);
+    const buf = await page.screenshot({ fullPage: false, type: "png", clip: width ? undefined : undefined });
+    this.#recordTargetAction(targetId, "capture_screenshot", { width }, { byteLength: buf.length });
+    return buf.toString("base64");
+  }
+
   async exportPageEvidence(targetId, evidenceDir, label, extra = {}) {
     const page = this.#getPage(targetId);
     const evidenceId = createId("ev");
@@ -577,6 +750,21 @@ export class BrowserController {
     } catch (error) {
       const message = error?.message ?? "Unknown launch error";
       throw new Error(`Failed to launch bundled Chromium: ${message}`);
+    }
+  }
+
+  async #launchPersistentContext(headless) {
+    const executablePath = chromium.executablePath();
+    try {
+      this.context = await chromium.launchPersistentContext(this.userDataDir, {
+        headless,
+        executablePath,
+        args: ["--no-sandbox"],
+        viewport: { width: 1440, height: 980 }
+      });
+    } catch (error) {
+      const message = error?.message ?? "Unknown launch error";
+      throw new Error(`Failed to launch persistent Chromium context: ${message}`);
     }
   }
 

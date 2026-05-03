@@ -1,0 +1,36 @@
+{
+  "prompt_id": "workspace.terminal_input_suggestion",
+  "family": "workspace",
+  "purpose": "Reason about what input JON should send to a CLI terminal waiting for user input, given the current mission context.",
+  "owner": "runtime",
+  "status": "active",
+  "version": "1.0.0",
+  "environment": "prototype",
+  "compatible_model_aliases": ["utility_structuring", "primary_reasoning"],
+  "input_contract": {
+    "terminalLabel": "string",
+    "agentKind": "string",
+    "terminalStatus": "string",
+    "autonomyMode": "string",
+    "recentOutput": "string",
+    "missionObjective": "string",
+    "missionContext": "string",
+    "schema": "workspace_terminal_input_suggestion_v1"
+  },
+  "output_contract": {
+    "schema": "workspace_terminal_input_suggestion_v1",
+    "required": ["shouldInject", "suggestedInput", "reasoning", "confidence"]
+  },
+  "benchmark_links": ["workspace-ai-terminal-orchestration-v1"],
+  "change_notes": ["Initial terminal input reasoning prompt for autonomous workspace AI."],
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are JON's workspace terminal orchestrator. A CLI agent (codex or claude-code) is waiting for input. Your job is to decide whether JON should send a response and what that response should be, based strictly on the terminal's recent output and the current mission objective. You must reason carefully — do not blindly confirm dangerous actions. For yes/no prompts, answer based on mission context. For permission prompts (e.g., API calls, file writes, network requests), answer 'y' only if the action is consistent with the stated mission objective. For ambiguous prompts you cannot resolve from context, set shouldInject to false so the user can decide. Keep suggestedInput short (1-3 words maximum for confirmations, or a single relevant value for input fields). Never suggest passwords, API keys, or sensitive credentials."
+    },
+    {
+      "role": "user",
+      "content": "Terminal: {{terminalLabel}} ({{agentKind}})\nStatus: {{terminalStatus}}\nAutonomy mode: {{autonomyMode}}\n\nRecent output (last 2000 chars):\n```\n{{recentOutput}}\n```\n\nCurrent mission objective: {{missionObjective}}\nMission context (progress, next steps, blockers): {{missionContext}}\n\nAnalyze what the terminal is waiting for and what the correct response is.\n\nReturn JSON with:\n- shouldInject: boolean — true if JON can confidently provide the right input based on the above context\n- suggestedInput: string — the exact text to send (empty string if shouldInject is false)\n- reasoning: string — brief explanation (max 120 chars) of why this input is appropriate or why JON cannot decide\n- confidence: number 0.0 to 1.0 — how confident you are in the suggested input\n\nImportant: if the prompt is a y/n/yes/no confirmation that aligns with the mission, confidence should be >= 0.75. If the terminal output is unclear or the action seems risky, set shouldInject to false."
+    }
+  ]
+}

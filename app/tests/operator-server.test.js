@@ -191,8 +191,28 @@ export async function run() {
     assert.equal(Array.isArray(dashboard.desktopActionSupport?.availableBrowsers), true);
     assert.equal(dashboard.desktopActionSupport.availableBrowsers.length >= 2, true);
     assert.equal(Boolean(dashboard.workspace?.autonomyPolicy), true);
+    assert.equal(Array.isArray(dashboard.userMemoryRecords), true);
+    assert.equal(Array.isArray(dashboard.startupMemoryContext?.memoryRecords), true);
+    const smokeStatus = await fetchJson(server.baseUrl, "/api/smoke/status");
+    assert.equal(typeof smokeStatus.running, "boolean");
+    const smokeLatest = await fetchJson(server.baseUrl, "/api/smoke/latest");
+    assert.equal(Array.isArray(smokeLatest.history), true);
+    assert.equal(typeof smokeLatest.status?.running, "boolean");
+    const realSurfaceSmokeStatus = await fetchJson(server.baseUrl, "/api/smoke/real-surfaces/status");
+    assert.equal(typeof realSurfaceSmokeStatus.running, "boolean");
+    const realSurfaceSmokeLatest = await fetchJson(server.baseUrl, "/api/smoke/real-surfaces/latest");
+    assert.equal(Array.isArray(realSurfaceSmokeLatest.history), true);
+    assert.equal(typeof realSurfaceSmokeLatest.status?.running, "boolean");
 
     const workspaceProjectId = dashboard.selectedProjectId ?? dashboard.projects[0].id;
+    const startupMemory = await fetchJson(server.baseUrl, `/api/memory/startup?projectId=${encodeURIComponent(workspaceProjectId)}`);
+    assert.equal(startupMemory.projectId, workspaceProjectId);
+    assert.equal(Array.isArray(startupMemory.memoryRecords), true);
+    const memoryRecordsPayload = await fetchJson(server.baseUrl, `/api/memory/records?projectId=${encodeURIComponent(workspaceProjectId)}`);
+    assert.equal(Array.isArray(memoryRecordsPayload.records), true);
+    const memorySearchPayload = await fetchJson(server.baseUrl, `/api/memory/search?projectId=${encodeURIComponent(workspaceProjectId)}&q=Codex`);
+    assert.equal(Array.isArray(memorySearchPayload.records), true);
+
     const workspaceBrief = await fetchJson(server.baseUrl, `/api/projects/${workspaceProjectId}/workspace/mission-brief`, {
       method: "POST",
       body: JSON.stringify({
@@ -262,6 +282,27 @@ export async function run() {
       assert.equal(rankingPayload.policyId, "capability-ranking-v2");
       assert.equal(rankingPayload.results.length > 0, true);
       assert.equal(Boolean(rankingPayload.results[0].explanation?.components), true);
+      const buildProposalPayload = await fetchJson(server.baseUrl, "/api/capabilities/build/propose", {
+        method: "POST",
+        body: JSON.stringify({
+          mission: "Collect 12 supplier profiles from a vendor portal into a CSV file.",
+          desiredOutcome: "Verified CSV with 12 supplier profile rows.",
+          failureContext: {
+            status: "failed",
+            summary: "The browser opened but no structured rows were extracted.",
+            failedChecks: ["No parser produced the requested supplier rows."]
+          },
+          registerDraftSkill: true
+        })
+      });
+      assert.equal(buildProposalPayload.validation.valid, true);
+      assert.equal(buildProposalPayload.proposal.status, "draft_proposed");
+      assert.equal(buildProposalPayload.proposal.capabilityKind, "web_data_adapter");
+      assert.equal(buildProposalPayload.registeredDraftSkill, true);
+      assert.equal(
+        buildProposalPayload.skillRegistry.userDefined.some((skill) => skill.id === buildProposalPayload.proposal.proposedSkillManifest.id),
+        true
+      );
       const feedbackPayload = await fetchJson(server.baseUrl, "/api/capabilities/feedback", {
         method: "POST",
         body: JSON.stringify({
@@ -295,9 +336,10 @@ export async function run() {
       });
       assert.equal(userSkillRegistry.userDefined.some((skill) => skill.id === "skill.test_user_skill"), true);
 
-      const configPayload = await fetchJson(server.baseUrl, "/api/agent/config");
+    const configPayload = await fetchJson(server.baseUrl, "/api/agent/config");
     assert.equal(configPayload.config.guardrails.showInternalPlansInChat, false);
     assert.equal(configPayload.config.guardrails.desktopAutonomy.level, "supervised");
+    assert.equal(configPayload.config.guardrails.terminalWorkspaceView, "cards");
     const updatedConfig = await fetchJson(server.baseUrl, "/api/agent/config", {
       method: "PUT",
       body: JSON.stringify({
@@ -307,6 +349,7 @@ export async function run() {
           guardrails: {
             ...configPayload.config.guardrails,
             assistantVerbosity: "balanced",
+            terminalWorkspaceView: "surface",
             showInternalPlansInChat: true,
             desktopAutonomy: {
               ...configPayload.config.guardrails.desktopAutonomy,
@@ -319,6 +362,7 @@ export async function run() {
       })
     });
     assert.equal(updatedConfig.config.guardrails.assistantVerbosity, "balanced");
+    assert.equal(updatedConfig.config.guardrails.terminalWorkspaceView, "surface");
     assert.equal(updatedConfig.config.guardrails.showInternalPlansInChat, true);
     assert.equal(updatedConfig.config.guardrails.desktopAutonomy.level, "operator_trusted");
     assert.equal(updatedConfig.config.guardrails.desktopAutonomy.autoApproveMediumRisk, true);
@@ -334,6 +378,7 @@ export async function run() {
       body: JSON.stringify({})
     });
     assert.equal(resetConfig.config.guardrails.showInternalPlansInChat, false);
+    assert.equal(resetConfig.config.guardrails.terminalWorkspaceView, "cards");
     assert.equal(resetConfig.config.guardrails.desktopAutonomy.level, "supervised");
 
     const projectId = dashboard.projects[0].id;
@@ -573,6 +618,7 @@ export async function run() {
     const refreshedDashboard = await fetchJson(server.baseUrl, "/api/dashboard");
     assert.equal(refreshedDashboard.llmDashboard.callCount >= 1, true);
     assert.equal(refreshedDashboard.llmDashboard.recentRuns.some((entry) => entry.runId === missionLaunch.runId), true);
+    assert.equal(refreshedDashboard.userMemoryRecords.some((record) => record.category === "mission_summary"), true);
   } finally {
     await server.close();
   }

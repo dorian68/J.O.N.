@@ -11,7 +11,9 @@
     "mission": "string",
     "scenarioType": "string",
     "missionUnderstanding": "object",
-    "allowlistedDomains": "array"
+    "allowlistedDomains": "array",
+    "projectMemory": "object|null",
+    "userMemory": "object|null"
   },
   "output_contract": {
     "type": "structured",
@@ -28,7 +30,7 @@
     },
     {
       "role": "user",
-      "content": "Mission: {{mission}}\nScenario type: {{scenarioType}}\nMission understanding: {{missionUnderstanding}}\nAllowlisted domains: {{allowlistedDomains}}\nReasoning context: {{reasoningContextJson}}\nReturn a structured plan with steps and assumptions only."
+      "content": "Mission: {{mission}}\nScenario type: {{scenarioType}}\nMission understanding: {{missionUnderstanding}}\nAllowlisted domains: {{allowlistedDomains}}\nProject memory: {{projectMemory}}\nUser memory: {{userMemory}}\nReasoning context: {{reasoningContextJson}}\nReturn a structured plan with steps and assumptions only. Treat projectMemory and userMemory as soft prior evidence: reuse successful patterns that fit the mission, respect stated preferences when safe, avoid recent failure patterns or blockers, and never override current safety policy, approvals, allowlists, or explicit user instructions."
     }
   ]
 }

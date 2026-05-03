@@ -1,4 +1,16 @@
+import fs from "node:fs/promises";
 import path from "node:path";
+import { BrowserOperator } from "../browser/browser-operator.js";
+import { BrowserController } from "../browser/browser-controller.js";
+import {
+  auditMissionPlan,
+  auditMissionExecution,
+  auditBrowserMission,
+  auditRunStatusChange,
+  auditStepFailure
+} from "../observability/audit-logger.js";
+import { MissionProgressTracker } from "./mission-progress-tracker.js";
+import { SemanticOutcomeVerifier } from "./semantic-outcome-verifier.js";
 import {
   APPROVAL_CATEGORY,
   APPROVAL_DECISION,
@@ -14,7 +26,8 @@ import {
   buildDeterministicDecisionDraftOutput,
   buildDeterministicMissionUnderstandingOutput,
   buildDeterministicPlanOutput,
-  buildDeterministicFallbackOutput
+  buildDeterministicFallbackOutput,
+  buildDeterministicWindowDescriptionOutput
 } from "../llm/deterministic-fallbacks.js";
 import { validateMissionUnderstandingOutput } from "../mission/mission-understanding.js";
 import { buildDeterministicDesktopPlan, validateDesktopPlanOutput } from "../mission/desktop-plan.js";
@@ -29,6 +42,41 @@ import { createDefaultContextualReasoningEngine } from "../reasoning/contextual-
 import { buildRunReviewModel } from "../service/run-review-model.js";
 import { compactAccessibilityForPrompt } from "../computer/desktop-perception.js";
 import { buildRecoveryAttempt, checkpointRecord } from "../computer/desktop-recovery.js";
+import { buildDesktopRecoveryPlan } from "../computer/desktop-recovery-planner.js";
+import {
+  appendDesktopObservation,
+  createDesktopObservationTimeline,
+  summarizeDesktopObservationTimeline
+} from "../computer/desktop-observation-timeline.js";
+import {
+  DESKTOP_AUTONOMY_MEMORY_SETTING_KEY,
+  defaultDesktopAutonomyMemory,
+  normalizeDesktopAutonomyMemory,
+  summarizeDesktopAutonomyMemory,
+  updateDesktopAutonomyMemory
+} from "../computer/desktop-memory.js";
+import {
+  defaultProjectMemory,
+  harvestProjectRunMemoryRecords,
+  normalizeProjectMemory,
+  projectMemorySettingKey,
+  summarizeProjectMemory,
+  updateProjectMemoryFromRun
+} from "../memory/project-memory.js";
+import {
+  USER_MEMORY_SETTING_KEY,
+  defaultUserMemory,
+  extractUserMemoryRecordsFromRun,
+  normalizeUserMemory,
+  summarizeUserMemory,
+  updateUserMemoryFromRun
+} from "../memory/user-memory.js";
+import {
+  buildDesktopReplanContext,
+  selectDesktopReplanContinuation
+} from "../computer/desktop-replanner.js";
+import { DesktopRunWatcher } from "../computer/desktop-run-watcher.js";
+import { buildDesktopUserFacingError } from "../computer/desktop-user-facing.js";
 import { assessDesktopStep, desktopSandboxSummary } from "../computer/desktop-safety.js";
 import { buildDesktopSkillCatalog, graphSkillIdForDesktopSkill, skillForStep } from "../computer/desktop-skills.js";
 import {
@@ -42,12 +90,29 @@ import {
   capabilityNodeId,
   compactCapabilityGraphForPrompt
 } from "../capabilities/capability-graph.js";
+import {
+  recordCapabilityRunOutcome,
+  selectEnabledCapabilityForMission
+} from "../capabilities/capability-candidate-workspace.js";
 
 const PRIMARY_REASONING_PROMPT = Object.freeze({
   promptId: "system.primary_reasoning",
   version: "1.0.0"
 });
 const RUN_HANDOFF_DECISION_TIMEOUT_MS = 4_000;
+const MAX_DYNAMIC_DESKTOP_REPLANS = 2;
+
+function semanticSelectorForDesktopStep(step = {}) {
+  const query = String(step.target?.semanticTarget ?? step.input?.semanticTarget ?? "").trim();
+  if (!query) {
+    return null;
+  }
+  return {
+    query,
+    role: String(step.target?.role ?? step.input?.role ?? "").trim() || null,
+    automationId: String(step.target?.automationId ?? step.input?.automationId ?? "").trim() || null
+  };
+}
 
 function assertStructuredStringArray(value, label) {
   if (!Array.isArray(value)) {
@@ -137,6 +202,27 @@ function validateAmbiguityNote(output) {
   };
 }
 
+function validateWindowDescriptionOutput(output) {
+  if (!output || typeof output !== "object") {
+    throw Object.assign(new Error("Window description output must be an object."), {
+      category: "malformed_output"
+    });
+  }
+  const description = String(output.description ?? "").trim();
+  if (!description) {
+    throw Object.assign(new Error("Window description output must contain description."), {
+      category: "malformed_output"
+    });
+  }
+  const pageType = String(output.pageType ?? "unknown").trim() || "unknown";
+  const allowedPageTypes = new Set(["browser_page", "desktop_app", "dialog", "terminal", "file_manager", "unknown"]);
+  return {
+    description,
+    keyElements: assertStructuredStringArray(output.keyElements ?? [], "keyElements").slice(0, 12),
+    pageType: allowedPageTypes.has(pageType) ? pageType : "unknown"
+  };
+}
+
 function shouldUseDeterministicFallback(error) {
   return [
     "auth_error",
@@ -178,6 +264,48 @@ function extractHostname(url) {
   }
 }
 
+function parsePositiveInteger(value) {
+  const parsed = Number.parseInt(String(value ?? "").trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function extractRequestedBrowserResultCount(run, desktopAction = {}) {
+  const direct = parsePositiveInteger(run.metadata?.missionSpec?.parameters?.browserLaunch?.resultCount);
+  if (direct) {
+    return direct;
+  }
+  const text = [
+    run.metadata?.missionSpec?.objective,
+    run.metadata?.missionSpec?.deliverable,
+    run.mission,
+    desktopAction.searchQuery
+  ].map((entry) => String(entry ?? "")).join(" ");
+  const resultNouns = "(postes?|jobs?|offres?|missions?|results?|r[eé]sultats?|items?|[eé]l[eé]ments?|articles?|posts?|publications?|products?|produits?|profiles?|profils?|documents?|fichiers?|tickets?|issues?|messages?)";
+  const countBeforeTarget = text.match(new RegExp(`\\b(\\d{1,2})\\b[\\s\\S]{0,80}\\b${resultNouns}\\b`, "i"));
+  if (countBeforeTarget?.[1]) {
+    return parsePositiveInteger(countBeforeTarget[1]);
+  }
+  const actionBeforeCount = text.match(/\b(list(?:er)?|liste|lister|show|find|trouve|chercher|cherche)\b[\s\S]{0,80}\b(\d{1,2})\b/i);
+  if (actionBeforeCount?.[2]) {
+    return parsePositiveInteger(actionBeforeCount[2]);
+  }
+  return null;
+}
+
+function countExtractedBrowserResults(...sources) {
+  for (const source of sources) {
+    if (!source || typeof source !== "object") {
+      continue;
+    }
+    for (const key of ["results", "items", "extractedResults", "listings", "jobs"]) {
+      if (Array.isArray(source[key])) {
+        return source[key].length;
+      }
+    }
+  }
+  return 0;
+}
+
 function verificationCheck(label, passed, details = {}) {
   return {
     label,
@@ -193,7 +321,9 @@ export class PrototypeAgent {
     computerControlService,
     policyEngine,
     llmGateway,
-    reasoningEngine = createDefaultContextualReasoningEngine()
+    reasoningEngine = createDefaultContextualReasoningEngine(),
+    workspaceLauncher = null,
+    browserLauncher = null
   }) {
     this.database = database;
     this.browser = browserController;
@@ -201,6 +331,68 @@ export class PrototypeAgent {
     this.policy = policyEngine;
     this.llmGateway = llmGateway;
     this.reasoning = reasoningEngine;
+    this.workspaceLauncher = workspaceLauncher;
+    this.browserLauncher = browserLauncher;
+    this.surfaceLocks = new Map();
+  }
+
+  #surfaceLockLabel(lockName) {
+    if (lockName === "browser") {
+      return "browser surface";
+    }
+    if (lockName === "desktop") {
+      return "desktop surface";
+    }
+    return `${lockName} surface`;
+  }
+
+  async #withSurfaceLock(lockName, run, operation) {
+    if (!lockName) {
+      return operation();
+    }
+
+    const previous = this.surfaceLocks.get(lockName) ?? Promise.resolve();
+    const queued = this.surfaceLocks.has(lockName);
+    let release = () => {};
+    const current = new Promise((resolve) => {
+      release = resolve;
+    });
+    const queueTail = previous.catch(() => {}).then(() => current);
+    this.surfaceLocks.set(lockName, queueTail);
+
+    try {
+      if (queued) {
+        const label = this.#surfaceLockLabel(lockName);
+        await this.#updateRun(run.id, {
+          status: RUN_STATUS.PAUSED,
+          lifecycleStage: "queued_surface_lock",
+          summary: `Queued waiting for ${label}.`
+        });
+        this.#recordEvent(run.id, createEvent("run.queued", EVENT_ACTOR.SYSTEM, `Run queued waiting for ${label}.`, {
+          lockName
+        }));
+      }
+
+      await previous.catch(() => {});
+
+      if (queued) {
+        const label = this.#surfaceLockLabel(lockName);
+        this.#recordEvent(run.id, createEvent("run.dequeued", EVENT_ACTOR.SYSTEM, `Run acquired ${label}.`, {
+          lockName
+        }));
+      }
+
+      return await operation();
+    } finally {
+      release();
+      if (this.surfaceLocks.get(lockName) === queueTail) {
+        this.surfaceLocks.delete(lockName);
+      }
+    }
+  }
+
+  #surfaceLockForComputerAction(desktopAction = null) {
+    return desktopAction?.type === "browser_autonomy" ? "browser" : "desktop";
   }
 
   #getAgentConfiguration() {
@@ -216,6 +408,121 @@ export class PrototypeAgent {
 
   #desktopSandboxSummary() {
     return desktopSandboxSummary(this.#getAgentConfiguration());
+  }
+
+  #getDesktopAutonomyMemory() {
+    const setting = this.database.getAppSetting?.(
+      DESKTOP_AUTONOMY_MEMORY_SETTING_KEY,
+      defaultDesktopAutonomyMemory()
+    );
+    return normalizeDesktopAutonomyMemory(setting?.value ?? defaultDesktopAutonomyMemory());
+  }
+
+  #saveDesktopAutonomyMemory(memory) {
+    this.database.upsertAppSetting?.(
+      DESKTOP_AUTONOMY_MEMORY_SETTING_KEY,
+      normalizeDesktopAutonomyMemory(memory)
+    );
+  }
+
+  #getProjectMemory(projectId) {
+    if (!projectId) {
+      return defaultProjectMemory(null);
+    }
+    const fallback = defaultProjectMemory(projectId);
+    const setting = this.database.getAppSetting?.(
+      projectMemorySettingKey(projectId),
+      fallback
+    );
+    return normalizeProjectMemory(setting?.value ?? fallback, projectId);
+  }
+
+  #getProjectMemorySummary(projectId) {
+    if (!projectId) {
+      return summarizeProjectMemory(defaultProjectMemory(null));
+    }
+    return summarizeProjectMemory(this.#getProjectMemory(projectId));
+  }
+
+  #saveProjectMemory(projectId, memory) {
+    if (!projectId) {
+      return;
+    }
+    this.database.upsertAppSetting?.(
+      projectMemorySettingKey(projectId),
+      normalizeProjectMemory(memory, projectId)
+    );
+  }
+
+  #recordProjectMemoryFromRun(run) {
+    if (!run?.projectId) {
+      return null;
+    }
+    const current = this.#getProjectMemory(run.projectId);
+    const updated = updateProjectMemoryFromRun(current, run);
+    if (updated !== current) {
+      this.#saveProjectMemory(run.projectId, updated);
+    }
+    for (const record of harvestProjectRunMemoryRecords(run)) {
+      try {
+        this.database.insertMemoryRecord?.(record);
+      } catch {
+        // skip duplicate records silently
+      }
+    }
+    const selectedCapabilityId = run.metadata?.selectedCapabilityId ?? null;
+    if (selectedCapabilityId) {
+      try {
+        recordCapabilityRunOutcome(this.database, selectedCapabilityId, {
+          runId: run.id,
+          projectId: run.projectId ?? null,
+          mission: run.mission ?? null,
+          outcomeStatus: run.status === "completed" ? "completed" : "failed",
+          approvalCount: 0,
+          evidenceCount: 0
+        });
+      } catch {
+        // non-blocking
+      }
+    }
+    return updated;
+  }
+
+  #getUserMemory() {
+    const setting = this.database.getAppSetting?.(
+      USER_MEMORY_SETTING_KEY,
+      defaultUserMemory()
+    );
+    return normalizeUserMemory(setting?.value ?? defaultUserMemory());
+  }
+
+  #getUserMemorySummary() {
+    return summarizeUserMemory(this.#getUserMemory());
+  }
+
+  #saveUserMemory(memory) {
+    this.database.upsertAppSetting?.(
+      USER_MEMORY_SETTING_KEY,
+      normalizeUserMemory(memory)
+    );
+  }
+
+  #recordUserMemoryFromRun(run) {
+    const current = this.#getUserMemory();
+    const updated = updateUserMemoryFromRun(current, run);
+    if (updated !== current) {
+      this.#saveUserMemory(updated);
+    }
+    for (const record of extractUserMemoryRecordsFromRun(run)) {
+      const createdAt = nowIso();
+      this.database.insertMemoryRecord?.({
+        id: createId("mem"),
+        ...record,
+        createdAt,
+        updatedAt: createdAt
+      });
+    }
+    return updated;
   }
 
   createProject({ name, description = "", allowlistedDomains }) {
@@ -348,6 +655,28 @@ export class PrototypeAgent {
     };
   }
 
+  #getBrowserVisionPolicy() {
+    const configured = this.getLlmGatewayStatus().vision ?? {};
+    return {
+      enabled: configured.enabled !== false,
+      maxFramesPerRun: Number.isFinite(Number(configured.maxFramesPerRun))
+        ? Number(configured.maxFramesPerRun)
+        : 4,
+      screenshotWidth: Number.isFinite(Number(configured.screenshotWidth))
+        ? Number(configured.screenshotWidth)
+        : 480,
+      defaultDetail: ["auto", "low", "high"].includes(configured.defaultDetail)
+        ? configured.defaultDetail
+        : "low",
+      interactionDetail: ["auto", "low", "high"].includes(configured.interactionDetail)
+        ? configured.interactionDetail
+        : "high",
+      blockerDetail: ["auto", "low", "high"].includes(configured.blockerDetail)
+        ? configured.blockerDetail
+        : "high"
+    };
+  }
+
   async #listAvailableBrowsers() {
     try {
       const browsers = await this.computer.listInstalledBrowsers();
@@ -441,7 +770,7 @@ export class PrototypeAgent {
       orchestration: input.orchestration ?? null
     });
     const runDir = await this.database.ensureRunDir(run.id);
-    const completion = this.#executeResearchMission({
+    const completion = this.#withSurfaceLock("browser", run, () => this.#executeResearchMission({
       run,
       runDir,
       project,
@@ -451,7 +780,7 @@ export class PrototypeAgent {
       sourceTargets: input.sourceTargets,
       sourceTrustClassification: input.sourceTrustClassification,
       evidenceSensitivity: input.evidenceSensitivity
-    });
+    }));
     return { runId: run.id, completion };
   }
 
@@ -472,13 +801,13 @@ export class PrototypeAgent {
       orchestration: input.orchestration ?? null
     });
     const runDir = await this.database.ensureRunDir(run.id);
-    const completion = this.#executeFormPreparationMission({
+    const completion = this.#withSurfaceLock("browser", run, () => this.#executeFormPreparationMission({
       run,
       runDir,
       project,
       formUrl: input.formUrl,
       values: input.values
-    });
+    }));
     return { runId: run.id, completion };
   }
 
@@ -507,7 +836,7 @@ export class PrototypeAgent {
       orchestration: input.orchestration ?? null
     });
     const runDir = await this.database.ensureRunDir(run.id);
-    const completion = desktopAction?.type === "desktop_autonomy"
+    const launchExecution = () => desktopAction?.type === "desktop_autonomy"
       ? this.#executeDesktopAutonomyScenario({
         run,
         runDir,
@@ -515,6 +844,15 @@ export class PrototypeAgent {
         desktopAction,
         surfaceClassification: input.surfaceClassification ?? "real_local_desktop",
         evidenceSensitivity: input.evidenceSensitivity ?? "real_local_desktop"
+      })
+      : desktopAction?.type === "browser_autonomy"
+      ? this.#executeBrowserAutonomyScenario({
+        run,
+        runDir,
+        project,
+        desktopAction,
+        surfaceClassification: input.surfaceClassification ?? "real_local_browser",
+        evidenceSensitivity: input.evidenceSensitivity ?? "real_local_browser"
       })
       : ["launch_browser", "launch_browser_search"].includes(desktopAction?.type)
       ? this.#executeComputerBrowserLaunchScenario({
@@ -545,6 +883,11 @@ export class PrototypeAgent {
         targetWindowLabel: input.targetWindowLabel,
         targetWindowRule: input.targetWindowRule
       });
+    const completion = this.#withSurfaceLock(
+      this.#surfaceLockForComputerAction(desktopAction),
+      run,
+      launchExecution
+    );
     return { runId: run.id, completion };
   }
 
@@ -1083,7 +1426,11 @@ export class PrototypeAgent {
     installedApplications,
     activeAccessibilityBefore = null,
     desktopSnapshot = null,
-    skillCatalog = []
+    skillCatalog = [],
+    desktopMemory = null,
+    projectMemory = null,
+    userMemory = null,
+    replanContext = null
   }) {
     const missionUnderstanding = run.plan?.missionUnderstanding ?? run.metadata?.preflight?.understanding ?? null;
     const sandbox = this.#desktopSandboxSummary();
@@ -1103,6 +1450,11 @@ export class PrototypeAgent {
       limit: 20,
       feedbackRecords: capabilityFeedback
     });
+    const selectedCapability = selectEnabledCapabilityForMission(
+      this.database,
+      run.mission,
+      run.metadata?.missionSpec?.deliverable ?? ""
+    );
     const input = {
       mission: run.mission,
       missionSpec: run.metadata?.missionSpec ?? null,
@@ -1115,6 +1467,18 @@ export class PrototypeAgent {
       desktopSnapshot,
       skillCatalog,
       capabilityGraph,
+      selectedCapability: selectedCapability ? {
+        id: selectedCapability.id,
+        title: selectedCapability.title,
+        capabilityKind: selectedCapability.capabilityKind,
+        artifactKind: selectedCapability.artifactKind,
+        mission: selectedCapability.mission,
+        status: selectedCapability.status
+      } : null,
+      desktopMemory: desktopMemory ? summarizeDesktopAutonomyMemory(desktopMemory) : null,
+      projectMemory,
+      userMemory,
+      replanContext,
       sandbox
     };
     try {
@@ -1135,6 +1499,11 @@ export class PrototypeAgent {
           desktopSnapshot: JSON.stringify(desktopSnapshot ?? null),
           skillCatalog: JSON.stringify(skillCatalog),
           capabilityGraph: JSON.stringify(capabilityGraph),
+          selectedCapability: JSON.stringify(input.selectedCapability ?? null),
+          desktopMemory: JSON.stringify(input.desktopMemory),
+          projectMemory: JSON.stringify(projectMemory ?? null),
+          userMemory: JSON.stringify(userMemory ?? null),
+          replanContext: JSON.stringify(replanContext ?? null),
           sandbox: JSON.stringify(input.sandbox)
         },
         input,
@@ -1170,6 +1539,483 @@ export class PrototypeAgent {
     }
   }
 
+  async #describeBrowserVisualFrame({
+    run,
+    project,
+    frame = {},
+    screenshotBase64 = null,
+    change = null,
+    phase = null,
+    step = null,
+    visionDetail = "low"
+  }) {
+    const structuredSummary = {
+      url: frame?.url ?? null,
+      title: frame?.title ?? null,
+      loadingState: frame?.loadingState ?? null,
+      blocker: frame?.blocker ?? null,
+      bodyTextLength: frame?.bodyTextLength ?? 0,
+      bodyPreview: frame?.bodyPreview ?? "",
+      interactiveElementCount: frame?.interactiveElementCount ?? 0,
+      changeReasons: change?.reasons ?? [],
+      phase,
+      step: step ? {
+        id: step.id ?? null,
+        action: step.action ?? null,
+        label: step.label ?? null
+      } : null
+    };
+    const descriptionInput = {
+      windowTitle: frame?.title ?? "browser",
+      pageUrl: frame?.url ?? null,
+      ocrText: frame?.bodyPreview || "(no visible DOM text captured)",
+      accessibilitySummary: JSON.stringify(structuredSummary),
+      hasScreenshot: Boolean(screenshotBase64)
+    };
+    const extraMessages = screenshotBase64
+      ? [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Browser screenshot frame. Use the image as the primary source. Structured fallback: ${JSON.stringify(structuredSummary)}`
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/png;base64,${screenshotBase64}`,
+              detail: ["auto", "low", "high"].includes(visionDetail) ? visionDetail : "low"
+            }
+          }
+        ]
+      }]
+      : [];
+
+    let visionResult;
+    try {
+      visionResult = await this.#invokeReasonedLlm({
+        run,
+        project,
+        reasoningStage: REASONING_STAGE.WINDOW_DESCRIPTION,
+        callType: LLM_CALL_TYPE.WINDOW_DESCRIPTION,
+        taskPromptId: "task.window_description",
+        bindings: {
+          windowTitle: String(descriptionInput.windowTitle ?? "(unknown)"),
+          ocrText: descriptionInput.ocrText,
+          accessibilitySummary: descriptionInput.accessibilitySummary,
+          hasScreenshot: String(descriptionInput.hasScreenshot)
+        },
+        input: descriptionInput,
+        extraMessages,
+        metadata: {
+          browserMultimodalFrame: true,
+          phase,
+          stepId: step?.id ?? null,
+          changeReasons: change?.reasons ?? [],
+          visionDetail
+        },
+        validateOutput: validateWindowDescriptionOutput
+      });
+    } catch (error) {
+      const fallbackOutput = validateWindowDescriptionOutput(
+        buildDeterministicWindowDescriptionOutput(descriptionInput)
+      );
+      this.#recordEvent(run.id, createEvent("run.browser_vision_fallback_used", EVENT_ACTOR.SYSTEM, "Browser visual frame description used deterministic fallback.", {
+        errorCategory: error.category ?? "provider_unavailable",
+        message: error.message,
+        phase,
+        stepId: step?.id ?? null
+      }));
+      visionResult = {
+        output: fallbackOutput,
+        callRecord: error.callRecord ?? null,
+        reasoningSnapshot: error.reasoningSnapshot ?? null,
+        generationMode: "deterministic_fallback"
+      };
+    }
+
+    const description = {
+      id: createId("browser_vision"),
+      status: "described",
+      createdAt: nowIso(),
+      phase,
+      stepId: step?.id ?? null,
+      stepAction: step?.action ?? null,
+      url: frame?.url ?? null,
+      title: frame?.title ?? null,
+      visualHash: frame?.visual?.screenshotHash ?? null,
+      hasScreenshot: Boolean(screenshotBase64),
+      visionDetail,
+      description: visionResult.output.description,
+      keyElements: visionResult.output.keyElements,
+      pageType: visionResult.output.pageType,
+      llmCallId: visionResult.callRecord?.id ?? null,
+      generationMode: visionResult.generationMode ?? (visionResult.callRecord ? "llm" : "deterministic_fallback")
+    };
+    this.#recordEvent(run.id, createEvent("run.browser_vision_described", EVENT_ACTOR.BROWSER, "Browser visual frame described from screenshot and structured state.", {
+      frameId: description.id,
+      phase,
+      stepId: description.stepId,
+      pageType: description.pageType,
+      keyElements: description.keyElements,
+      visualHash: description.visualHash,
+      visionDetail: description.visionDetail,
+      llmCallId: description.llmCallId,
+      generationMode: description.generationMode
+    }));
+    return description;
+  }
+
+  async #describeDesktopVisualFrame({
+    run,
+    project,
+    snapshot = null,
+    change = null,
+    phase = null,
+    step = null,
+    visionDetail = "low"
+  }) {
+    const screenshotPath = snapshot?.activeVisual?.outputPath ?? null;
+    const screenshotBase64 = screenshotPath
+      ? await fs.readFile(screenshotPath).then((buffer) => buffer.toString("base64")).catch(() => null)
+      : null;
+    if (!screenshotBase64 && !snapshot?.activeContentSignature) {
+      return null;
+    }
+    const structuredSummary = {
+      activeWindow: snapshot?.activeWindow ?? null,
+      visibleWindowCount: snapshot?.visibleWindows?.length ?? 0,
+      semanticTargets: snapshot?.activeSemanticTargets ?? [],
+      activeContentSignature: snapshot?.activeContentSignature ?? null,
+      visualHash: snapshot?.activeVisual?.screenshotHash ?? null,
+      changeReasons: change?.reasons ?? [],
+      phase,
+      step: step ? {
+        id: step.id ?? null,
+        primitive: step.primitive ?? null,
+        label: step.label ?? null
+      } : null
+    };
+    const descriptionInput = {
+      windowTitle: snapshot?.activeWindow?.title ?? "desktop",
+      pageUrl: null,
+      ocrText: snapshot?.activeContentSignature || "(no visible desktop text captured)",
+      accessibilitySummary: JSON.stringify(structuredSummary),
+      hasScreenshot: Boolean(screenshotBase64)
+    };
+    const extraMessages = screenshotBase64
+      ? [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Desktop screenshot frame. Use the image as the primary source. Structured fallback: ${JSON.stringify(structuredSummary)}`
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/png;base64,${screenshotBase64}`,
+              detail: ["auto", "low", "high"].includes(visionDetail) ? visionDetail : "low"
+            }
+          }
+        ]
+      }]
+      : [];
+
+    let visionResult;
+    try {
+      visionResult = await this.#invokeReasonedLlm({
+        run,
+        project,
+        reasoningStage: REASONING_STAGE.WINDOW_DESCRIPTION,
+        callType: LLM_CALL_TYPE.WINDOW_DESCRIPTION,
+        taskPromptId: "task.window_description",
+        bindings: {
+          windowTitle: String(descriptionInput.windowTitle ?? "(unknown)"),
+          ocrText: descriptionInput.ocrText,
+          accessibilitySummary: descriptionInput.accessibilitySummary,
+          hasScreenshot: String(descriptionInput.hasScreenshot)
+        },
+        input: descriptionInput,
+        extraMessages,
+        metadata: {
+          desktopMultimodalFrame: true,
+          phase,
+          stepId: step?.id ?? null,
+          primitive: step?.primitive ?? null,
+          changeReasons: change?.reasons ?? [],
+          visionDetail
+        },
+        validateOutput: validateWindowDescriptionOutput
+      });
+    } catch (error) {
+      const fallbackOutput = validateWindowDescriptionOutput(
+        buildDeterministicWindowDescriptionOutput(descriptionInput)
+      );
+      this.#recordEvent(run.id, createEvent("run.desktop_vision_fallback_used", EVENT_ACTOR.SYSTEM, "Desktop visual frame description used deterministic fallback.", {
+        errorCategory: error.category ?? "provider_unavailable",
+        message: error.message,
+        phase,
+        stepId: step?.id ?? null
+      }));
+      visionResult = {
+        output: fallbackOutput,
+        callRecord: error.callRecord ?? null,
+        generationMode: "deterministic_fallback"
+      };
+    }
+
+    const description = {
+      id: createId("desktop_vision"),
+      status: "described",
+      createdAt: nowIso(),
+      phase,
+      stepId: step?.id ?? null,
+      primitive: step?.primitive ?? null,
+      activeWindowId: snapshot?.activeWindow?.id ?? null,
+      activeWindowTitle: snapshot?.activeWindow?.title ?? null,
+      visualHash: snapshot?.activeVisual?.screenshotHash ?? null,
+      hasScreenshot: Boolean(screenshotBase64),
+      visionDetail,
+      description: visionResult.output.description,
+      keyElements: visionResult.output.keyElements,
+      pageType: visionResult.output.pageType,
+      llmCallId: visionResult.callRecord?.id ?? null,
+      generationMode: visionResult.generationMode ?? (visionResult.callRecord ? "llm" : "deterministic_fallback")
+    };
+    this.#recordEvent(run.id, createEvent("run.desktop_vision_described", EVENT_ACTOR.COMPUTER, "Desktop visual frame described from screenshot and structured state.", {
+      frameId: description.id,
+      phase,
+      stepId: description.stepId,
+      primitive: description.primitive,
+      pageType: description.pageType,
+      keyElements: description.keyElements,
+      visualHash: description.visualHash,
+      visionDetail: description.visionDetail,
+      llmCallId: description.llmCallId,
+      generationMode: description.generationMode
+    }));
+    return description;
+  }
+
+  async #executeBrowserAutonomyScenario({
+    run,
+    runDir,
+    project,
+    desktopAction,
+    surfaceClassification = "real_local_browser",
+    evidenceSensitivity = "real_local_browser"
+  }) {
+    try {
+      await this.#stageRun(run.id, {
+        status: RUN_STATUS.RUNNING,
+        lifecycleStage: "executing",
+        summary: "Browser autonomy mission running."
+      }, "run.started", "Browser autonomy scenario started.");
+
+      const evidenceDir = path.join(runDir, "evidence");
+      const allowlistedHosts = Array.isArray(desktopAction?.allowlistedHosts)
+        ? desktopAction.allowlistedHosts
+        : (project?.allowlistedDomains ?? []);
+      const startUrl = desktopAction?.startUrl ?? null;
+      const projectMemory = this.#getProjectMemorySummary(project?.id);
+      const userMemory = this.#getUserMemorySummary();
+      const browserVisionPolicy = this.#getBrowserVisionPolicy();
+
+      const browserController = new BrowserController({ headless: false });
+      const browserOperator = new BrowserOperator({
+        browserController,
+        llmGateway: this.llmGateway,
+        projectId: project.id,
+        runId: run.id,
+        evidenceRoot: evidenceDir,
+        describeVisualFrame: browserVisionPolicy.enabled
+          ? async ({ frame, screenshotBase64, change, phase, step, visionDetail }) => this.#describeBrowserVisualFrame({
+            run,
+            project,
+            frame,
+            screenshotBase64,
+            change,
+            phase,
+            step,
+            visionDetail
+          })
+          : null,
+        onEvent: async (event) => {
+          if (event.type === "browser.watch_changed") {
+            this.#recordEvent(run.id, createEvent("run.browser_watch_changed", EVENT_ACTOR.BROWSER, "Browser watcher detected a page state change.", {
+              phase: event.payload?.phase ?? null,
+              stepId: event.payload?.stepId ?? null,
+              stepAction: event.payload?.stepAction ?? null,
+              reasons: event.payload?.reasons ?? [],
+              after: event.payload?.after ?? null,
+              visualDescription: event.payload?.visualDescription ?? null
+            }));
+          } else if (event.type === "browser.watch_started") {
+            this.#recordEvent(run.id, createEvent("run.browser_watch_started", EVENT_ACTOR.BROWSER, "Browser watcher started continuous page observation.", {
+              targetId: event.payload?.targetId ?? null,
+              baseline: event.payload?.baseline ?? null
+            }));
+          } else if (event.type === "browser.replan_triggered") {
+            this.#recordEvent(run.id, createEvent("run.browser_replan_triggered", EVENT_ACTOR.BROWSER, "Browser mid-run replan generated from current page state.", {
+              replanId: event.payload?.replanId ?? null,
+              replanCount: event.payload?.replanCount ?? 1,
+              triggerReason: event.payload?.triggerReason ?? null,
+              triggerReasons: event.payload?.triggerReasons ?? [],
+              generationMode: event.payload?.generationMode ?? null,
+              newStepCount: event.payload?.newStepCount ?? 0
+            }));
+          }
+        }
+      });
+
+      this.#recordEvent(run.id, createEvent("tool.executed", EVENT_ACTOR.BROWSER, "Browser autonomy operator launched.", {
+        tool: "browser_autonomy",
+        startUrl,
+        allowlistedHosts
+      }));
+
+      const result = await browserOperator.runMission({
+        mission: run.mission,
+        startUrl,
+        allowlistedHosts,
+        projectMemory: {
+          project: projectMemory,
+          user: userMemory
+        },
+        browserWatchIncludeScreenshot: browserVisionPolicy.enabled,
+        browserWatchScreenshotWidth: browserVisionPolicy.screenshotWidth,
+        maxMultimodalVisionFrames: desktopAction?.maxMultimodalVisionFrames ?? browserVisionPolicy.maxFramesPerRun,
+        browserVisionPolicy,
+        closeBrowser: true
+      });
+
+      for (const evidenceRecord of result.evidence ?? []) {
+        if (evidenceRecord?.id) {
+          this.database.insertEvidence(run.id, {
+            id: evidenceRecord.id,
+            evidenceType: evidenceRecord.type ?? EVIDENCE_TYPE.PAGE_SCREENSHOT,
+            label: evidenceRecord.label ?? "Browser autonomy evidence",
+            storagePath: evidenceRecord.screenshotPath ?? evidenceRecord.summaryPath ?? null,
+            linkedSurface: evidenceRecord.url ?? startUrl ?? "browser",
+            linkedEventId: null,
+            linkedSourceId: null,
+            sensitivity: evidenceSensitivity,
+            metadata: { surfaceClassification, url: evidenceRecord.url ?? null },
+            createdAt: nowIso()
+          });
+        }
+      }
+
+      const stepCount = result.stepResults?.length ?? 0;
+      const errorCount = result.errors?.length ?? 0;
+      const watchChangeCount = result.browserWatchChanges?.length ?? 0;
+      const multimodalFrameCount = result.multimodalFrames?.length ?? 0;
+      const replanAdaptations = (result.adaptations ?? []).filter((a) => a.type === "browser_replan");
+      const replanCount = replanAdaptations.length;
+      const replanSuffix = replanCount > 0 ? ` (${replanCount} replan${replanCount > 1 ? "s" : ""})` : "";
+
+      // Semantic outcome verification — partial is NOT auto-completed
+      const browserSemanticVerification = new SemanticOutcomeVerifier().verify({
+        mission: run.mission,
+        planOutcomes: [],
+        actionLog: [],
+        evidence: result.evidence ?? [],
+        artifacts: [],
+        browserResult: result
+      });
+
+      const finalStatus = browserSemanticVerification.verifiedByOutcomes
+        ? RUN_STATUS.COMPLETED
+        : RUN_STATUS.FAILED;
+
+      const summary = result.status === "completed" && browserSemanticVerification.verifiedByOutcomes
+        ? `Browser mission completed — ${stepCount} steps executed${replanSuffix}.`
+        : result.status === "partial" || !browserSemanticVerification.verifiedByOutcomes
+        ? `Browser mission partially completed — ${stepCount} steps, ${errorCount} errors${replanSuffix}. Verification: ${browserSemanticVerification.verificationVerdict}.`
+        : `Browser mission failed — ${errorCount} errors${replanSuffix}.`;
+
+      await this.#stageRun(run.id, {
+        status: finalStatus,
+        lifecycleStage: browserSemanticVerification.verifiedByOutcomes ? "completed" : "failed",
+        summary,
+        output: {
+          browserStatus: result.status,
+          stepCount,
+          errorCount,
+          blockerCount: result.blockers?.length ?? 0,
+          browserWatchChangeCount: watchChangeCount,
+          multimodalFrameCount,
+          replanCount,
+          extracted: result.extracted ?? {},
+          finalUrl: result.browserState?.url ?? null
+        },
+        metadata: {
+          ...(this.database.getRun(run.id)?.metadata ?? {}),
+          finalUrl: result.browserState?.url ?? null,
+          semanticVerification: {
+            verifiedByOutcomes: browserSemanticVerification.verifiedByOutcomes,
+            verificationVerdict: browserSemanticVerification.verificationVerdict,
+            objectiveSatisfied: browserSemanticVerification.objectiveSatisfied,
+            confidence: browserSemanticVerification.confidence,
+            failureReason: browserSemanticVerification.failureReason,
+            nextBestAction: browserSemanticVerification.nextBestAction,
+            unsatisfiedOutcomes: browserSemanticVerification.unsatisfiedOutcomes,
+            satisfiedOutcomes: browserSemanticVerification.satisfiedOutcomes
+          },
+          browserObservationSummary: {
+            watchChangeCount,
+            multimodalFrameCount,
+            visionPolicy: {
+              modelAlias: "vision_fallback",
+              maxFramesPerRun: browserVisionPolicy.maxFramesPerRun,
+              screenshotWidth: browserVisionPolicy.screenshotWidth,
+              defaultDetail: browserVisionPolicy.defaultDetail,
+              interactionDetail: browserVisionPolicy.interactionDetail,
+              blockerDetail: browserVisionPolicy.blockerDetail
+            },
+            lastChangeReasons: result.browserWatchChanges?.at(-1)?.reasons ?? [],
+            lastVisualDescription: result.multimodalFrames?.at(-1)?.description ?? null,
+            blockerCount: result.blockers?.length ?? 0,
+            replanCount,
+            replanAdaptations: replanAdaptations.map((a) => ({
+              replanId: a.id,
+              triggerReasons: a.triggerReasons ?? [],
+              generationMode: a.generationMode ?? null,
+              newStepCount: a.newStepCount ?? 0,
+              currentUrl: a.currentUrl ?? null,
+              detectedAt: a.detectedAt ?? null
+            }))
+          }
+        }
+      }, browserSemanticVerification.verifiedByOutcomes ? "run.completed" : "run.failed", summary);
+
+      auditBrowserMission({
+        projectId: project.id,
+        runId: run.id,
+        mission: run.mission,
+        finalStatus,
+        browserResult: result
+      });
+      return { runStatus: finalStatus, result };
+    } catch (error) {
+      auditBrowserMission({
+        projectId: project.id,
+        runId: run.id,
+        mission: run.mission,
+        finalStatus: "failed",
+        browserResult: null
+      });
+      const failSummary = `Browser autonomy failed: ${error.message}`;
+      await this.#stageRun(run.id, {
+        status: RUN_STATUS.FAILED,
+        lifecycleStage: "failed",
+        summary: failSummary
+      }, "run.failed", failSummary).catch(() => {});
+      throw error;
+    }
+  }
+
   async #executeDesktopAutonomyScenario({
     run,
     runDir,
@@ -1180,6 +2026,10 @@ export class PrototypeAgent {
   }) {
     let desktopPlanForFeedback = null;
     let actionLogForFeedback = [];
+    let observationTimeline = null;
+    let latestDesktopEvidencePath = null;
+    let desktopMemoryForRun = null;
+    let desktopWatcher = null;
     try {
       const planDraft = await this.#generatePlan({
         run,
@@ -1223,6 +2073,29 @@ export class PrototypeAgent {
         windows: []
       }));
       const skillCatalog = buildDesktopSkillCatalog(installedApplications);
+      const desktopMemory = this.#getDesktopAutonomyMemory();
+      const projectMemory = this.#getProjectMemorySummary(project?.id);
+      const userMemory = this.#getUserMemorySummary();
+      const desktopVisionPolicy = this.#getBrowserVisionPolicy();
+      desktopMemoryForRun = desktopMemory;
+      observationTimeline = createDesktopObservationTimeline({
+        runId: run.id,
+        mission: run.mission
+      });
+      appendDesktopObservation(observationTimeline, {
+        phase: "initial_desktop",
+        status: "observed",
+        window: activeWindowBefore,
+        perception: activeAccessibilityBefore ? { accessibility: activeAccessibilityBefore } : null
+      });
+      desktopWatcher = new DesktopRunWatcher({
+        computer: this.computer,
+        intervalMs: 500,
+        maxChanges: 24,
+        includeScreenshot: desktopVisionPolicy.enabled,
+        retainScreenshotPath: desktopVisionPolicy.enabled
+      });
+      await desktopWatcher.start();
       const desktopPlan = await this.#generateDesktopPlan({
         run,
         project,
@@ -1232,12 +2105,22 @@ export class PrototypeAgent {
         installedApplications,
         activeAccessibilityBefore,
         desktopSnapshot,
-        skillCatalog
+        skillCatalog,
+        desktopMemory,
+        projectMemory,
+        userMemory
       });
       desktopPlan.output = validateDesktopPlanOutput(desktopPlan.output, {
         maxSteps: this.#desktopSandboxSummary().maxPlanSteps ?? 14
       });
       desktopPlanForFeedback = desktopPlan.output;
+
+      auditMissionPlan({
+        projectId: project.id,
+        runId: run.id,
+        mission: run.mission,
+        plan: desktopPlan.output
+      });
 
       if (desktopPlan.output.requiresClarification) {
         throw new Error(`Desktop plan needs clarification before acting: ${desktopPlan.output.clarificationQuestion}`);
@@ -1251,6 +2134,8 @@ export class PrototypeAgent {
         activeAccessibilityBefore,
         desktopSnapshot,
         skillCatalog,
+        desktopMemory: summarizeDesktopAutonomyMemory(desktopMemory),
+        projectMemory,
         sandbox: this.#desktopSandboxSummary(),
         desktopPlan: desktopPlan.output,
         surfaceClassification
@@ -1276,10 +2161,89 @@ export class PrototypeAgent {
       const checkpoints = [];
       const agentConfiguration = this.#getAgentConfiguration();
       let currentWindow = activeWindowBefore ?? null;
-      for (const step of desktopPlan.output.steps) {
+      let consecutiveFailures = 0;
+      let dynamicReplanCount = 0;
+      const executableSteps = [...desktopPlan.output.steps];
+      const missionTracker = new MissionProgressTracker({
+        runId: run.id,
+        projectId: project.id,
+        mission: run.mission,
+        plan: desktopPlan.output
+      });
+      missionTracker.setActiveSurface("desktop", { app: desktopPlan.output.selectedApplication?.id ?? null });
+      for (let stepIndex = 0; stepIndex < executableSteps.length; stepIndex++) {
+        const step = executableSteps[stepIndex];
+        const watchedChanges = await this.#consumeDesktopWatcherChanges({
+          run,
+          desktopWatcher,
+          observationTimeline,
+          step
+        });
+        if (watchedChanges.length > 0 && actionLog.length > 0 && dynamicReplanCount < MAX_DYNAMIC_DESKTOP_REPLANS && step.primitive !== "observe_windows") {
+          currentWindow = watchedChanges.at(-1)?.after?.activeWindow ?? currentWindow;
+          const watcherReplan = await this.#attemptDesktopDynamicReplan({
+            run,
+            project,
+            desktopAction,
+            installedApplications,
+            skillCatalog,
+            desktopMemory,
+            projectMemory,
+            userMemory,
+            desktopPlan: desktopPlan.output,
+            actionLog,
+            observationTimeline,
+            currentWindow,
+            failedStep: step,
+            error: new Error(`Desktop state changed while JON was monitoring: ${watchedChanges.at(-1)?.reasons?.join(", ") ?? "unknown change"}.`),
+            currentStepIndex: Math.max(0, stepIndex - 1),
+            remainingSteps: executableSteps.slice(stepIndex)
+          });
+          if (watcherReplan.accepted) {
+            dynamicReplanCount++;
+            missionTracker.recordDynamicReplan();
+            executableSteps.splice(
+              stepIndex,
+              executableSteps.length - stepIndex,
+              ...watcherReplan.steps
+            );
+            stepIndex--;
+            await this.#markDesktopWatcherBaseline(desktopWatcher);
+            continue;
+          }
+        }
         if (step.primitive === "stop") {
           actionLog.push({ step, status: "stopped", result: null });
           break;
+        }
+        if (step.primitive === "await_manual_action") {
+          const actionDescription = step.input?.description ?? step.label ?? "Manual action required";
+          const authorization = await this.policy.authorize({
+            runId: run.id,
+            category: APPROVAL_CATEGORY.MANUAL_USER_ACTION,
+            riskLevel: "low",
+            actionLabel: actionDescription,
+            targetLabel: "user",
+            reason: step.input?.reason ?? "JON cannot perform this action autonomously and requires you to act.",
+            expectedEffect: step.input?.expectedEffect ?? "User completes the required action so JON can continue.",
+            consequenceOfRefusal: "The mission will stop.",
+            evidenceId: approvalContextEvidence.evidenceId,
+            metadata: { primitive: "await_manual_action", stepId: step.id }
+          });
+          if (!authorization.allowed) {
+            return this.#stopRunFromApproval(run.id, authorization.approvalRecord, actionDescription);
+          }
+          currentWindow = await this.computer.detectActiveWindow().catch(() => currentWindow);
+          actionLog.push({ step, status: "completed", result: { manualActionConfirmed: true } });
+          appendDesktopObservation(observationTimeline, {
+            phase: "manual_action_confirmed",
+            status: "completed",
+            step,
+            window: currentWindow,
+            result: { manualActionConfirmed: true }
+          });
+          consecutiveFailures = 0;
+          continue;
         }
         if (step.primitive === "observe_windows") {
           const observed = await this.computer.listVisibleWindows();
@@ -1292,6 +2256,104 @@ export class PrototypeAgent {
           });
           checkpoints.push(observeCheckpoint);
           actionLog.push({ step, status: "completed", result: { visibleWindows: observed }, checkpoint: observeCheckpoint });
+          appendDesktopObservation(observationTimeline, {
+            phase: "observe_windows",
+            status: "completed",
+            step,
+            window: currentWindow,
+            result: { visibleWindowCount: observed.length }
+          });
+          await this.#markDesktopWatcherBaseline(desktopWatcher);
+          consecutiveFailures = 0;
+          continue;
+        }
+        if (step.primitive === "launch_workspace_cli") {
+          let cliResult = null;
+          let cliStatus = "completed";
+          if (typeof this.workspaceLauncher === "function") {
+            try {
+              const launchPromise = Promise.resolve(this.workspaceLauncher(run.projectId, {
+                command: String(step.input?.command ?? "").trim(),
+                args: Array.isArray(step.input?.args) ? step.input.args : [],
+                label: String(step.input?.label ?? step.label ?? "").trim(),
+                cwd: step.input?.cwd ?? undefined,
+                autonomyMode: "assisted",
+                conversationId: run.conversationId ?? null,
+                authorized: true
+              }));
+              const launchTimeout = new Promise((_, reject) =>
+                setTimeout(() => reject(Object.assign(new Error("Workspace launcher timed out after 10s."), { code: "LAUNCHER_TIMEOUT" })), 10_000)
+              );
+              const launchResult = await Promise.race([launchPromise, launchTimeout]);
+              const terminalId = launchResult?.terminal?.id ?? null;
+              cliResult = {
+                launched: true,
+                terminalId,
+                command: step.input?.command,
+                label: launchResult?.terminal?.label ?? step.input?.label
+              };
+
+              // waitForCompletion: block until the terminal exits or times out
+              if (step.input?.waitForCompletion && terminalId) {
+                const waitMaxMs = Math.min(Number(step.input.waitTimeoutMs ?? 300_000), 600_000);
+                const pollIntervalMs = 2_000;
+                const waitStart = Date.now();
+                while (Date.now() - waitStart < waitMaxMs) {
+                  await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+                  const session = this.database.getWorkspaceTerminalSession(terminalId);
+                  if (!session || session.status === "completed" || session.status === "error" || session.status === "detached") {
+                    cliResult.exitStatus = session?.status ?? "unknown";
+                    cliResult.exitCode = session?.metadata?.exitCode ?? null;
+                    break;
+                  }
+                }
+              }
+            } catch (launchError) {
+              cliResult = { launched: false, error: launchError.message };
+              cliStatus = "failed";
+            }
+          } else {
+            cliResult = { launched: false, error: "workspaceLauncher not configured" };
+            cliStatus = "failed";
+          }
+          this.#recordEvent(run.id, createEvent("tool.executed", EVENT_ACTOR.COMPUTER, `Workspace CLI launched: ${step.input?.command ?? "unknown"}.`, {
+            primitive: step.primitive,
+            stepId: step.id,
+            launched: cliResult?.launched ?? false,
+            terminalId: cliResult?.terminalId ?? null
+          }));
+          actionLog.push({ step, status: cliStatus, result: cliResult });
+          if (cliStatus === "completed") consecutiveFailures = 0;
+          continue;
+        }
+        if (step.primitive === "open_workspace_browser") {
+          let browserResult = null;
+          let browserStatus = "completed";
+          if (typeof this.browserLauncher === "function") {
+            try {
+              const session = await this.browserLauncher(run.projectId, {
+                runId: run.id,
+                url: step.input?.url ?? null,
+                allowlistedHosts: Array.isArray(step.input?.allowlistedHosts) ? step.input.allowlistedHosts : [],
+                headless: step.input?.headless ?? true
+              });
+              browserResult = { opened: true, sessionId: session?.id ?? null, url: step.input?.url ?? null };
+            } catch (browserError) {
+              browserResult = { opened: false, error: browserError.message };
+              browserStatus = "failed";
+            }
+          } else {
+            browserResult = { opened: false, error: "browserLauncher not configured" };
+            browserStatus = "failed";
+          }
+          this.#recordEvent(run.id, createEvent("tool.executed", EVENT_ACTOR.COMPUTER, `Workspace browser opened: ${step.input?.url ?? "blank"}.`, {
+            primitive: step.primitive,
+            stepId: step.id,
+            opened: browserResult?.opened ?? false,
+            sessionId: browserResult?.sessionId ?? null
+          }));
+          actionLog.push({ step, status: browserStatus, result: browserResult });
+          if (browserStatus === "completed") consecutiveFailures = 0;
           continue;
         }
         const isFilePrimitive = [
@@ -1329,43 +2391,134 @@ export class PrototypeAgent {
           });
           checkpoints.push(blockedCheckpoint);
           actionLog.push({ step, status: "blocked", result: null, safety, recovery, checkpoint: blockedCheckpoint });
+          auditStepFailure({
+            runId: run.id,
+            projectId: project.id,
+            stepId: step.id,
+            stepIndex,
+            totalSteps: executableSteps.length,
+            primitive: step.primitive,
+            label: step.label,
+            status: "blocked",
+            safetyReason: safety.reason,
+            riskLevel: safety.riskLevel ?? null,
+            recoveryAttempted: Boolean(recovery),
+            consecutiveFailures: consecutiveFailures + 1
+          });
+          missionTracker.recordStepResult({ stepId: step.id, primitive: step.primitive, label: step.label, status: "blocked" });
           this.#recordEvent(run.id, createEvent("tool.blocked", EVENT_ACTOR.POLICY, `Desktop primitive blocked: ${step.primitive}.`, {
             primitive: step.primitive,
             stepId: step.id,
             reason: safety.reason
           }));
-          break;
+          consecutiveFailures++;
+          appendDesktopObservation(observationTimeline, {
+            phase: "blocked_by_policy",
+            status: "failed",
+            step,
+            window: currentWindow,
+            recovery,
+            error: new Error(safety.reason)
+          });
+          continue;
         }
-        const beforePerception = currentWindow?.id
+        const stepAwareness = await this.#observeDesktopStepContext({
+          run,
+          step,
+          currentWindow,
+          observationTimeline
+        });
+        currentWindow = stepAwareness.currentWindow ?? currentWindow;
+        let beforePerception = stepAwareness.beforePerception ?? (currentWindow?.id
           ? await this.computer.inspectVisibleUi(currentWindow.id).catch((error) => ({
             available: false,
             reason: error.message
           }))
-          : null;
+          : null);
+        appendDesktopObservation(observationTimeline, {
+          phase: "before_step",
+          status: "observed",
+          step,
+          window: currentWindow,
+          perception: beforePerception
+        });
         if (safety.requiresApproval) {
-          const category = step.primitive === "launch_application"
-            ? APPROVAL_CATEGORY.LOCAL_APP_LAUNCH
-            : APPROVAL_CATEGORY.LOCAL_DESKTOP_ACTUATION;
-          const authorization = await this.policy.authorize({
-            runId: run.id,
-            category,
-            riskLevel: safety.riskLevel,
-            actionLabel: step.label,
-            targetLabel: step.target?.label ?? step.target?.appId ?? currentWindow?.title ?? "desktop",
-            reason: `${safety.reason} Explicit approval is required before executing this local primitive.`,
-            expectedEffect: step.expectedOutcome,
-            consequenceOfRefusal: "The desktop autonomy run will stop before performing this primitive.",
-            evidenceId: approvalContextEvidence.evidenceId,
-            metadata: {
-              primitive: step.primitive,
-              stepId: step.id,
-              sandbox: this.#desktopSandboxSummary(),
-              selectedSkillId: selectedSkill.id,
-              surfaceClassification
+          const isTrustedApp = step.primitive === "launch_application" && (() => {
+            const appId = step.target?.appId ?? desktopPlan.output.selectedApplication?.id ?? "";
+            const execPath = (step.target?.executablePath ?? "").toLowerCase();
+            const trusted = agentConfiguration.guardrails?.trustedApplications ?? [];
+            return trusted.some((entry) => {
+              const e = String(entry).toLowerCase();
+              return e && (e === String(appId).toLowerCase() || (execPath && execPath.includes(e)));
+            });
+          })();
+          if (!isTrustedApp) {
+            const category = step.primitive === "launch_application"
+              ? APPROVAL_CATEGORY.LOCAL_APP_LAUNCH
+              : APPROVAL_CATEGORY.LOCAL_DESKTOP_ACTUATION;
+            const authorization = await this.policy.authorize({
+              runId: run.id,
+              category,
+              riskLevel: safety.riskLevel,
+              actionLabel: step.label,
+              targetLabel: step.target?.label ?? step.target?.appId ?? currentWindow?.title ?? "desktop",
+              reason: `${safety.reason} Explicit approval is required before executing this local primitive.`,
+              expectedEffect: step.expectedOutcome,
+              consequenceOfRefusal: "The desktop autonomy run will stop before performing this primitive.",
+              evidenceId: approvalContextEvidence.evidenceId,
+              metadata: {
+                primitive: step.primitive,
+                stepId: step.id,
+                sandbox: this.#desktopSandboxSummary(),
+                selectedSkillId: selectedSkill.id,
+                surfaceClassification
+              }
+            });
+            if (!authorization.allowed) {
+              if (authorization.approvalRecord?.decision === APPROVAL_DECISION.STOP_RUN) {
+                return this.#stopRunFromApproval(run.id, authorization.approvalRecord, step.label);
+              }
+              this.#recordEvent(run.id, createEvent("tool.blocked", EVENT_ACTOR.POLICY, `Step skipped after approval denial: ${step.label}.`, {
+                primitive: step.primitive,
+                stepId: step.id,
+                reason: authorization.approvalRecord?.rationale ?? "Approval denied"
+              }));
+              actionLog.push({ step, status: "skipped", result: null, safety, reason: "approval_denied" });
+              auditStepFailure({
+                runId: run.id,
+                projectId: project.id,
+                stepId: step.id,
+                stepIndex,
+                totalSteps: executableSteps.length,
+                primitive: step.primitive,
+                label: step.label,
+                status: "skipped",
+                reason: "approval_denied",
+                safetyReason: safety?.reason ?? null,
+                riskLevel: safety?.riskLevel ?? null,
+                approvalRationale: authorization.approvalRecord?.rationale ?? authorization.approvalRecord?.metadata?.rationale ?? null,
+                consecutiveFailures: consecutiveFailures + 1
+              });
+              missionTracker.recordStepResult({ stepId: step.id, primitive: step.primitive, label: step.label, status: "skipped" });
+              consecutiveFailures++;
+              continue;
             }
-          });
-          if (!authorization.allowed) {
-            return this.#stopRunFromApproval(run.id, authorization.approvalRecord, step.label);
+            const approvalChanges = await this.#consumeDesktopWatcherChanges({
+              run,
+              desktopWatcher,
+              observationTimeline,
+              step
+            });
+            if (approvalChanges.length > 0) {
+              const approvalAwareness = await this.#observeDesktopStepContext({
+                run,
+                step,
+                currentWindow: approvalChanges.at(-1)?.after?.activeWindow ?? currentWindow,
+                observationTimeline
+              });
+              currentWindow = approvalAwareness.currentWindow ?? currentWindow;
+              beforePerception = approvalAwareness.beforePerception ?? beforePerception;
+            }
           }
         }
 
@@ -1375,13 +2528,55 @@ export class PrototypeAgent {
           case "launch_application": {
             const appId = step.target?.appId ?? desktopPlan.output.selectedApplication?.id;
             result = await this.computer.launchApplication(appId);
-            const waitResult = await this.computer.waitForVisibleWindowMatch((windowState) => {
-              return String(windowState.processName ?? "").toLowerCase() === String(result?.application?.processName ?? "").toLowerCase()
-                || String(windowState.executablePath ?? "").toLowerCase() === String(result?.application?.executablePath ?? "").toLowerCase()
-                || String(windowState.title ?? "").toLowerCase().includes(String(result?.application?.label ?? "").toLowerCase());
-            }, { timeoutMs: 5000, intervalMs: 150 });
-            currentWindow = waitResult.matchedWindow ?? await this.computer.detectActiveWindow();
-            result = { launch: result, waitResult, currentWindow };
+            const appProcessName = String(result?.application?.processName ?? "").toLowerCase();
+            const appExePath = String(result?.application?.executablePath ?? "").toLowerCase();
+            const appLabel = String(result?.application?.label ?? appId ?? "").toLowerCase();
+            const appLabelSlug = appLabel.replace(/[._\-\s]/g, "");
+
+            // Strategy 1 — exact match: processName / executablePath / label (12s)
+            const exactMatcher = (w) =>
+              (appProcessName && String(w.processName ?? "").toLowerCase() === appProcessName)
+              || (appExePath && String(w.executablePath ?? "").toLowerCase() === appExePath)
+              || (appLabel && String(w.title ?? "").toLowerCase().includes(appLabel));
+
+            let waitResult = await this.computer.waitForVisibleWindowMatch(exactMatcher, { timeoutMs: 12000, intervalMs: 300 });
+
+            // Strategy 2 — fuzzy match on label slug (5s extra)
+            if (!waitResult.validated && appLabelSlug.length >= 3) {
+              const fuzzyMatcher = (w) => {
+                const pn = String(w.processName ?? "").toLowerCase().replace(/[._\-\s]/g, "");
+                const ti = String(w.title ?? "").toLowerCase().replace(/[._\-\s]/g, "");
+                return pn.includes(appLabelSlug) || ti.includes(appLabelSlug) || appLabelSlug.includes(pn.slice(0, Math.min(pn.length, 5)));
+              };
+              waitResult = await this.computer.waitForVisibleWindowMatch(fuzzyMatcher, { timeoutMs: 5000, intervalMs: 400 });
+            }
+
+            // Strategy 3 — new window appeared since mission start
+            if (!waitResult.validated) {
+              const windowsNow = await this.computer.listVisibleWindows();
+              const knownIds = new Set((visibleWindowsBefore ?? []).map((w) => w.id));
+              const newWindows = windowsNow.filter((w) => !knownIds.has(w.id));
+              if (newWindows.length > 0) {
+                waitResult = { validated: true, ambiguous: false, matchedWindow: newWindows[0], visibleWindows: windowsNow, recoveryStrategy: "new_window_since_launch" };
+              }
+            }
+
+            currentWindow = waitResult.matchedWindow ?? await this.computer.detectActiveWindow().catch(() => null);
+
+            if (!currentWindow) {
+              const visibleNow = await this.computer.listVisibleWindows().catch(() => []);
+              throw new Error(
+                `Application launch did not produce a visible window. appId=${appId}. ` +
+                `Visible windows: [${visibleNow.map((w) => `"${w.title}"`).join(", ") || "none"}]`
+              );
+            }
+
+            result = {
+              launch: result,
+              waitResult,
+              currentWindow,
+              recoveryStrategy: waitResult.recoveryStrategy ?? (waitResult.validated ? "exact_match" : "active_window_fallback")
+            };
             break;
           }
           case "focus_window": {
@@ -1413,13 +2608,23 @@ export class PrototypeAgent {
                 automationId: step.target?.automationId ?? step.input?.automationId ?? null
               }
               : null;
-            const semanticResolution = semanticSelector && targetWindow?.id
+            let semanticResolution = semanticSelector && targetWindow?.id
               ? await this.computer.resolveSemanticTarget(targetWindow.id, semanticSelector).catch((error) => ({
                 found: false,
                 reason: error.message,
                 target: null
               }))
               : null;
+            if (semanticSelector && !semanticResolution?.found && targetWindow?.id) {
+              for (let _semPoll = 0; _semPoll < 3 && !semanticResolution?.found; _semPoll++) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                semanticResolution = await this.computer.resolveSemanticTarget(targetWindow.id, semanticSelector).catch((error) => ({
+                  found: false,
+                  reason: error.message,
+                  target: null
+                }));
+              }
+            }
             if (semanticSelector && !semanticResolution?.found) {
               throw new Error(`Semantic desktop target was not found: ${semanticResolution?.reason ?? semanticSelector.query}`);
             }
@@ -1443,6 +2648,90 @@ export class PrototypeAgent {
           case "capture_window": {
             const targetWindow = currentWindow ?? await this.computer.detectActiveWindow();
             result = await this.computer.captureWindow(targetWindow?.id);
+            break;
+          }
+          case "read_visible_text": {
+            const targetWindow = currentWindow ?? await this.computer.detectActiveWindow();
+            const captureResult = await this.computer.captureWindow(targetWindow?.id).catch(() => null);
+            const ocrResult = captureResult?.outputPath
+              ? await this.computer.extractTextFromImage(captureResult.outputPath).catch(() => ({ available: false, engine: null, text: "", lines: [], words: [] }))
+              : { available: false, engine: null, text: "", lines: [], words: [] };
+            const uiInspection = targetWindow?.id
+              ? await this.computer.inspectVisibleUi(targetWindow.id).catch(() => null)
+              : null;
+            result = {
+              windowTitle: targetWindow?.title ?? null,
+              text: ocrResult.text ?? "",
+              lines: ocrResult.lines ?? [],
+              words: ocrResult.words ?? [],
+              ocrAvailable: ocrResult.available ?? false,
+              ocrEngine: ocrResult.engine ?? null,
+              accessibilitySummary: uiInspection?.accessibilitySummary ?? null,
+              semanticTargets: uiInspection?.semanticTargets ?? []
+            };
+            break;
+          }
+          case "describe_window": {
+            const targetWindow = currentWindow ?? await this.computer.detectActiveWindow();
+            const visionSnapshot = await this.computer.buildWindowVisionSnapshot(targetWindow?.id, {
+              capture: true,
+              maxDepth: 4,
+              maxNodes: 80
+            });
+            const screenshotPath = visionSnapshot?.screenshot?.outputPath ?? null;
+            const imageBase64 = screenshotPath
+              ? await fs.readFile(screenshotPath).then((buf) => buf.toString("base64")).catch(() => null)
+              : null;
+            const ocrText = visionSnapshot?.ocr?.text ?? "";
+            const accessibilitySummary = visionSnapshot?.accessibility?.summary ?? null;
+            const extraMessages = imageBase64
+              ? [{
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: `Window screenshot (base64 PNG) — use this image as the primary source for your description. OCR fallback: ${ocrText || "(none)"}. Accessibility summary: ${JSON.stringify(accessibilitySummary ?? null)}`
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:image/png;base64,${imageBase64}`,
+                      detail: "high"
+                    }
+                  }
+                ]
+              }]
+              : [];
+            const descriptionInput = {
+              windowTitle: targetWindow?.title ?? null,
+              ocrText: ocrText || "(no OCR text available)",
+              accessibilitySummary: JSON.stringify(accessibilitySummary ?? null),
+              hasScreenshot: Boolean(imageBase64)
+            };
+            const descriptionLlmResult = await this.#invokeReasonedLlm({
+              run,
+              project,
+              reasoningStage: REASONING_STAGE.WINDOW_DESCRIPTION,
+              callType: LLM_CALL_TYPE.WINDOW_DESCRIPTION,
+              taskPromptId: "task.window_description",
+              bindings: {
+                windowTitle: String(descriptionInput.windowTitle ?? "(unknown)"),
+                ocrText: descriptionInput.ocrText,
+                accessibilitySummary: descriptionInput.accessibilitySummary,
+                hasScreenshot: String(descriptionInput.hasScreenshot)
+              },
+              input: descriptionInput,
+              extraMessages,
+              validateOutput: validateWindowDescriptionOutput
+            });
+            result = {
+              windowTitle: targetWindow?.title ?? null,
+              description: descriptionLlmResult.output?.description ?? "",
+              keyElements: descriptionLlmResult.output?.keyElements ?? [],
+              pageType: descriptionLlmResult.output?.pageType ?? null,
+              ocrText,
+              hasScreenshot: Boolean(imageBase64)
+            };
             break;
           }
           case "list_directory":
@@ -1469,6 +2758,70 @@ export class PrototypeAgent {
             currentWindow,
             beforeWindow: activeWindowBefore
           });
+          const visibleWindowsForRecovery = await Promise.resolve(this.computer.listVisibleWindows()).catch(() => []);
+          const recoveryPlan = buildDesktopRecoveryPlan({
+            step,
+            error,
+            currentWindow,
+            beforeWindow: activeWindowBefore,
+            visibleWindows: visibleWindowsForRecovery,
+            desktopMemory
+          });
+          appendDesktopObservation(observationTimeline, {
+            phase: "recovery_planned",
+            status: "observed",
+            step,
+            window: currentWindow,
+            recovery: {
+              ...recovery,
+              selectedStrategy: recoveryPlan.strategies[0]?.id ?? recovery.selectedStrategy
+            },
+            error
+          });
+          const recoveredStep = await this.#attemptDesktopStepRecovery({
+            step,
+            error,
+            currentWindow,
+            beforeWindow: activeWindowBefore,
+            beforePerception,
+            safety,
+            recovery,
+            recoveryPlan,
+            visibleWindows: visibleWindowsForRecovery
+          });
+          if (recoveredStep.completed) {
+            checkpoints.push(recoveredStep.checkpoint);
+            actionLog.push({
+              step,
+              status: "completed",
+              result: recoveredStep.result,
+              perceptionAfter: recoveredStep.perceptionAfter,
+              perceptionDelta: recoveredStep.perceptionDelta,
+              recovery: recoveredStep.recovery,
+              safety,
+              checkpoint: recoveredStep.checkpoint
+            });
+            this.#recordEvent(run.id, createEvent("tool.recovery_succeeded", EVENT_ACTOR.COMPUTER, `Desktop recovery succeeded after ${step.primitive} failed.`, {
+              primitive: step.primitive,
+              stepId: step.id,
+              selectedStrategy: recoveredStep.recovery?.selectedStrategy ?? "semantic_target_retry",
+              reason: error.message,
+              targetWindowId: recoveredStep.currentWindow?.id ?? null
+            }));
+            appendDesktopObservation(observationTimeline, {
+              phase: "recovery_succeeded",
+              status: "completed",
+              step,
+              window: recoveredStep.currentWindow,
+              perception: recoveredStep.perceptionAfter,
+              result: recoveredStep.result,
+              recovery: recoveredStep.recovery
+            });
+            currentWindow = recoveredStep.currentWindow ?? currentWindow;
+            await this.#markDesktopWatcherBaseline(desktopWatcher);
+            consecutiveFailures = 0;
+            continue;
+          }
           const recoveredWindow = await this.computer.detectActiveWindow().catch(() => null);
           const failurePerception = recoveredWindow?.id
             ? await this.computer.inspectVisibleUi(recoveredWindow.id).catch((inspectError) => ({
@@ -1479,6 +2832,7 @@ export class PrototypeAgent {
           const failureCapture = recoveredWindow?.id
             ? await this.computer.captureWindow(recoveredWindow.id).catch(() => null)
             : null;
+          latestDesktopEvidencePath = failureCapture?.outputPath ?? latestDesktopEvidencePath;
           const failedCheckpoint = checkpointRecord({
             step,
             before: beforePerception,
@@ -1503,14 +2857,113 @@ export class PrototypeAgent {
             safety,
             checkpoint: failedCheckpoint
           });
+          auditStepFailure({
+            runId: run.id,
+            projectId: project.id,
+            stepId: step.id,
+            stepIndex,
+            totalSteps: executableSteps.length,
+            primitive: step.primitive,
+            label: step.label,
+            status: "failed",
+            errorMessage: error.message,
+            safetyReason: safety?.reason ?? null,
+            riskLevel: safety?.riskLevel ?? null,
+            recoveryAttempted: Boolean(recovery),
+            screenshotPath: failureCapture?.outputPath ?? null,
+            consecutiveFailures: consecutiveFailures + 1
+          });
+          missionTracker.recordStepResult({
+            stepId: step.id, primitive: step.primitive, label: step.label,
+            status: "failed", errorMessage: error.message,
+            screenshotPath: failureCapture?.outputPath ?? null,
+            recoveryAttempted: Boolean(recovery)
+          });
+          appendDesktopObservation(observationTimeline, {
+            phase: "step_failed",
+            status: "failed",
+            step,
+            window: recoveredWindow ?? currentWindow,
+            perception: failurePerception,
+            recovery: {
+              ...recovery,
+              recoveryPlan
+            },
+            error,
+            capturePath: failureCapture?.outputPath ?? null
+          });
           this.#recordEvent(run.id, createEvent("tool.recovery_attempted", EVENT_ACTOR.COMPUTER, `Desktop recovery attempted after ${step.primitive} failed.`, {
             primitive: step.primitive,
             stepId: step.id,
-            selectedStrategy: recovery.selectedStrategy,
+            selectedStrategy: recoveryPlan.strategies[0]?.id ?? recovery.selectedStrategy,
             reason: error.message
           }));
           currentWindow = recoveredWindow ?? currentWindow;
-          break;
+          if (dynamicReplanCount < MAX_DYNAMIC_DESKTOP_REPLANS) {
+            const dynamicReplan = await this.#attemptDesktopDynamicReplan({
+              run,
+              project,
+              desktopAction,
+              installedApplications,
+              skillCatalog,
+              desktopMemory,
+              projectMemory,
+              userMemory,
+              desktopPlan: desktopPlan.output,
+              actionLog,
+              observationTimeline,
+              currentWindow,
+              failedStep: step,
+              error,
+              currentStepIndex: stepIndex,
+              remainingSteps: executableSteps.slice(stepIndex + 1)
+            });
+            if (dynamicReplan.accepted) {
+              dynamicReplanCount++;
+              executableSteps.splice(
+                stepIndex + 1,
+                executableSteps.length - stepIndex - 1,
+                ...dynamicReplan.steps
+              );
+              consecutiveFailures = 0;
+              continue;
+            }
+          }
+          consecutiveFailures++;
+          if (consecutiveFailures >= 3) {
+            const resyncWindow = await this.computer.detectActiveWindow().catch(() => null);
+            if (resyncWindow?.id) {
+              currentWindow = resyncWindow;
+              await this.computer.captureWindow(resyncWindow.id).catch(() => null);
+            }
+            this.#recordEvent(run.id, createEvent("run.paused", EVENT_ACTOR.SYSTEM, `Mission paused after ${consecutiveFailures} consecutive failures — waiting for user intervention.`, {
+              consecutiveFailures,
+              currentWindowTitle: currentWindow?.title ?? null
+            }));
+            await this.#updateRun(run.id, {
+              status: RUN_STATUS.PAUSED,
+              lifecycleStage: "paused_consecutive_failures",
+              summary: `Mission paused after ${consecutiveFailures} consecutive failures. Please check the desktop state and resume.`
+            });
+            const resumeAuthorization = await this.policy.authorize({
+              runId: run.id,
+              category: APPROVAL_CATEGORY.MANUAL_USER_ACTION,
+              riskLevel: "low",
+              actionLabel: "Résoudre le blocage et reprendre la mission",
+              targetLabel: currentWindow?.title ?? "desktop",
+              reason: `JON a échoué ${consecutiveFailures} étapes consécutives. Vérifiez l'état de l'écran et confirmez pour que JON puisse continuer.`,
+              expectedEffect: "La mission reprend depuis l'état actuel de l'écran.",
+              consequenceOfRefusal: "La mission s'arrête.",
+              evidenceId: approvalContextEvidence.evidenceId,
+              metadata: { consecutiveFailures, lastFailedPrimitive: step.primitive, stepId: step.id }
+            });
+            if (!resumeAuthorization.allowed) {
+              return this.#stopRunFromApproval(run.id, resumeAuthorization.approvalRecord, "Resume after consecutive failures");
+            }
+            consecutiveFailures = 0;
+            currentWindow = await this.computer.detectActiveWindow().catch(() => currentWindow);
+          }
+          continue;
         }
         let recovery = null;
         if (!currentWindow) {
@@ -1567,6 +3020,56 @@ export class PrototypeAgent {
           safety,
           checkpoint
         });
+        missionTracker.recordStepResult({
+          stepId: step.id,
+          primitive: step.primitive,
+          label: step.label,
+          status: "completed",
+          recoveryAttempted: Boolean(recovery)
+        });
+        if (step.primitive === "launch_application" && result?.currentWindow?.title) {
+          missionTracker.setActiveSurface("desktop", { app: result.currentWindow.title });
+        }
+        appendDesktopObservation(observationTimeline, {
+          phase: "after_step",
+          status: "completed",
+          step,
+          window: currentWindow,
+          perception: perceptionAfter,
+          result,
+          recovery
+        });
+        await this.#markDesktopWatcherBaseline(desktopWatcher);
+        consecutiveFailures = 0;
+
+        // Auth screen detection — pause naturally when a login screen appears after a step
+        const _authTitle = (currentWindow?.title ?? "").toLowerCase();
+        const _authText = JSON.stringify(perceptionAfter ?? "").toLowerCase();
+        const _authByTitle = ["sign in", "log in", "login", "connexion", "authentification", "authenticate", "mot de passe"].some((kw) => _authTitle.includes(kw));
+        const _authByForm = _authText.includes("password") && (_authText.includes("email") || _authText.includes("username") || _authText.includes("identifiant") || _authText.includes("utilisateur"));
+        if (_authByTitle || _authByForm) {
+          this.#recordEvent(run.id, createEvent("run.auth_screen_detected", EVENT_ACTOR.SYSTEM, `Authentication screen detected after ${step.primitive}.`, {
+            windowTitle: currentWindow?.title ?? null,
+            stepId: step.id,
+            triggerType: _authByTitle ? "window_title" : "accessibility_form"
+          }));
+          const authAuthorization = await this.policy.authorize({
+            runId: run.id,
+            category: APPROVAL_CATEGORY.MANUAL_USER_ACTION,
+            riskLevel: "low",
+            actionLabel: "Authentification requise",
+            targetLabel: currentWindow?.title ?? "fenêtre active",
+            reason: `JON a détecté un écran d'authentification sur "${currentWindow?.title ?? "fenêtre inconnue"}". Veuillez vous connecter pour permettre à JON de continuer la mission.`,
+            expectedEffect: "Vous complétez l'authentification, puis JON reprend la mission automatiquement.",
+            consequenceOfRefusal: "La mission s'arrêtera.",
+            evidenceId: approvalContextEvidence.evidenceId,
+            metadata: { authDetectedAt: step.id, windowTitle: currentWindow?.title ?? null }
+          });
+          if (!authAuthorization.allowed) {
+            return this.#stopRunFromApproval(run.id, authAuthorization.approvalRecord, "Auth blocker — mission stopped by user.");
+          }
+          currentWindow = await this.computer.detectActiveWindow().catch(() => currentWindow);
+        }
       }
 
       const activeWindowAfter = await this.computer.detectActiveWindow();
@@ -1589,11 +3092,22 @@ export class PrototypeAgent {
           reason: error.message
         }))
         : null;
+      latestDesktopEvidencePath = finalVisionSnapshot?.screenshot?.outputPath ?? finalCapture?.outputPath ?? latestDesktopEvidencePath;
+      appendDesktopObservation(observationTimeline, {
+        phase: "final_desktop",
+        status: "observed",
+        window: activeWindowAfter,
+        perception: finalVisionSnapshot,
+        capturePath: latestDesktopEvidencePath
+      });
+      const observationSummary = summarizeDesktopObservationTimeline(observationTimeline);
       const evidence = await this.computer.exportActionEvidence(path.join(runDir, "evidence"), "desktop-autonomy", {
         mission: run.mission,
         desktopPlan: desktopPlan.output,
         actionLog,
         checkpoints,
+        observationTimeline,
+        observationSummary,
         visibleWindowsBefore,
         activeWindowBefore,
         activeAccessibilityBefore,
@@ -1618,7 +3132,8 @@ export class PrototypeAgent {
           surfaceClassification,
           selectedApplicationId: desktopPlan.output.selectedApplication?.id ?? null,
           actionCount: actionLog.length,
-          checkpointCount: checkpoints.length
+          checkpointCount: checkpoints.length,
+          observationSummary
         },
         createdAt: nowIso()
       });
@@ -1669,6 +3184,44 @@ export class PrototypeAgent {
       if (desktopVerification.checks.some((check) => check.status !== "pass")) {
         desktopVerification.overallStatus = "fail";
       }
+      const updatedDesktopMemory = updateDesktopAutonomyMemory(desktopMemory, {
+        run,
+        desktopPlan: desktopPlan.output,
+        actionLog,
+        observationSummary,
+        outcomeStatus: desktopVerification.overallStatus === "pass" ? "completed" : "failed"
+      });
+      this.#saveDesktopAutonomyMemory(updatedDesktopMemory);
+      // Semantic outcome verification — validates user objective, not just procedural steps
+      const desktopSemanticVerification = new SemanticOutcomeVerifier().verify({
+        mission: run.mission,
+        planOutcomes: desktopPlan.output.verificationGoals ?? [],
+        actionLog,
+        evidence: evidence.evidenceId ? [{ id: evidence.evidenceId }] : [],
+        artifacts: [],
+        browserResult: null,
+        desktopState: { activeWindow: activeAccessibilityAfter ?? null },
+        trackerSnapshot: missionTracker.toSnapshot()
+      });
+      missionTracker.setFinalVerification(desktopSemanticVerification);
+      missionTracker.complete({ verifiedByOutcomes: desktopSemanticVerification.verifiedByOutcomes });
+      await this.#mergeRunMetadata(run.id, {
+        desktopObservationSummary: observationSummary,
+        desktopMemorySummary: summarizeDesktopAutonomyMemory(updatedDesktopMemory),
+        selectedApplication: desktopPlan.output.selectedApplication ?? null,
+        selectedApplicationId: desktopPlan.output.selectedApplication?.id ?? null,
+        missionProgress: missionTracker.toSnapshot(),
+        semanticVerification: {
+          verifiedByOutcomes: desktopSemanticVerification.verifiedByOutcomes,
+          verificationVerdict: desktopSemanticVerification.verificationVerdict,
+          objectiveSatisfied: desktopSemanticVerification.objectiveSatisfied,
+          confidence: desktopSemanticVerification.confidence,
+          failureReason: desktopSemanticVerification.failureReason,
+          nextBestAction: desktopSemanticVerification.nextBestAction,
+          unsatisfiedOutcomes: desktopSemanticVerification.unsatisfiedOutcomes,
+          satisfiedOutcomes: desktopSemanticVerification.satisfiedOutcomes
+        }
+      });
       await this.#recordVerificationSummary(run.id, desktopVerification);
       this.#recordCapabilityFeedbackForDesktopPlan({
         run,
@@ -1678,6 +3231,9 @@ export class PrototypeAgent {
       });
       if (desktopVerification.overallStatus !== "pass") {
         throw new Error("Desktop autonomy verification failed after execution.");
+      }
+      if (!desktopSemanticVerification.verifiedByOutcomes) {
+        throw new Error(`Desktop autonomy semantic verification failed: ${desktopSemanticVerification.failureReason ?? desktopSemanticVerification.verificationVerdict}`);
       }
 
       await this.#updateRun(run.id, {
@@ -1689,11 +3245,50 @@ export class PrototypeAgent {
         actionCount: actionLog.length,
         selectedApplicationId: desktopPlan.output.selectedApplication?.id ?? null
       }));
+      auditMissionExecution({
+        projectId: project.id,
+        runId: run.id,
+        mission: run.mission,
+        finalStatus: "completed",
+        actionLog,
+        consecutiveFailures
+      });
       return {
         ...(await this.getRunBundle(run.id)),
         desktopPlan: desktopPlan.output
       };
     } catch (error) {
+      const observationSummary = observationTimeline
+        ? summarizeDesktopObservationTimeline(observationTimeline)
+        : null;
+      const userFacingError = buildDesktopUserFacingError({
+        error,
+        actionLog: actionLogForFeedback,
+        observationSummary,
+        latestEvidencePath: latestDesktopEvidencePath
+      });
+      const failedDesktopMemory = updateDesktopAutonomyMemory(desktopMemoryForRun, {
+        run,
+        desktopPlan: desktopPlanForFeedback,
+        actionLog: actionLogForFeedback,
+        observationSummary,
+        outcomeStatus: "failed"
+      });
+      this.#saveDesktopAutonomyMemory(failedDesktopMemory);
+      await this.#mergeRunMetadata(run.id, {
+        desktopObservationSummary: observationSummary,
+        desktopMemorySummary: summarizeDesktopAutonomyMemory(failedDesktopMemory),
+        userFacingError
+      }).catch(() => {});
+      auditMissionExecution({
+        projectId: project.id,
+        runId: run.id,
+        mission: run.mission,
+        finalStatus: "failed",
+        actionLog: actionLogForFeedback,
+        consecutiveFailures: 0,
+        stoppedReason: error.message
+      });
       this.#recordCapabilityFeedbackForDesktopPlan({
         run,
         desktopPlan: desktopPlanForFeedback,
@@ -1703,6 +3298,8 @@ export class PrototypeAgent {
       });
       await this.#failRun(run.id, error);
       throw error;
+    } finally {
+      await desktopWatcher?.stop?.();
     }
   }
 
@@ -1773,26 +3370,34 @@ export class PrototypeAgent {
         linkedEventId: approvalContextEvent.id
       });
 
-      const authorization = await this.policy.authorize({
-        runId: run.id,
-        category: APPROVAL_CATEGORY.LOCAL_APP_LAUNCH,
-        riskLevel: "medium",
-        actionLabel: `Open ${desktopAction.browser?.label ?? "browser"}`,
-        targetLabel: desktopAction.browser?.label ?? desktopAction.browser?.id ?? "browser",
-        reason: "The run needs to open one bounded local browser application before any further desktop-visible step can happen.",
-        expectedEffect: `${desktopAction.browser?.label ?? "The selected browser"} will open on this machine.`,
-        consequenceOfRefusal: "The run cannot continue with the requested desktop-visible browser step.",
-        evidenceId: approvalContextEvidence.evidenceId,
-        metadata: {
-          browserId: desktopAction.browser?.id ?? null,
-          browserLabel: desktopAction.browser?.label ?? null,
-          browserExecutablePath: desktopAction.browser?.executablePath ?? null,
-          reversibility: "reversible_local_launch",
-          surfaceClassification
+      const agentConfigForBrowser = this.#getAgentConfiguration();
+      const trustedBrowserIds = agentConfigForBrowser.guardrails?.trustedBrowserIds ?? [];
+      const browserId = desktopAction.browser?.id ?? "";
+      const isTrustedBrowser = trustedBrowserIds.some((entry) =>
+        String(entry).toLowerCase() === String(browserId).toLowerCase()
+      );
+      if (!isTrustedBrowser) {
+        const authorization = await this.policy.authorize({
+          runId: run.id,
+          category: APPROVAL_CATEGORY.LOCAL_APP_LAUNCH,
+          riskLevel: "medium",
+          actionLabel: `Open ${desktopAction.browser?.label ?? "browser"}`,
+          targetLabel: desktopAction.browser?.label ?? desktopAction.browser?.id ?? "browser",
+          reason: "The run needs to open one bounded local browser application before any further desktop-visible step can happen.",
+          expectedEffect: `${desktopAction.browser?.label ?? "The selected browser"} will open on this machine.`,
+          consequenceOfRefusal: "The run cannot continue with the requested desktop-visible browser step.",
+          evidenceId: approvalContextEvidence.evidenceId,
+          metadata: {
+            browserId: desktopAction.browser?.id ?? null,
+            browserLabel: desktopAction.browser?.label ?? null,
+            browserExecutablePath: desktopAction.browser?.executablePath ?? null,
+            reversibility: "reversible_local_launch",
+            surfaceClassification
+          }
+        });
+        if (!authorization.allowed) {
+          return this.#stopRunFromApproval(run.id, authorization.approvalRecord, `Open ${desktopAction.browser?.label ?? "browser"}`);
         }
-      });
-      if (!authorization.allowed) {
-        return this.#stopRunFromApproval(run.id, authorization.approvalRecord, `Open ${desktopAction.browser?.label ?? "browser"}`);
       }
 
       const launchResult = await this.computer.launchBrowser(desktopAction.browser.id, {
@@ -1881,6 +3486,13 @@ export class PrototypeAgent {
         linkedEventId: evidenceEvent.id
       });
 
+      const expectedLaunchUrl = String(desktopAction.url ?? "").trim();
+      const requestedResultCount = extractRequestedBrowserResultCount(run, desktopAction);
+      const extractedResultCount = countExtractedBrowserResults(desktopAction, launchResult, windowCapture);
+      const launchUrlWasUsed = !expectedLaunchUrl
+        || String(launchResult?.url ?? "") === expectedLaunchUrl
+        || String(launchedWindow?.title ?? "").includes(expectedLaunchUrl)
+        || String(windowCapture?.content ?? "").includes(expectedLaunchUrl);
       const browserLaunchVerification = {
         scenarioType: "computer_observation",
         verificationGoals: planDraft.plan.missionUnderstanding?.verificationGoals ?? [],
@@ -1904,7 +3516,20 @@ export class PrototypeAgent {
           verificationCheck("Desktop launch proof was persisted.", Boolean(evidence.evidenceId), {
             evidenceId: evidence.evidenceId,
             screenshotCaptured: Boolean(windowCapture?.outputPath)
-          })
+          }),
+          ...(expectedLaunchUrl
+            ? [verificationCheck("The requested browser launch URL was used.", launchUrlWasUsed, {
+              requestedUrl: expectedLaunchUrl,
+              launchedUrl: launchResult?.url ?? null,
+              launchedWindowTitle: launchedWindow?.title ?? null
+            })]
+            : []),
+          ...(requestedResultCount
+            ? [verificationCheck("The requested browser result list was extracted.", extractedResultCount >= requestedResultCount, {
+              requestedResultCount,
+              extractedResultCount
+            })]
+            : [])
         ]
       };
       if (browserLaunchVerification.checks.some((check) => check.status !== "pass")) {
@@ -1912,6 +3537,29 @@ export class PrototypeAgent {
       }
       await this.#recordVerificationSummary(run.id, browserLaunchVerification);
       if (browserLaunchVerification.overallStatus !== "pass") {
+        const incompleteDeliverable = Boolean(requestedResultCount && extractedResultCount < requestedResultCount);
+        const browserLaunchPrimitivePassed = browserLaunchVerification.checks
+          .filter((check) => check.label !== "The requested browser result list was extracted.")
+          .every((check) => check.status === "pass");
+        if (incompleteDeliverable && browserLaunchPrimitivePassed) {
+          const summary = `Browser was opened, but the requested ${requestedResultCount} results were not extracted.`;
+          await this.#updateRun(run.id, {
+            status: RUN_STATUS.FAILED,
+            lifecycleStage: "failed_incomplete_deliverable",
+            summary
+          });
+          this.#recordEvent(run.id, createEvent("run.failed", EVENT_ACTOR.AGENT, "Browser launch completed but the requested result list was not delivered.", {
+            browserId: desktopAction.browser.id,
+            browserLabel: desktopAction.browser.label,
+            requestedResultCount,
+            extractedResultCount,
+            reason: "incomplete_deliverable"
+          }));
+          return {
+            ...(await this.getRunBundle(run.id)),
+            verification
+          };
+        }
         throw new Error("Desktop browser launch verification failed after execution.");
       }
 
@@ -2037,7 +3685,7 @@ export class PrototypeAgent {
       const beforeCapture = await this.computer.captureWindow(focusedWindow.id);
       const waitResult = await this.computer.waitForUiState(focusedWindow.id, expectedMatcher);
       const afterCapture = await this.computer.captureWindow(focusedWindow.id);
-      const verification = this.computer.verifyVisibleOutcome(beforeCapture, afterCapture, (before, after) => expectedMatcher({
+      const verification = await this.computer.verifyVisibleOutcome(beforeCapture, afterCapture, (before, after) => expectedMatcher({
         ...after,
         windowId: after.window?.id ?? after.windowId ?? focusedWindow.id,
         title: after.window?.title ?? after.title ?? focusedWindow.title ?? null,
@@ -2419,6 +4067,8 @@ export class PrototypeAgent {
   }
 
   #createPreviewReasoningSnapshot({ run, project, scenarioType, missionDraft, availableBrowsers }) {
+    const projectMemory = this.#getProjectMemorySummary(project?.id);
+    const userMemory = this.#getUserMemorySummary();
     return this.reasoning.createSnapshot({
       stage: REASONING_STAGE.MISSION_UNDERSTANDING,
       run,
@@ -2440,13 +4090,17 @@ export class PrototypeAgent {
         scenarioType,
         missionSpec: missionDraft,
         allowlistedDomains: project?.allowlistedDomains ?? [],
-        availableBrowsers
+        availableBrowsers,
+        projectMemory,
+        userMemory
       },
       priorSnapshots: []
     });
   }
 
   async #previewMissionUnderstanding({ run, project, scenarioType, missionDraft, availableBrowsers }) {
+    const projectMemory = this.#getProjectMemorySummary(project?.id);
+    const userMemory = this.#getUserMemorySummary();
     const reasoningSnapshot = this.#createPreviewReasoningSnapshot({
       run,
       project,
@@ -2459,14 +4113,18 @@ export class PrototypeAgent {
       scenarioType,
       missionSpec: missionDraft,
       allowlistedDomains: project?.allowlistedDomains ?? [],
-      availableBrowsers
+      availableBrowsers,
+      projectMemory,
+      userMemory
     };
     const bindings = {
       mission: run.mission,
       scenarioType,
       missionSpec: JSON.stringify(missionDraft ?? null),
       allowlistedDomains: JSON.stringify(project?.allowlistedDomains ?? []),
-      availableBrowsers: JSON.stringify(availableBrowsers ?? [])
+      availableBrowsers: JSON.stringify(availableBrowsers ?? []),
+      projectMemory: JSON.stringify(projectMemory ?? null),
+      userMemory: JSON.stringify(userMemory ?? null)
     };
     const preparedPayload = prepareRuntimeReasoningPayload({
       reasoningStage: REASONING_STAGE.MISSION_UNDERSTANDING,
@@ -2552,7 +4210,8 @@ export class PrototypeAgent {
     input,
     metadata = {},
     validateOutput,
-    priorSnapshots = []
+    priorSnapshots = [],
+    extraMessages = []
   }) {
     const reasoningSnapshot = await this.#createReasoningSnapshot({
       run,
@@ -2590,7 +4249,8 @@ export class PrototypeAgent {
         tokenGovernancePolicyId: preparedPayload.policy.id,
         requestedModelAlias: modelAlias
       }),
-      validateOutput
+      validateOutput,
+      extraMessages
     }).catch((error) => {
       error.reasoningSnapshot = reasoningSnapshot;
       throw error;
@@ -2604,12 +4264,29 @@ export class PrototypeAgent {
 
   async #generatePlan({ run, project, scenarioType }) {
     const availableBrowsers = await this.#listAvailableBrowsers();
+    const projectMemory = this.#getProjectMemorySummary(project?.id);
+    const userMemory = this.#getUserMemorySummary();
+    const selectedCapabilityForPlan = selectEnabledCapabilityForMission(
+      this.database,
+      run.mission,
+      run.metadata?.missionSpec?.deliverable ?? ""
+    );
     const input = {
       mission: run.mission,
       scenarioType,
       missionSpec: run.metadata?.missionSpec ?? null,
       allowlistedDomains: project?.allowlistedDomains ?? [],
-      availableBrowsers
+      availableBrowsers,
+      projectMemory,
+      userMemory,
+      selectedCapability: selectedCapabilityForPlan ? {
+        id: selectedCapabilityForPlan.id,
+        title: selectedCapabilityForPlan.title,
+        capabilityKind: selectedCapabilityForPlan.capabilityKind,
+        artifactKind: selectedCapabilityForPlan.artifactKind,
+        mission: selectedCapabilityForPlan.mission,
+        status: selectedCapabilityForPlan.status
+      } : null
     };
     const metadata = {
       scenarioType,
@@ -2635,7 +4312,10 @@ export class PrototypeAgent {
           scenarioType,
           missionUnderstanding: JSON.stringify(missionUnderstanding.output),
           allowlistedDomains: JSON.stringify(project?.allowlistedDomains ?? []),
-          availableBrowsers: JSON.stringify(availableBrowsers ?? [])
+          availableBrowsers: JSON.stringify(availableBrowsers ?? []),
+          projectMemory: JSON.stringify(projectMemory ?? null),
+          userMemory: JSON.stringify(userMemory ?? null),
+          selectedCapability: JSON.stringify(input.selectedCapability ?? null)
         },
         input: {
           ...input,
@@ -2764,7 +4444,9 @@ export class PrototypeAgent {
           scenarioType,
           missionSpec: JSON.stringify(run.metadata?.missionSpec ?? null),
           allowlistedDomains: JSON.stringify(project?.allowlistedDomains ?? []),
-          availableBrowsers: JSON.stringify(input.availableBrowsers ?? [])
+          availableBrowsers: JSON.stringify(input.availableBrowsers ?? []),
+          projectMemory: JSON.stringify(input.projectMemory ?? null),
+          userMemory: JSON.stringify(input.userMemory ?? null)
         },
         input,
         metadata,
@@ -3008,7 +4690,7 @@ export class PrototypeAgent {
     return llmResult;
   }
 
-  async #invokeLlm({ run, callType, modelAlias, promptRefs, input, metadata = {}, validateOutput }) {
+  async #invokeLlm({ run, callType, modelAlias, promptRefs, input, metadata = {}, validateOutput, extraMessages = [] }) {
     if (!this.llmGateway) {
       throw new Error("LLM gateway is not configured.");
     }
@@ -3031,7 +4713,8 @@ export class PrototypeAgent {
         promptRefs,
         input,
         metadata,
-        validateOutput
+        validateOutput,
+        extraMessages
       });
       this.database.insertLlmCall(result.callRecord);
       this.#recordEvent(run.id, createEvent("llm.call.completed", EVENT_ACTOR.AGENT, `LLM call completed: ${callType}.`, {
@@ -3188,6 +4871,19 @@ export class PrototypeAgent {
       ...patch,
       updatedAt: nowIso()
     });
+    if (["completed", "failed", "stopped"].includes(String(patch.status ?? "").toLowerCase())) {
+      const run = this.database.getRun(runId);
+      this.#recordProjectMemoryFromRun(run);
+      this.#recordUserMemoryFromRun(run);
+      auditRunStatusChange({
+        runId,
+        projectId: run?.projectId ?? null,
+        mission: run?.mission ?? null,
+        toStatus: patch.status,
+        lifecycleStage: patch.lifecycleStage ?? null,
+        reason: patch.summary ?? null
+      });
+    }
   }
 
   async #failRun(runId, error) {
@@ -3219,6 +4915,437 @@ export class PrototypeAgent {
       actionLabel
     }));
     return this.getRunBundle(runId);
+  }
+
+  async #markDesktopWatcherBaseline(desktopWatcher = null) {
+    if (!desktopWatcher) {
+      return null;
+    }
+    return desktopWatcher.markBaseline().catch(() => null);
+  }
+
+  async #consumeDesktopWatcherChanges({
+    run,
+    project = null,
+    desktopWatcher = null,
+    observationTimeline = null,
+    step = null,
+    visionPolicy = null
+  } = {}) {
+    if (!desktopWatcher) {
+      return [];
+    }
+    await desktopWatcher.observeNow().catch(() => null);
+    const changes = desktopWatcher.consumeChanges();
+    if (changes.length === 0) {
+      return [];
+    }
+    const latest = changes.at(-1);
+    const policy = visionPolicy ?? this.#getBrowserVisionPolicy();
+    const shouldDescribe = policy.enabled !== false
+      && latest?.after?.activeVisual?.outputPath
+      && (latest.reasons ?? []).some((reason) => [
+        "visual_changed",
+        "active_window_changed",
+        "active_content_changed",
+        "active_window_title_changed"
+      ].includes(reason));
+    const visualDescription = shouldDescribe
+      ? await this.#describeDesktopVisualFrame({
+        run,
+        project,
+        snapshot: latest.after,
+        change: latest,
+        phase: "background_watch_change",
+        step,
+        visionDetail: (latest.reasons ?? []).includes("active_window_changed")
+          || ["click_point", "type_text", "send_hotkey"].includes(step?.primitive)
+          ? policy.interactionDetail
+          : policy.defaultDetail
+      }).catch(() => null)
+      : null;
+    if (observationTimeline) {
+      appendDesktopObservation(observationTimeline, {
+        phase: "background_watch_change",
+        status: "changed",
+        step,
+        window: latest?.after?.activeWindow ?? null,
+        visualDescription,
+        visualHash: latest?.after?.activeVisual?.screenshotHash ?? null,
+        capturePath: latest?.after?.activeVisual?.outputPath ?? null,
+        result: {
+          changeCount: changes.length,
+          reasons: latest?.reasons ?? [],
+          activeWindowTitle: latest?.after?.activeWindow?.title ?? null,
+          visibleWindowCount: latest?.after?.visibleWindows?.length ?? 0,
+          visualHash: latest?.after?.activeVisual?.screenshotHash ?? null,
+          visualDescriptionId: visualDescription?.id ?? null
+        }
+      });
+    }
+    this.#recordEvent(run.id, createEvent("run.desktop_watch_changed", EVENT_ACTOR.COMPUTER, "Desktop watcher detected a background state change.", {
+      stepId: step?.id ?? null,
+      primitive: step?.primitive ?? null,
+      changeCount: changes.length,
+      reasons: latest?.reasons ?? [],
+      activeWindowId: latest?.after?.activeWindow?.id ?? null,
+      activeWindowTitle: latest?.after?.activeWindow?.title ?? null,
+      visualHash: latest?.after?.activeVisual?.screenshotHash ?? null,
+      visualDescription: visualDescription ? {
+        id: visualDescription.id,
+        description: visualDescription.description,
+        keyElements: visualDescription.keyElements,
+        pageType: visualDescription.pageType,
+        generationMode: visualDescription.generationMode,
+        visionDetail: visualDescription.visionDetail
+      } : null
+    }));
+    return changes;
+  }
+
+  async #observeDesktopStepContext({
+    run,
+    step,
+    currentWindow = null,
+    observationTimeline = null
+  }) {
+    const [activeWindow, visibleWindows] = await Promise.all([
+      Promise.resolve(this.computer.detectActiveWindow()).catch(() => null),
+      Promise.resolve(this.computer.listVisibleWindows()).catch(() => [])
+    ]);
+    const visibleWindowIds = new Set(visibleWindows.map((windowState) => windowState.id).filter(Boolean));
+    let selectedWindow = currentWindow ?? activeWindow ?? null;
+    let adaptation = null;
+
+    if (selectedWindow?.id && !visibleWindowIds.has(selectedWindow.id)) {
+      selectedWindow = activeWindow ?? visibleWindows[0] ?? null;
+      adaptation = {
+        selectedStrategy: "active_window_fallback",
+        reason: "The previous target window is no longer visible, so JON refreshed to the active visible window.",
+        recoveredWindowId: selectedWindow?.id ?? null
+      };
+    } else if (!selectedWindow && activeWindow) {
+      selectedWindow = activeWindow;
+      adaptation = {
+        selectedStrategy: "active_window_fallback",
+        reason: "No current window was available, so JON refreshed to the active window.",
+        recoveredWindowId: activeWindow.id
+      };
+    }
+
+    const selector = semanticSelectorForDesktopStep(step);
+    let semanticResolution = null;
+    if (selector) {
+      const candidateWindows = [];
+      const seen = new Set();
+      for (const candidate of [selectedWindow, activeWindow, ...visibleWindows]) {
+        if (!candidate?.id || seen.has(candidate.id)) {
+          continue;
+        }
+        seen.add(candidate.id);
+        candidateWindows.push(candidate);
+      }
+      for (const candidate of candidateWindows) {
+        const resolution = await this.computer.resolveSemanticTarget(candidate.id, selector, {
+          maxDepth: 5,
+          maxNodes: 240,
+          minScore: 0.28
+        }).catch((error) => ({
+          found: false,
+          reason: error.message,
+          target: null
+        }));
+        if (!resolution?.found || !resolution.target?.center) {
+          continue;
+        }
+        semanticResolution = resolution;
+        if (selectedWindow?.id !== candidate.id) {
+          selectedWindow = await Promise.resolve(this.computer.focusWindow(candidate.id)).catch(() => candidate);
+          adaptation = {
+            selectedStrategy: "pre_step_semantic_refocus",
+            reason: `The semantic target "${selector.query}" was visible in another window, so JON focused that window before acting.`,
+            recoveredWindowId: selectedWindow?.id ?? candidate.id
+          };
+        }
+        break;
+      }
+    }
+
+    const beforePerception = selectedWindow?.id
+      ? await this.computer.inspectVisibleUi(selectedWindow.id).catch((error) => ({
+        available: false,
+        reason: error.message
+      }))
+      : null;
+
+    const awareness = {
+      activeWindowId: activeWindow?.id ?? null,
+      visibleWindowCount: visibleWindows.length,
+      adapted: Boolean(adaptation),
+      semanticTargetFound: selector ? Boolean(semanticResolution?.found) : null,
+      semanticTargetLabel: semanticResolution?.target?.label ?? null
+    };
+
+    if (observationTimeline) {
+      appendDesktopObservation(observationTimeline, {
+        phase: "continuous_observation",
+        status: adaptation ? "adapted" : "observed",
+        step,
+        window: selectedWindow,
+        perception: beforePerception,
+        result: awareness,
+        recovery: adaptation
+      });
+    }
+
+    if (adaptation) {
+      this.#recordEvent(run.id, createEvent("tool.pre_step_adapted", EVENT_ACTOR.COMPUTER, `Desktop context adapted before ${step.primitive}.`, {
+        primitive: step.primitive,
+        stepId: step.id,
+        selectedStrategy: adaptation.selectedStrategy,
+        recoveredWindowId: adaptation.recoveredWindowId,
+        semanticTargetFound: awareness.semanticTargetFound
+      }));
+    }
+
+    return {
+      currentWindow: selectedWindow,
+      beforePerception,
+      awareness,
+      adaptation,
+      semanticResolution
+    };
+  }
+
+  async #attemptDesktopDynamicReplan({
+    run,
+    project,
+    desktopAction,
+    installedApplications,
+    skillCatalog,
+    desktopMemory,
+    projectMemory = null,
+    userMemory = null,
+    desktopPlan,
+    actionLog,
+    observationTimeline,
+    currentWindow,
+    failedStep,
+    error,
+    currentStepIndex,
+    remainingSteps
+  }) {
+    const visibleWindows = await Promise.resolve(this.computer.listVisibleWindows()).catch(() => []);
+    const activeWindow = await Promise.resolve(this.computer.detectActiveWindow()).catch(() => currentWindow);
+    const activeAccessibilityBefore = activeWindow?.id
+      ? await this.computer.inspectAccessibilityTree(activeWindow.id).catch((inspectError) => ({
+        available: false,
+        reason: inspectError.message,
+        tree: null
+      }))
+      : null;
+    const desktopSnapshot = await this.computer.inspectDesktop({
+      maxWindows: 6,
+      maxDepth: 2,
+      maxNodes: 80
+    }).catch((snapshotError) => ({
+      capturedAt: nowIso(),
+      unavailable: true,
+      reason: snapshotError.message,
+      activeWindow,
+      visibleWindowCount: visibleWindows.length,
+      windows: []
+    }));
+    const observationSummary = observationTimeline
+      ? summarizeDesktopObservationTimeline(observationTimeline)
+      : null;
+    const replanContext = buildDesktopReplanContext({
+      run,
+      failedStep,
+      error,
+      currentStepIndex,
+      remainingSteps,
+      actionLog,
+      observationSummary,
+      currentWindow: activeWindow ?? currentWindow
+    });
+
+    let replanResult = null;
+    try {
+      replanResult = await this.#generateDesktopPlan({
+        run,
+        project,
+        desktopAction,
+        visibleWindows,
+        activeWindow,
+        installedApplications,
+        activeAccessibilityBefore,
+        desktopSnapshot,
+        skillCatalog,
+        desktopMemory,
+        projectMemory,
+        userMemory,
+        replanContext
+      });
+      replanResult.output = validateDesktopPlanOutput(replanResult.output, {
+        maxSteps: this.#desktopSandboxSummary().maxPlanSteps ?? 14
+      });
+    } catch (replanError) {
+      this.#recordEvent(run.id, createEvent("run.dynamic_replan_failed", EVENT_ACTOR.SYSTEM, "Dynamic desktop replan failed.", {
+        failedStepId: failedStep?.id ?? null,
+        failedPrimitive: failedStep?.primitive ?? null,
+        originalError: error?.message ?? null,
+        replanError: replanError.message
+      }));
+      return { accepted: false, error: replanError };
+    }
+
+    const steps = selectDesktopReplanContinuation(replanResult.output, {
+      maxSteps: this.#desktopSandboxSummary().maxPlanSteps ?? 14
+    });
+    if (steps.length === 0) {
+      return { accepted: false, replanResult };
+    }
+
+    if (observationTimeline) {
+      appendDesktopObservation(observationTimeline, {
+        phase: "dynamic_replan",
+        status: "completed",
+        step: failedStep,
+        window: activeWindow ?? currentWindow,
+        result: {
+          replacementStepCount: steps.length,
+          planSummary: replanResult.output.planSummary
+        },
+        recovery: {
+          selectedStrategy: "dynamic_replan",
+          reason: error?.message ?? "Prior step failed after recovery."
+        }
+      });
+    }
+    this.#recordEvent(run.id, createEvent("run.dynamic_replanned", EVENT_ACTOR.AGENT, "Desktop plan dynamically replanned from current screen state.", {
+      failedStepId: failedStep?.id ?? null,
+      failedPrimitive: failedStep?.primitive ?? null,
+      replacementStepCount: steps.length,
+      planSummary: replanResult.output.planSummary
+    }));
+
+    return {
+      accepted: true,
+      steps,
+      replanResult,
+      replanContext
+    };
+  }
+
+  async #attemptDesktopStepRecovery({
+    step,
+    error,
+    currentWindow = null,
+    beforeWindow = null,
+    beforePerception = null,
+    safety = null,
+    recovery = null,
+    recoveryPlan = null,
+    visibleWindows = []
+  }) {
+    if (step?.primitive !== "click_point") {
+      return { completed: false };
+    }
+    const semanticQuery = step.target?.semanticTarget ?? step.input?.semanticTarget ?? null;
+    if (!semanticQuery) {
+      return { completed: false };
+    }
+
+    const selector = {
+      query: semanticQuery,
+      role: step.target?.role ?? step.input?.role ?? null,
+      automationId: step.target?.automationId ?? step.input?.automationId ?? null
+    };
+    const activeWindow = await Promise.resolve(this.computer.detectActiveWindow()).catch(() => null);
+    const observedWindows = visibleWindows.length > 0
+      ? visibleWindows
+      : await Promise.resolve(this.computer.listVisibleWindows()).catch(() => []);
+    const candidateWindowIds = recoveryPlan?.strategies
+      ?.find((strategy) => strategy.id === "semantic_target_retry")
+      ?.candidateWindowIds ?? [];
+    const candidateWindows = [];
+    const seenWindowIds = new Set();
+    for (const windowState of [currentWindow, activeWindow, beforeWindow, ...observedWindows]) {
+      if (!windowState?.id || seenWindowIds.has(windowState.id)) {
+        continue;
+      }
+      seenWindowIds.add(windowState.id);
+      candidateWindows.push(windowState);
+    }
+    const orderedCandidateWindows = [
+      ...candidateWindowIds.map((windowId) => candidateWindows.find((windowState) => windowState.id === windowId)).filter(Boolean),
+      ...candidateWindows.filter((windowState) => !candidateWindowIds.includes(windowState.id))
+    ];
+
+    for (const windowState of orderedCandidateWindows) {
+      const semanticResolution = await this.computer.resolveSemanticTarget(windowState.id, selector, {
+        maxDepth: 5,
+        maxNodes: 240,
+        minScore: 0.28
+      }).catch((resolveError) => ({
+        found: false,
+        reason: resolveError.message,
+        target: null
+      }));
+      if (!semanticResolution?.found || !semanticResolution.target?.center) {
+        continue;
+      }
+      if (activeWindow?.id !== windowState.id) {
+        await Promise.resolve(this.computer.focusWindow(windowState.id)).catch(() => null);
+      }
+      const clickResult = await this.computer.clickPoint(windowState.id, semanticResolution.target.center);
+      const recoveredWindow = await Promise.resolve(this.computer.detectActiveWindow()).catch(() => windowState);
+      const perceptionAfter = recoveredWindow?.id
+        ? await this.computer.inspectVisibleUi(recoveredWindow.id).catch((inspectError) => ({
+          available: false,
+          reason: inspectError.message
+        }))
+        : null;
+      const perceptionDelta = this.computer.comparePerception(beforePerception, perceptionAfter);
+      const recoveredAttempt = {
+        ...(recovery ?? {}),
+        selectedStrategy: "semantic_target_retry",
+        retryReason: error?.message ?? null,
+        retriedAt: nowIso(),
+        recoveredWindowId: recoveredWindow?.id ?? windowState.id,
+        recoveryPlan,
+        semanticResolution
+      };
+      const checkpoint = checkpointRecord({
+        step,
+        before: beforePerception,
+        after: perceptionAfter,
+        safety,
+        recovery: recoveredAttempt,
+        verification: {
+          validated: true,
+          reason: `Retried click on semantic target "${semanticQuery}" after re-observing desktop windows.`,
+          perceptionDelta
+        }
+      });
+
+      return {
+        completed: true,
+        currentWindow: recoveredWindow ?? windowState,
+        result: {
+          ...clickResult,
+          semanticResolution,
+          recovered: true
+        },
+        recovery: recoveredAttempt,
+        perceptionAfter,
+        perceptionDelta,
+        checkpoint
+      };
+    }
+
+    return { completed: false };
   }
 
   #recordCapabilityFeedbackForDesktopPlan({

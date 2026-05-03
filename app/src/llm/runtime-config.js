@@ -2,6 +2,7 @@ import path from "node:path";
 import {
   DEFAULT_LLM_PROVIDER_MODE,
   DEFAULT_LLM_TIMEOUT_MS,
+  DEFAULT_LLM_BUDGETS,
   DEFAULT_PROMPT_ENVIRONMENT,
   LOGS_ROOT,
   LLM_PROVIDER_ALIAS
@@ -19,6 +20,9 @@ const VALID_PROVIDER_MODES = new Set([
 const PROVIDER_MODE_ALIASES = Object.freeze({
   [LLM_PROVIDER_ALIAS.OPENAI]: LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE
 });
+const DEFAULT_OPENAI_TEXT_MODEL = "gpt-4.1-mini";
+const DEFAULT_OPENAI_VISION_MODEL = "gpt-5-mini";
+const VISION_DETAIL_LEVELS = new Set(["auto", "low", "high"]);
 
 function parsePositiveInt(value, fallback, issues, label) {
   if (value == null || value === "") {
@@ -51,8 +55,36 @@ function parseBoolean(value, fallback = false) {
   return !["0", "false", "no"].includes(String(value).trim().toLowerCase());
 }
 
+function parseVisionDetail(value, fallback, issues, label) {
+  if (value == null || value === "") {
+    return fallback;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (VISION_DETAIL_LEVELS.has(normalized)) {
+    return normalized;
+  }
+  issues.push(`${label} must be one of: auto, low, high.`);
+  return fallback;
+}
+
 function hasOwn(env, key) {
   return Object.prototype.hasOwnProperty.call(env, key);
+}
+
+function normalizeVisionModelSetting(setting, issues) {
+  const normalized = String(setting.value ?? "").trim();
+  if (!normalized) {
+    return setting;
+  }
+  const compact = normalized.toLowerCase().replace(/[\s_]+/g, "-");
+  if (compact === "gpt-5.1-mini" || compact === "gpt-5-1-mini") {
+    issues.push("COWORK_OPENAI_VISION_MODEL=gpt-5.1-mini was normalized to gpt-5-mini; the general low-cost vision model is gpt-5-mini.");
+    return {
+      ...setting,
+      value: DEFAULT_OPENAI_VISION_MODEL
+    };
+  }
+  return setting;
 }
 
 function resolveTrimmedSetting(env, key, defaultValue = "") {
@@ -96,6 +128,10 @@ function parseProviderMode(value, issues) {
   return PROVIDER_MODE_ALIASES[DEFAULT_LLM_PROVIDER_MODE] ?? DEFAULT_LLM_PROVIDER_MODE;
 }
 
+function runtimeProfileFromEnv(env = {}) {
+  return String(env.COWORK_LLM_RUNTIME_PROFILE ?? env.COWORK_RUNTIME_PROFILE ?? "production_strict").trim() || "production_strict";
+}
+
 function parsePriceOverrides(env, issues) {
   return {
     primary_reasoning: {
@@ -115,6 +151,11 @@ function parsePriceOverrides(env, issues) {
 
 export function buildLlmRuntimeConfig({ env = process.env, secretResolution = null } = {}) {
   const issues = [];
+  const runtimeProfile = runtimeProfileFromEnv(env);
+  const productionStrict = parseBoolean(
+    env.COWORK_LLM_PRODUCTION_STRICT,
+    runtimeProfile === "production_strict"
+  );
   const providerMode = parseProviderMode(env.COWORK_LLM_PROVIDER_MODE, issues);
   const requestedProviderMode = env.COWORK_LLM_PROVIDER_MODE || DEFAULT_LLM_PROVIDER_MODE;
   const liveModeRequested = providerMode === LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE || providerMode === "auto";
@@ -156,11 +197,14 @@ export function buildLlmRuntimeConfig({ env = process.env, secretResolution = nu
     issues.push("COWORK_OPENAI_API_KEY_PREFIX must not contain new lines.");
   }
 
-  const defaultModelSetting = resolveTrimmedSetting(env, "COWORK_OPENAI_MODEL", "gpt-4.1-mini");
+  const defaultModelSetting = resolveTrimmedSetting(env, "COWORK_OPENAI_MODEL", DEFAULT_OPENAI_TEXT_MODEL);
   const modelSettings = {
     primary_reasoning: resolveTrimmedSetting(env, "COWORK_OPENAI_PRIMARY_MODEL", defaultModelSetting.value),
     utility_structuring: resolveTrimmedSetting(env, "COWORK_OPENAI_UTILITY_MODEL", defaultModelSetting.value),
-    vision_fallback: resolveTrimmedSetting(env, "COWORK_OPENAI_VISION_MODEL", defaultModelSetting.value)
+    vision_fallback: normalizeVisionModelSetting(
+      resolveTrimmedSetting(env, "COWORK_OPENAI_VISION_MODEL", DEFAULT_OPENAI_VISION_MODEL),
+      issues
+    )
   };
   const modelMap = {
     primary_reasoning: modelSettings.primary_reasoning.value,
@@ -181,17 +225,29 @@ export function buildLlmRuntimeConfig({ env = process.env, secretResolution = nu
   const config = {
     providerMode,
     requestedProviderMode,
+    runtimeProfile,
+    productionStrict,
     requireOsSecretStore,
     promptEnvironment: env.COWORK_PROMPT_ENVIRONMENT || DEFAULT_PROMPT_ENVIRONMENT,
-    allowMockFallback: parseBoolean(env.COWORK_LLM_ALLOW_MOCK_FALLBACK, true),
+    allowMockFallback: productionStrict ? false : parseBoolean(env.COWORK_LLM_ALLOW_MOCK_FALLBACK, false),
     deterministicFallback: {
-      allowForPrototype: parseBoolean(env.COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK, true)
+      allowForPrototype: productionStrict ? false : parseBoolean(env.COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK, false)
     },
     budgets: {
-      perRunTokens: parsePositiveInt(env.COWORK_LLM_BUDGET_PER_RUN_TOKENS, 12_000, issues, "COWORK_LLM_BUDGET_PER_RUN_TOKENS"),
-      perSessionTokens: parsePositiveInt(env.COWORK_LLM_BUDGET_PER_SESSION_TOKENS, 50_000, issues, "COWORK_LLM_BUDGET_PER_SESSION_TOKENS"),
-      perRunUsd: parseNonNegativeFloat(env.COWORK_LLM_BUDGET_PER_RUN_USD, 0.5, issues, "COWORK_LLM_BUDGET_PER_RUN_USD"),
-      perSessionUsd: parseNonNegativeFloat(env.COWORK_LLM_BUDGET_PER_SESSION_USD, 2, issues, "COWORK_LLM_BUDGET_PER_SESSION_USD")
+      perRunTokens: parsePositiveInt(env.COWORK_LLM_BUDGET_PER_RUN_TOKENS, DEFAULT_LLM_BUDGETS.perRunTokens, issues, "COWORK_LLM_BUDGET_PER_RUN_TOKENS"),
+      perSessionTokens: parsePositiveInt(env.COWORK_LLM_BUDGET_PER_SESSION_TOKENS, DEFAULT_LLM_BUDGETS.perSessionTokens, issues, "COWORK_LLM_BUDGET_PER_SESSION_TOKENS"),
+      perRunUsd: parseNonNegativeFloat(env.COWORK_LLM_BUDGET_PER_RUN_USD, DEFAULT_LLM_BUDGETS.perRunUsd, issues, "COWORK_LLM_BUDGET_PER_RUN_USD"),
+      perSessionUsd: parseNonNegativeFloat(env.COWORK_LLM_BUDGET_PER_SESSION_USD, DEFAULT_LLM_BUDGETS.perSessionUsd, issues, "COWORK_LLM_BUDGET_PER_SESSION_USD")
+    },
+    vision: {
+      enabled: parseBoolean(env.COWORK_BROWSER_VISION_ENABLED, true),
+      modelAlias: "vision_fallback",
+      defaultModel: DEFAULT_OPENAI_VISION_MODEL,
+      maxFramesPerRun: parsePositiveInt(env.COWORK_BROWSER_VISION_MAX_FRAMES_PER_RUN, 4, issues, "COWORK_BROWSER_VISION_MAX_FRAMES_PER_RUN"),
+      screenshotWidth: parsePositiveInt(env.COWORK_BROWSER_VISION_SCREENSHOT_WIDTH, 480, issues, "COWORK_BROWSER_VISION_SCREENSHOT_WIDTH"),
+      defaultDetail: parseVisionDetail(env.COWORK_BROWSER_VISION_DEFAULT_DETAIL, "low", issues, "COWORK_BROWSER_VISION_DEFAULT_DETAIL"),
+      interactionDetail: parseVisionDetail(env.COWORK_BROWSER_VISION_INTERACTION_DETAIL, "high", issues, "COWORK_BROWSER_VISION_INTERACTION_DETAIL"),
+      blockerDetail: parseVisionDetail(env.COWORK_BROWSER_VISION_BLOCKER_DETAIL, "high", issues, "COWORK_BROWSER_VISION_BLOCKER_DETAIL")
     },
     retryPolicy: {
       maxAttemptsPerProvider: parsePositiveInt(env.COWORK_LLM_MAX_ATTEMPTS_PER_PROVIDER, 2, issues, "COWORK_LLM_MAX_ATTEMPTS_PER_PROVIDER"),
@@ -203,7 +259,10 @@ export function buildLlmRuntimeConfig({ env = process.env, secretResolution = nu
       rateLimitCooldownMs: parsePositiveInt(env.COWORK_LLM_RATE_LIMIT_COOLDOWN_MS, 60_000, issues, "COWORK_LLM_RATE_LIMIT_COOLDOWN_MS")
     },
     logging: {
-      path: path.join(LOGS_ROOT, "llm-runtime.jsonl"),
+      path: env.COWORK_LLM_LOG_PATH
+        ? path.resolve(env.COWORK_LLM_LOG_PATH)
+        : path.join(LOGS_ROOT, env.COWORK_LLM_LOG_SCOPE === "test" ? "llm-runtime.test.jsonl" : "llm-runtime.jsonl"),
+      scope: env.COWORK_LLM_LOG_SCOPE === "test" ? "test" : "runtime",
       enabled: parseBoolean(env.COWORK_LLM_LOGGING_ENABLED, true)
     },
     providers: {
@@ -226,7 +285,18 @@ export function buildLlmRuntimeConfig({ env = process.env, secretResolution = nu
 
   const configIssues = [...issues];
   if (!openAiApiKey && liveModeRequested) {
-    configIssues.push("OpenAI-compatible provider is not configured; live mode will degrade to mock or deterministic fallback.");
+    configIssues.push(productionStrict
+      ? "OpenAI-compatible provider is not configured; production strict mode will fail closed instead of using mock or deterministic fallback."
+      : "OpenAI-compatible provider is not configured; live mode will degrade to mock or deterministic fallback.");
+  }
+  if (productionStrict && providerMode === LLM_PROVIDER_ALIAS.MOCK_OFFLINE) {
+    configIssues.push("Production strict mode forbids mock_offline provider mode.");
+  }
+  if (productionStrict && parseBoolean(env.COWORK_LLM_ALLOW_MOCK_FALLBACK, false)) {
+    configIssues.push("Production strict mode ignores COWORK_LLM_ALLOW_MOCK_FALLBACK; mock fallback remains disabled.");
+  }
+  if (productionStrict && parseBoolean(env.COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK, false)) {
+    configIssues.push("Production strict mode ignores COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK; deterministic fallback remains disabled.");
   }
   if (requireOsSecretStore && openAiSecretSource !== "os_secret_store") {
     configIssues.push("OS-backed secret store is required but the OpenAI-compatible provider key did not resolve from the OS secret store.");
@@ -254,13 +324,16 @@ export function buildLlmRuntimeConfig({ env = process.env, secretResolution = nu
 }
 
 export function deriveProviderOrder(config) {
+  if (config.productionStrict && config.providerMode === LLM_PROVIDER_ALIAS.MOCK_OFFLINE) {
+    return [];
+  }
   switch (config.providerMode) {
     case "disabled":
       return [];
     case "auto":
       return config.providers.openaiCompatible.apiKey
         ? [LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE, ...(config.allowMockFallback ? [LLM_PROVIDER_ALIAS.MOCK_OFFLINE] : [])]
-        : [LLM_PROVIDER_ALIAS.MOCK_OFFLINE];
+        : (config.allowMockFallback ? [LLM_PROVIDER_ALIAS.MOCK_OFFLINE] : []);
     case LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE:
       return [
         LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE,
@@ -322,12 +395,20 @@ export function buildPublicLlmConfigStatus(config) {
   return {
     providerMode: config.providerMode,
     requestedProviderMode: config.requestedProviderMode,
+    runtimeProfile: config.runtimeProfile,
+    productionStrict: config.productionStrict,
     promptEnvironment: config.promptEnvironment,
     allowMockFallback: config.allowMockFallback,
     deterministicFallback: config.deterministicFallback.allowForPrototype,
     budgets: config.budgets,
+    vision: config.vision,
     retryPolicy: config.retryPolicy,
     circuitBreaker: config.circuitBreaker,
+    logging: {
+      path: config.logging.path,
+      scope: config.logging.scope,
+      enabled: config.logging.enabled
+    },
     configIssues: config.issues,
     providers: {
       openaiCompatible: buildPublicOpenAiCompatibleStatus(config)

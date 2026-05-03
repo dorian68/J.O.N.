@@ -96,6 +96,16 @@ function normalizeOptionalText(value, label, maxLength) {
   return normalized;
 }
 
+function firstOptionalText(values, label, maxLength) {
+  for (const value of values) {
+    const normalized = normalizeOptionalText(value, label, maxLength);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return "";
+}
+
 function normalizeList(value, label, { maxItems, maxItemLength }) {
   const rawItems = Array.isArray(value)
     ? value
@@ -114,6 +124,147 @@ function normalizeList(value, label, { maxItems, maxItemLength }) {
     }
   }
   return items;
+}
+
+function normalizeBrowserIdHint(value) {
+  const hint = normalizeLine(value).toLowerCase();
+  if (!hint) {
+    return "";
+  }
+  if (/\b(chrome|google chrome)\b/.test(hint)) {
+    return "chrome";
+  }
+  if (/\b(edge|microsoft edge|msedge)\b/.test(hint)) {
+    return "edge";
+  }
+  if (/\b(firefox|mozilla firefox)\b/.test(hint)) {
+    return "firefox";
+  }
+  if (/\b(brave|brave browser)\b/.test(hint)) {
+    return "brave";
+  }
+  return /^[a-z][a-z0-9_-]{1,39}$/.test(hint) && ["chrome", "edge", "firefox", "brave"].includes(hint)
+    ? hint
+    : "";
+}
+
+const RESULT_TYPE_HINTS = Object.freeze([
+  { value: "jobs", patterns: [/\b(jobs?|postes?|offres?|emploi|missions?)\b/i] },
+  { value: "profiles", patterns: [/\b(profiles?|profils?|contacts?|people|personnes?)\b/i] },
+  { value: "products", patterns: [/\b(products?|produits?|articles a vendre|articles à vendre)\b/i] },
+  { value: "articles", patterns: [/\b(articles?|posts?|billets?|publications?)\b/i] },
+  { value: "documents", patterns: [/\b(documents?|docs?|pdfs?|fichiers?)\b/i] },
+  { value: "tickets", patterns: [/\b(tickets?|issues?|bugs?|incidents?)\b/i] }
+]);
+
+function inferResultType(input, rawParameters = {}, rawBrowserLaunch = {}) {
+  const explicit = firstOptionalText([
+    rawBrowserLaunch.resultType,
+    rawBrowserLaunch.itemType,
+    rawParameters.resultType,
+    rawParameters.itemType,
+    rawParameters.resultKind
+  ], "Browser result type", 60);
+  if (explicit) {
+    return explicit.toLowerCase();
+  }
+  const text = [
+    input.objective,
+    input.deliverable,
+    ...(Array.isArray(input.constraints) ? input.constraints : typeof input.constraints === "string" ? input.constraints.split(/\r?\n/) : [])
+  ].map((entry) => normalizeLine(entry)).join(" ");
+  for (const hint of RESULT_TYPE_HINTS) {
+    if (hint.patterns.some((pattern) => pattern.test(text))) {
+      return hint.value;
+    }
+  }
+  return "";
+}
+
+function normalizeSiteHint(value) {
+  const raw = normalizeLine(value);
+  if (!raw) {
+    return {
+      raw: "",
+      url: "",
+      host: "",
+      targetSite: ""
+    };
+  }
+  const candidate = /^https?:\/\//i.test(raw) ? raw : /^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(raw) ? `https://${raw}` : "";
+  if (candidate) {
+    try {
+      const parsed = new URL(candidate);
+      return {
+        raw,
+        url: parsed.toString(),
+        host: parsed.hostname,
+        targetSite: parsed.hostname.replace(/^www\./i, "")
+      };
+    } catch {
+      return {
+        raw,
+        url: candidate,
+        host: "",
+        targetSite: raw
+      };
+    }
+  }
+  return {
+    raw,
+    url: "",
+    host: "",
+    targetSite: raw
+  };
+}
+
+function buildGenericSearchUrl({ siteHint = {}, searchQuery = "", resultType = "" } = {}) {
+  const parts = [];
+  if (siteHint.host) {
+    parts.push(`site:${siteHint.host}`);
+  } else if (siteHint.targetSite) {
+    parts.push(siteHint.targetSite);
+  }
+  if (searchQuery) {
+    parts.push(searchQuery);
+  }
+  if (resultType && !parts.some((part) => part.toLowerCase().includes(resultType.toLowerCase()))) {
+    parts.push(resultType);
+  }
+  const query = parts.join(" ").trim();
+  return query ? `https://www.google.com/search?q=${encodeURIComponent(query)}` : "";
+}
+
+function looksLikeSearchUrl(value) {
+  try {
+    const parsed = new URL(String(value ?? ""));
+    return /(^|\.)google\./i.test(parsed.hostname)
+      || /(^|\.)bing\./i.test(parsed.hostname)
+      || /duckduckgo\.com$/i.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function normalizePositiveInteger(value, { min = 1, max = 50 } = {}) {
+  const raw = normalizeLine(value);
+  if (!raw) {
+    return null;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < min) {
+    return null;
+  }
+  return Math.min(parsed, max);
+}
+
+function normalizeCoreMissionParameters(input) {
+  const browserLaunch = normalizeBrowserLaunchParameters(input);
+  return {
+    ...browserLaunch,
+    ...normalizeComputerActionParameters(input, browserLaunch),
+    ...normalizeApplicationLaunchParameters(input)
+  };
 }
 
 function deliverableHintForMode(modeId) {
@@ -190,26 +341,91 @@ function normalizeFormParameters(input, missionEntryContract, limits) {
 }
 
 function normalizeBrowserLaunchParameters(input) {
-  const browserId = normalizeOptionalText(input.parameters?.browserLaunch?.browserId, "Preferred browser", 40);
-  const searchQuery = normalizeOptionalText(input.parameters?.browserLaunch?.searchQuery, "Browser search query", 180);
-  const url = normalizeOptionalText(input.parameters?.browserLaunch?.url, "Browser launch URL", 300);
-  return browserId || searchQuery || url
+  const rawParameters = isObject(input.parameters) ? input.parameters : {};
+  const rawBrowserLaunch = isObject(rawParameters.browserLaunch) ? rawParameters.browserLaunch : {};
+  const searchQuery = firstOptionalText([
+    rawBrowserLaunch.searchQuery,
+    rawBrowserLaunch.query,
+    rawParameters.searchQuery,
+    rawParameters.query,
+    rawParameters.keyword,
+    rawParameters.keywords
+  ], "Browser search query", 180);
+  const resultType = inferResultType(input, rawParameters, rawBrowserLaunch);
+  const browserId = normalizeBrowserIdHint(
+    rawBrowserLaunch.browserId
+      ?? rawBrowserLaunch.browserLabel
+      ?? rawParameters.browserId
+      ?? rawParameters.browser
+      ?? rawParameters.application
+      ?? rawParameters.applicationName
+  ) || normalizeOptionalText(rawBrowserLaunch.browserId, "Preferred browser", 40);
+  const explicitUrlHint = normalizeSiteHint(firstOptionalText([
+    rawBrowserLaunch.url,
+    rawBrowserLaunch.launchUrl,
+    rawParameters.url,
+    rawParameters.launchUrl,
+    rawParameters.browserLaunchUrl,
+    rawParameters.targetUrl
+  ], "Browser launch URL", 300));
+  const websiteHint = normalizeSiteHint(firstOptionalText([
+    rawBrowserLaunch.targetSite,
+    rawBrowserLaunch.website,
+    rawParameters.targetSite,
+    rawParameters.websiteUrl,
+    rawParameters.website,
+    rawParameters.site
+  ], "Browser target site", 180));
+  const explicitUrlIsSearch = looksLikeSearchUrl(explicitUrlHint.url);
+  const siteHint = explicitUrlHint.raw && !explicitUrlIsSearch ? explicitUrlHint : websiteHint;
+  const url = explicitUrlHint.url || (!searchQuery && !resultType ? websiteHint.url : "");
+  const resultCount = normalizePositiveInteger(
+    rawBrowserLaunch.resultCount
+      ?? rawParameters.resultCount
+      ?? rawParameters.count
+      ?? rawParameters.limit
+      ?? rawParameters.maxResults
+  );
+  const searchUrl = (explicitUrlIsSearch ? explicitUrlHint.url : "")
+    || normalizeSiteHint(rawBrowserLaunch.searchUrl ?? rawParameters.searchUrl).url
+    || (searchQuery || resultCount || (resultType && siteHint.targetSite) ? buildGenericSearchUrl({ siteHint, searchQuery, resultType }) : "");
+  const includeResultType = Boolean(resultType && (searchQuery || resultCount || siteHint.targetSite));
+  return browserId || searchQuery || url || searchUrl || resultCount || includeResultType || siteHint.targetSite
     ? {
       browserLaunch: {
         ...(browserId ? { browserId } : {}),
         ...(searchQuery ? { searchQuery } : {}),
-        ...(url ? { url } : {})
+        ...(url ? { url } : {}),
+        ...(searchUrl ? { searchUrl } : {}),
+        ...(siteHint.targetSite ? { targetSite: siteHint.targetSite } : {}),
+        ...(includeResultType ? { resultType } : {}),
+        ...(resultCount ? { resultCount } : {})
       }
     }
     : {};
 }
 
-function normalizeComputerActionParameters(input) {
-  const type = normalizeOptionalText(input.parameters?.computerAction?.type, "Computer action type", 60);
-  return type
+function normalizeComputerActionParameters(input, normalizedBrowserLaunch = null) {
+  const rawParameters = isObject(input.parameters) ? input.parameters : {};
+  const rawComputerAction = isObject(rawParameters.computerAction) ? rawParameters.computerAction : {};
+  const type = firstOptionalText([
+    rawComputerAction.type,
+    rawParameters.computerActionType,
+    rawParameters.actionType
+  ], "Computer action type", 60);
+  const browserLaunch = normalizedBrowserLaunch?.browserLaunch ?? null;
+  const inferredType = !type && browserLaunch
+    ? browserLaunch.searchQuery || browserLaunch.searchUrl || browserLaunch.resultCount || browserLaunch.resultType
+      ? "launch_browser_search"
+      : browserLaunch.url
+        ? "launch_browser"
+        : ""
+    : "";
+  const normalizedType = type || inferredType;
+  return normalizedType
     ? {
       computerAction: {
-        type
+        type: normalizedType
       }
     }
     : {};
@@ -257,9 +473,7 @@ export function normalizeMissionDraft(input, missionEntryContract = buildMission
 
   normalized.parameters = {
     ...normalized.parameters,
-    ...normalizeBrowserLaunchParameters(input),
-    ...normalizeComputerActionParameters(input),
-    ...normalizeApplicationLaunchParameters(input)
+    ...normalizeCoreMissionParameters(input)
   };
 
   const hasFormValues = isObject(input.parameters?.formValues);
@@ -279,12 +493,17 @@ export function normalizeMissionSpec(input, missionEntryContract = buildMissionE
   }
 
   const modeIds = missionEntryContract.modes.map((mode) => mode.id);
+  const normalizedBaseParameters = normalizeCoreMissionParameters(input);
+  const rawParameters = isObject(input.parameters) ? input.parameters : {};
   const inferredMode = inferMissionMode({
     objective: input.objective,
     deliverable: input.deliverable,
     constraints: input.constraints,
     forbiddenActions: input.forbiddenActions,
-    parameters: input.parameters
+    parameters: {
+      ...rawParameters,
+      ...normalizedBaseParameters
+    }
   });
   const requestedMode = normalizeOptionalText(input.mode, "Mission mode", 40);
   const mode = requestedMode && requestedMode !== "auto"
@@ -324,9 +543,7 @@ export function normalizeMissionSpec(input, missionEntryContract = buildMissionE
 
   normalized.parameters = {
     ...normalized.parameters,
-    ...normalizeBrowserLaunchParameters(input),
-    ...normalizeComputerActionParameters(input),
-    ...normalizeApplicationLaunchParameters(input)
+    ...normalizedBaseParameters
   };
 
   if (mode === "form") {
@@ -373,8 +590,20 @@ export function buildMissionStatement(spec, modeDescriptor = null, { includeExec
   if (spec.parameters?.browserLaunch?.searchQuery) {
     lines.push(`Browser search query if needed: ${spec.parameters.browserLaunch.searchQuery}`);
   }
+  if (spec.parameters?.browserLaunch?.targetSite) {
+    lines.push(`Browser target site if needed: ${spec.parameters.browserLaunch.targetSite}`);
+  }
   if (spec.parameters?.browserLaunch?.url) {
     lines.push(`Browser launch URL if needed: ${spec.parameters.browserLaunch.url}`);
+  }
+  if (spec.parameters?.browserLaunch?.searchUrl) {
+    lines.push(`Browser search URL if needed: ${spec.parameters.browserLaunch.searchUrl}`);
+  }
+  if (spec.parameters?.browserLaunch?.resultType) {
+    lines.push(`Requested browser result type if needed: ${spec.parameters.browserLaunch.resultType}`);
+  }
+  if (spec.parameters?.browserLaunch?.resultCount) {
+    lines.push(`Requested browser result count if needed: ${spec.parameters.browserLaunch.resultCount}`);
   }
   if (spec.parameters?.computerAction?.type) {
     lines.push(`Bounded desktop action if needed: ${spec.parameters.computerAction.type}`);

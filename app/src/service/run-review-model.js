@@ -45,6 +45,14 @@ function deriveOperatorState(run, pendingApprovals) {
     };
   }
 
+  if (run.status === "paused" && run.lifecycleStage === "queued_surface_lock") {
+    return {
+      code: "queued",
+      label: "Queued on shared surface",
+      tone: "info"
+    };
+  }
+
   if (run.status === "running") {
     return {
       code: "running",
@@ -168,6 +176,11 @@ function buildOutcomeSummary({ run, counts, missionUnderstanding, verificationSu
       continuedToRunId: orchestration.continuedToRunId ?? null
     },
     handoffDecision: orchestration.handoffDecision ?? null,
+    capabilityRecovery: run.metadata?.orchestrationRecovery ?? null,
+    browserObservationSummary: run.metadata?.browserObservationSummary ?? null,
+    desktopObservationSummary: run.metadata?.desktopObservationSummary ?? null,
+    desktopMemorySummary: run.metadata?.desktopMemorySummary ?? null,
+    userFacingError: run.metadata?.userFacingError ?? null,
     artifactsCreated: counts.artifacts,
     proofItems: counts.evidence,
     sourcesUsed: counts.sources,

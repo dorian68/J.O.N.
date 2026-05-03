@@ -106,10 +106,18 @@ function buildFixture() {
       selectedProjectId: projectId,
       activeRunIds: [activeRun.id],
       desktopActionSupport: {
-        availableBrowsers: [{ id: "edge", label: "Microsoft Edge" }, { id: "chrome", label: "Google Chrome" }]
+        availableBrowsers: [{ id: "edge", label: "Microsoft Edge" }, { id: "chrome", label: "Google Chrome" }],
+        availableCliAgents: [
+          { id: "codex", command: "codex", label: "Codex CLI", agentKind: "codex_cli", availability: "local_path" }
+        ]
       },
       missionEntry: {
         modes: []
+      },
+      agentConfiguration: {
+        guardrails: {
+          terminalWorkspaceView: "surface"
+        }
       },
       conversation: {
         conversations: [
@@ -144,7 +152,7 @@ function buildFixture() {
           projectId,
           objective: "Superviser une mission navigateur avec terminal Codex",
           status: "active",
-          nextSteps: ["Valider l’ouverture du navigateur"]
+          nextSteps: ["Valider l'ouverture du navigateur"]
         },
         terminals: [{
           id: "term_codex",
@@ -175,10 +183,59 @@ function buildFixture() {
           requiresApproval: true,
           createdAt: nowIso(-700)
         }],
+        terminalEvents: [
+          {
+            id: "evt_term_start",
+            terminalId: "term_codex",
+            projectId,
+            eventType: "process.started",
+            stream: null,
+            content: "",
+            metadata: {
+              snapshot: {
+                pid: 5421
+              }
+            },
+            createdAt: nowIso(-950)
+          },
+          {
+            id: "evt_term_output",
+            terminalId: "term_codex",
+            projectId,
+            eventType: "process.output",
+            stream: "stdout",
+            content: "Approve this command? [y/n]",
+            metadata: {},
+            createdAt: nowIso(-720)
+          },
+          {
+            id: "evt_term_output_2",
+            terminalId: "term_codex",
+            projectId,
+            eventType: "process.output",
+            stream: "stdout",
+            content: "Waiting for input",
+            metadata: {},
+            createdAt: nowIso(-710)
+          }
+        ],
+        liveProcesses: [
+          {
+            terminalId: "term_codex",
+            pid: 5421,
+            command: "codex",
+            args: [],
+            cwd: "C:\\\\workspace",
+            startedAt: nowIso(-950)
+          }
+        ],
         browserStrategy: {
           preferredMode: "workspace_browser_mode",
           supportedModes: ["workspace_browser_mode", "system_browser_mode"]
         },
+        availableCliAgents: [
+          { id: "codex", command: "codex", label: "Codex CLI", agentKind: "codex_cli", availability: "local_path" }
+        ],
         summary: {
           terminalCount: 1,
           waitingTerminalCount: 1
@@ -316,7 +373,7 @@ async function startMockUiServer(fixture) {
         "cache-control": "no-store",
         connection: "keep-alive"
       });
-      writeSse(response, "reply.delta", { text: "D’accord. J’utiliserai Microsoft Edge." });
+      writeSse(response, "reply.delta", { text: "D'accord. J'utiliserai Microsoft Edge." });
       writeSse(response, "turn.completed", {
         conversation: {
           id: fixture.activeConversationId,
@@ -327,7 +384,7 @@ async function startMockUiServer(fixture) {
           id: "turn_resolved",
           intentType: "desktop_action",
           action: "prepare_mission_preflight",
-          reply: "D’accord. J’utiliserai Microsoft Edge.",
+          reply: "D'accord. J'utiliserai Microsoft Edge.",
           requiresClarification: false,
           clarificationQuestion: "",
           uiBlocks: [],
@@ -376,6 +433,16 @@ async function startMockUiServer(fixture) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   return {
     url: `http://127.0.0.1:${server.address().port}`,
+    pushEvent(type, payload) {
+      const frame = `data: ${JSON.stringify({ type, payload: payload ?? {} })}\n\n`;
+      for (const response of eventResponses) {
+        try {
+          response.write(frame);
+        } catch {
+          eventResponses.delete(response);
+        }
+      }
+    },
     async close() {
       for (const response of eventResponses) {
         response.end();
@@ -408,7 +475,7 @@ export async function run() {
 
     await assert.doesNotReject(async () => {
       await page.locator('[data-testid="conversation-sidebar"].collapsed').waitFor({ state: "visible" });
-      await page.locator('[data-testid="run-inspector"].collapsed').waitFor({ state: "visible" });
+      await page.locator('[data-testid="workspace-rail"]').waitFor({ state: "visible" });
     });
     await assert.equal(await page.getByText("Tu veux utiliser quel navigateur ?").count(), 0);
     const railWritingModes = await page.locator(".side-rail-button small").evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).writingMode));
@@ -422,19 +489,71 @@ export async function run() {
     await page.locator('[data-testid="choice-card"]').waitFor({ state: "visible" });
     await assert.equal(await page.getByText("Quel navigateur veux-tu utiliser ?").count() >= 1, true);
     await page.getByRole("button", { name: "Microsoft Edge" }).click();
-    await page.locator(".react-message.assistant p", { hasText: "D’accord. J’utiliserai Microsoft Edge." }).last().waitFor({ state: "visible" });
+    await page.locator(".react-message.assistant p", { hasText: "D'accord. J'utiliserai Microsoft Edge." }).last().waitFor({ state: "visible" });
+    await assert.equal(await page.locator(".react-composer-row textarea").inputValue(), "");
     await assert.equal(await page.getByText("Ouvrir Microsoft Edge").count() >= 1, true);
-
     await assert.equal(await page.getByRole("button", { name: "Confirmer" }).count() >= 1, true);
 
-    await page.getByLabel("Ouvrir l’inspecteur").click();
+    // WorkspaceTerminalMessage is now in JON (workspace pilot conversation) only
+    await page.locator('[data-testid="jon-conversation-item"]').click();
+    await page.locator('[data-testid="workspace-terminal-bubble"]').waitFor({ state: "visible" });
+    await assert.equal(await page.getByText("Surface terminal").count() >= 1, true);
+    await assert.equal(await page.getByText("Codex CLI").count() >= 1, true);
+
+    // Navigate back to scoped conversation so ActivityPanel has conversationId scope
+    await page.getByText("Navigateur cinestar").click();
+    await page.locator('[data-testid="choice-card"]').waitFor({ state: "visible" });
+
+    // Open trace inspector from the single right workspace rail
+    await page.getByLabel("Ouvrir l'inspecteur").click();
     await page.locator('[data-testid="run-inspector"].open').waitFor({ state: "visible" });
     await assert.equal(await page.locator(".run-trace-list").count() >= 1, true);
-    await assert.equal(await page.getByText("Aucun run sélectionné.").count() >= 1, true);
+    await assert.equal(await page.getByText("Ouvre le navigateur et cherche cinestar").count() >= 1, true);
     await assert.equal(await page.getByText("Autre mission hors conversation").count(), 0);
+    await assert.equal(await page.getByText("Codex CLI attend une confirmation.").count() >= 1, true);
+    await page.getByRole("button", { name: "Réduire l'inspecteur" }).click();
+    await page.locator('[data-testid="workspace-rail"]').waitFor({ state: "visible" });
+
+    // Open terminal sidebar from the same right workspace rail
+    await page.getByLabel("Ouvrir les terminaux").click();
+    await page.locator('[data-testid="terminal-sidebar"].open').waitFor({ state: "visible" });
+    // New UX: sidebar shows compact rows — click first row to open the overlay
+    await page.locator('.terminal-row-item').first().click();
+    await page.locator('[data-testid="terminal-overlay"]').waitFor({ state: "visible" });
+    await page.locator('[data-testid="terminal-surface-view"]').waitFor({ state: "visible" });
+    await page.locator('[data-testid="terminal-surface-current-state"]').waitFor({ state: "visible" });
+    await page.locator('[data-testid="terminal-transcript-grouped"]').waitFor({ state: "visible" });
     await assert.equal(await page.getByText("Superviser une mission navigateur avec terminal Codex").count() >= 1, true);
     await assert.equal(await page.getByText("Codex CLI").count() >= 1, true);
-    await assert.equal(await page.getByText("Codex CLI attend une confirmation.").count() >= 1, true);
+    await assert.equal(await page.getByText("JON attend ton accord avant de répondre au terminal.").count() >= 1, true);
+    await assert.equal(await page.getByText("Sortie terminal · stdout · x2").count() >= 1, true);
+    await assert.equal(await page.getByText("Approve this command? [y/n]").count() >= 1, true);
+    await page.getByRole("button", { name: "Réduire les terminaux" }).click();
+    await page.locator('[data-testid="workspace-rail"]').waitFor({ state: "visible" });
+    // Navigate to JON — WorkspaceTerminalMessage (with "Créer un terminal") only renders there
+    await page.locator('[data-testid="jon-conversation-item"]').click();
+    await page.locator('[data-testid="workspace-terminal-bubble"]').waitFor({ state: "visible" });
+    await page.getByRole("button", { name: "Créer un terminal" }).click();
+    await page.locator('[data-testid="terminal-sidebar"].open').waitFor({ state: "visible" });
+    await assert.equal(await page.getByText("CLI détectés").count() >= 1, true);
+
+    // Test terminal alert injection via SSE
+    server.pushEvent("workspace.terminal.conversation_alert", {
+      projectId: fixture.projectId,
+      conversationId: fixture.activeConversationId,
+      terminalId: "term_codex",
+      terminalLabel: "Codex CLI",
+      terminalStatus: "waiting_for_input",
+      agentKind: "codex_cli",
+      decisionAction: "request_human_approval",
+      requiresApproval: true,
+      reason: "Codex CLI is waiting for your confirmation before proceeding.",
+      recentOutput: "Approve this command? [y/n]",
+      alertText: "Le terminal **Codex CLI** (codex_cli) attend une entrée utilisateur.\n\nDernière sortie : `Approve this command? [y/n]`\n\nVotre accord est requis avant que JON n'agisse."
+    });
+    await page.locator(".terminal-alert-bubble").waitFor({ state: "visible", timeout: 5000 });
+    await assert.equal(await page.locator(".terminal-output-snippet").count() >= 1, true);
+    await assert.equal(await page.locator(".terminal-reply-input").count() >= 1, true);
   } finally {
     await browser.close();
     await server.close();

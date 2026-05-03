@@ -7,6 +7,11 @@ export const DESKTOP_AUTONOMY_LEVELS = Object.freeze([
   "maximum_governed"
 ]);
 
+export const TERMINAL_WORKSPACE_VIEWS = Object.freeze([
+  "cards",
+  "surface"
+]);
+
 export const DEFAULT_DESKTOP_AUTONOMY = Object.freeze({
   level: "supervised",
   maxPlanSteps: 8,
@@ -66,9 +71,13 @@ export const DEFAULT_AGENT_GUARDRAILS = Object.freeze({
   safetyPreset: "balanced",
   assistantVerbosity: "concise",
   conversationMode: "natural_agent",
+  terminalWorkspaceView: "cards",
   debugMode: false,
   showInternalPlansInChat: false,
   showTraceLinksInChat: false,
+  trustedApplications: [],
+  trustedBrowserIds: [],
+  allowlistedDomains: [],
   approvalModeByAction: {
     local_app_launch: "confirm",
     browser_navigation: "confirm_when_external_or_sensitive",
@@ -155,6 +164,11 @@ function desktopAutonomyDefaultsForLevel(level) {
   }
 }
 
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((v) => cleanText(v, 512)).filter(Boolean);
+}
+
 export function normalizeDesktopAutonomySettings(value = {}) {
   const candidate = isObject(value) ? value : {};
   const requestedLevel = cleanText(candidate.level, 60);
@@ -192,6 +206,9 @@ export function defaultAgentConfiguration() {
     policyRulesSummary: "Runtime safety policies remain non-bypassable. Configurable guardrails tune UX and approval posture but cannot weaken hard safety floors.",
     guardrails: {
       ...DEFAULT_AGENT_GUARDRAILS,
+      trustedApplications: [...DEFAULT_AGENT_GUARDRAILS.trustedApplications],
+      trustedBrowserIds: [...DEFAULT_AGENT_GUARDRAILS.trustedBrowserIds],
+      allowlistedDomains: [...DEFAULT_AGENT_GUARDRAILS.allowlistedDomains],
       approvalModeByAction: { ...DEFAULT_AGENT_GUARDRAILS.approvalModeByAction },
       nonBypassableFloor: [...DEFAULT_AGENT_GUARDRAILS.nonBypassableFloor]
     }
@@ -218,6 +235,9 @@ export function normalizeAgentConfiguration(value = {}) {
       safetyPreset: cleanText(guardrails.safetyPreset, 40) || defaults.guardrails.safetyPreset,
       assistantVerbosity: cleanText(guardrails.assistantVerbosity, 40) || defaults.guardrails.assistantVerbosity,
       conversationMode: cleanText(guardrails.conversationMode, 40) || defaults.guardrails.conversationMode,
+      terminalWorkspaceView: TERMINAL_WORKSPACE_VIEWS.includes(cleanText(guardrails.terminalWorkspaceView, 40))
+        ? cleanText(guardrails.terminalWorkspaceView, 40)
+        : defaults.guardrails.terminalWorkspaceView,
       desktopScope: cleanText(guardrails.desktopScope, 80) || defaults.guardrails.desktopScope,
       browserScope: cleanText(guardrails.browserScope, 80) || defaults.guardrails.browserScope,
       fileScope: cleanText(guardrails.fileScope, 120) || defaults.guardrails.fileScope,
@@ -233,6 +253,9 @@ export function normalizeAgentConfiguration(value = {}) {
           ]).filter(([key, mode]) => key && mode)
         )
       },
+      trustedApplications: normalizeStringArray(guardrails.trustedApplications),
+      trustedBrowserIds: normalizeStringArray(guardrails.trustedBrowserIds),
+      allowlistedDomains: normalizeStringArray(guardrails.allowlistedDomains),
       desktopAutonomy: normalizeDesktopAutonomySettings(guardrails.desktopAutonomy),
       nonBypassableFloor: defaults.guardrails.nonBypassableFloor
     }

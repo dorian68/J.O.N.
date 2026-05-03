@@ -18,7 +18,16 @@ function isSpawnEperm(error) {
 export async function run() {
   const fixtureServer = await createFixtureServer();
   const dbPath = await tempDbPath("llm-integration");
-  const llmGateway = await createDefaultLlmGateway({ providerMode: "mock_offline" });
+  const llmGateway = await createDefaultLlmGateway({
+    providerMode: "mock_offline",
+    env: {
+      ...process.env,
+      COWORK_LLM_RUNTIME_PROFILE: "test",
+      COWORK_LLM_PRODUCTION_STRICT: "0",
+      COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK: "true",
+      COWORK_LLM_LOG_SCOPE: "test"
+    }
+  });
   const runtimeHandle = await createPrototypeRuntime({
     dbPath,
     llmGateway,

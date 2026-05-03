@@ -20,6 +20,7 @@ const EMPTY_DRAFT = Object.freeze({
 });
 
 const CONVERSATION_STORAGE_KEY = "jon.conversations.v1";
+const JON_CONVERSATION_ID = "jon";
 
 function id(prefix = "msg") {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
@@ -355,6 +356,93 @@ function conversationTurnsToMessages(turns = []) {
         createdAt: turn.createdAt
       };
     }
+    if (turn.kind === "terminal_alert") {
+      return {
+        id: turn.id,
+        role: "assistant",
+        kind: "terminal_alert",
+        text: turn.content,
+        terminalAlert: {
+          terminalId: payload.terminalId,
+          terminalLabel: payload.terminalLabel,
+          terminalStatus: payload.terminalStatus,
+          agentKind: payload.agentKind,
+          decisionAction: payload.decisionAction,
+          requiresApproval: payload.requiresApproval,
+          reason: payload.reason,
+          recentOutput: payload.recentOutput,
+          autonomyMode: payload.autonomyMode,
+          missionObjective: payload.missionObjective,
+          suggestedInput: payload.suggestedInput ?? null,
+          suggestionReasoning: payload.suggestionReasoning ?? null,
+          projectId: payload.projectId ?? turn.projectId
+        },
+        tone: payload.requiresApproval ? "warn" : payload.terminalStatus === "error" ? "danger" : "neutral",
+        createdAt: turn.createdAt
+      };
+    }
+    if (turn.kind === "terminal_started") {
+      return {
+        id: turn.id,
+        role: "assistant",
+        kind: "terminal_started",
+        text: turn.content,
+        terminalEvent: {
+          terminalId: payload.terminalId,
+          terminalLabel: payload.terminalLabel,
+          agentKind: payload.agentKind,
+          autonomyMode: payload.autonomyMode
+        },
+        createdAt: turn.createdAt
+      };
+    }
+    if (turn.kind === "terminal_completion") {
+      return {
+        id: turn.id,
+        role: "assistant",
+        kind: "terminal_completion",
+        text: turn.content,
+        terminalEvent: {
+          terminalId: payload.terminalId,
+          terminalLabel: payload.terminalLabel,
+          agentKind: payload.agentKind,
+          exitCode: payload.exitCode,
+          recentOutput: payload.recentOutput
+        },
+        createdAt: turn.createdAt
+      };
+    }
+    if (turn.kind === "terminal_auto_action") {
+      return {
+        id: turn.id,
+        role: "assistant",
+        kind: "terminal_auto_action",
+        text: turn.content,
+        terminalEvent: {
+          terminalId: payload.terminalId,
+          terminalLabel: payload.terminalLabel,
+          injectedInput: payload.injectedInput,
+          reasoning: payload.reasoning,
+          confidence: payload.confidence
+        },
+        createdAt: turn.createdAt
+      };
+    }
+    if (turn.kind === "mission_paused") {
+      return {
+        id: turn.id,
+        role: "assistant",
+        kind: "mission_paused",
+        text: turn.content,
+        missionPause: {
+          runId: payload.runId,
+          approvalId: payload.approvalId,
+          actionLabel: payload.actionLabel,
+          reason: payload.reason
+        },
+        createdAt: turn.createdAt
+      };
+    }
     return {
       id: turn.id,
       role: "assistant",
@@ -382,6 +470,265 @@ function conversationTurnsToMessages(turns = []) {
   });
 }
 
+// ─── PairDeviceModal ──────────────────────────────────────────────────────────
+
+function PairDeviceModal({ t, onClose }) {
+  const [pairingData, setPairingData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [secondsLeft, setSecondsLeft] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  async function generate() {
+    setLoading(true);
+    setError(null);
+    setPairingData(null);
+    try {
+      const data = await api("/api/mobile/pairing/start", { method: "POST" });
+      setPairingData(data);
+      const ttl = Math.round((new Date(data.expiresAt) - Date.now()) / 1000);
+      setSecondsLeft(Math.max(0, ttl));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { generate(); }, []);
+
+  useEffect(() => {
+    if (secondsLeft === null || secondsLeft <= 0) return;
+    const id = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [secondsLeft]);
+
+  async function copyLink() {
+    const toCopy = pairingData?.pairingUrl ?? pairingData?.lanUrl ?? `${window.location.origin}/mobile/`;
+    try {
+      await navigator.clipboard.writeText(toCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {}
+  }
+
+  const expired = secondsLeft === 0;
+  const mins = secondsLeft !== null ? Math.floor(secondsLeft / 60) : null;
+  const secs = secondsLeft !== null ? String(secondsLeft % 60).padStart(2, "0") : null;
+  const displayUrl = pairingData?.lanUrl ? `${pairingData.lanUrl}/mobile/` : `${window.location.origin}/mobile/`;
+
+  return (
+    <div className="pair-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="pair-modal">
+        <div className="pair-modal-header">
+          <h2 className="pair-modal-title">{t.pairDeviceTitle}</h2>
+          <button type="button" className="ghost icon-only" onClick={onClose} aria-label={t.pairDeviceClose}>✕</button>
+        </div>
+
+        <p className="pair-modal-subtitle">{t.pairDeviceSubtitle}</p>
+
+        {loading ? (
+          <div className="pair-modal-loading">{t.pairDeviceLoading}</div>
+        ) : error ? (
+          <div className="pair-modal-error">{t.pairDeviceError} : {error}</div>
+        ) : pairingData ? (
+          <>
+            {pairingData.lanEnabled === false ? (
+              <div className="pair-modal-lan-warning">
+                <strong>⚠ Serveur en mode local uniquement</strong>
+                <span>Le mobile ne peut pas atteindre ce serveur. Redémarre avec <code>COWORK_LAN=1</code> pour activer l'accès réseau.</span>
+              </div>
+            ) : null}
+
+            {pairingData.qrDataUri ? (
+              <div className="pair-modal-qr">
+                <img src={pairingData.qrDataUri} alt="QR pairing" className="pair-qr-img" />
+                <span className="pair-qr-hint">{t.pairDeviceQrHint}</span>
+              </div>
+            ) : null}
+
+            <div className="pair-modal-url-row">
+              <span className="pair-modal-label">{t.pairDeviceLanUrl}</span>
+              <a className="pair-modal-url" href={displayUrl} target="_blank" rel="noreferrer">{displayUrl}</a>
+              <button type="button" className="ghost small" onClick={copyLink}>
+                {copied ? t.pairDeviceCopied : t.pairDeviceCopy}
+              </button>
+            </div>
+
+            {pairingData.publicUrl ? (
+              <div className="pair-modal-url-row">
+                <span className="pair-modal-label">{t.pairDevicePublicUrl}</span>
+                <span className="pair-modal-url">{pairingData.publicUrl}/mobile/</span>
+              </div>
+            ) : null}
+
+            <div className={`pair-modal-code-block ${expired ? "expired" : ""}`}>
+              <span className="pair-modal-code-label">{t.pairDeviceCode}</span>
+              <span className="pair-modal-code">{pairingData.pairingCode}</span>
+              {!expired && secondsLeft !== null ? (
+                <span className="pair-modal-countdown">{t.pairDeviceExpires} {mins}:{secs}</span>
+              ) : null}
+              {expired ? (
+                <span className="pair-modal-expired">{t.pairDeviceExpired}</span>
+              ) : null}
+            </div>
+            <button type="button" className="secondary small" onClick={generate} style={{ alignSelf: "flex-start" }}>
+              {t.pairDeviceNew}
+            </button>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ─── SettingsModal ────────────────────────────────────────────────────────────
+
+function SettingsModal({ t, projectId, agentConfiguration, availableApplications, availableBrowsers, project, llmGatewayStatus, onClose }) {
+  const existing = agentConfiguration?.guardrails ?? {};
+  const [trustedApps, setTrustedApps] = useState(() => new Set(existing.trustedApplications ?? []));
+  const [trustedBrowsers, setTrustedBrowsers] = useState(() => new Set(existing.trustedBrowserIds ?? []));
+  const [domainsText, setDomainsText] = useState(() => (project?.allowlistedDomains ?? []).join("\n"));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  function toggleApp(appId) {
+    setTrustedApps((prev) => {
+      const next = new Set(prev);
+      if (next.has(appId)) next.delete(appId); else next.add(appId);
+      return next;
+    });
+    setSaved(false);
+  }
+
+  function toggleBrowser(browserId) {
+    setTrustedBrowsers((prev) => {
+      const next = new Set(prev);
+      if (next.has(browserId)) next.delete(browserId); else next.add(browserId);
+      return next;
+    });
+    setSaved(false);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setSaved(false);
+    setSaveError(null);
+    try {
+      const domains = domainsText.split("\n").map((d) => d.trim().toLowerCase()).filter(Boolean);
+      await Promise.all([
+        api("/api/agent/config", {
+          method: "PUT",
+          body: JSON.stringify({
+            guardrails: {
+              ...existing,
+              trustedApplications: [...trustedApps],
+              trustedBrowserIds: [...trustedBrowsers]
+            }
+          })
+        }),
+        projectId ? api(`/api/projects/${encodeURIComponent(projectId)}/allowlisted-domains`, {
+          method: "PUT",
+          body: JSON.stringify({ domains })
+        }) : Promise.resolve()
+      ]);
+      setSaved(true);
+    } catch {
+      setSaveError("Erreur lors de la sauvegarde.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="pair-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="pair-modal" style={{ maxWidth: "520px", maxHeight: "80vh", overflowY: "auto" }}>
+        <div className="pair-modal-header">
+          <h2>{t.settingsTitle}</h2>
+          <button type="button" className="ghost icon-only" onClick={onClose}>✕</button>
+        </div>
+
+        {availableApplications.length > 0 ? (
+          <section style={{ marginBottom: "20px" }}>
+            <h3 style={{ fontSize: "13px", marginBottom: "6px" }}>{t.settingsTrustedApps}</h3>
+            <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "10px" }}>{t.settingsTrustedAppsHint}</p>
+            <div className="settings-toggle-list">
+              {availableApplications.map((app) => (
+                <label key={app.id} className="settings-toggle-row">
+                  <span className="settings-toggle-label">{app.label ?? app.id}</span>
+                  <input
+                    type="checkbox"
+                    checked={trustedApps.has(app.id)}
+                    onChange={() => toggleApp(app.id)}
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {availableBrowsers.length > 0 ? (
+          <section style={{ marginBottom: "20px" }}>
+            <h3 style={{ fontSize: "13px", marginBottom: "6px" }}>{t.settingsTrustedBrowsers}</h3>
+            <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "10px" }}>{t.settingsTrustedBrowsersHint}</p>
+            <div className="settings-toggle-list">
+              {availableBrowsers.map((browser) => (
+                <label key={browser.id} className="settings-toggle-row">
+                  <span className="settings-toggle-label">{browser.label ?? browser.id}</span>
+                  <input
+                    type="checkbox"
+                    checked={trustedBrowsers.has(browser.id)}
+                    onChange={() => toggleBrowser(browser.id)}
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section style={{ marginBottom: "20px" }}>
+          <h3 style={{ fontSize: "13px", marginBottom: "6px" }}>{t.settingsAllowedDomains}</h3>
+          <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "8px" }}>{t.settingsAllowedDomainsHint}</p>
+          <textarea
+            className="settings-domains-textarea"
+            value={domainsText}
+            onChange={(e) => { setDomainsText(e.target.value); setSaved(false); }}
+            placeholder={t.settingsAllowedDomainsPlaceholder}
+            rows={5}
+            style={{ width: "100%", fontFamily: "monospace", fontSize: "12px", resize: "vertical" }}
+          />
+        </section>
+
+        {llmGatewayStatus ? (
+          <section style={{ marginBottom: "20px", padding: "10px 12px", background: "var(--bg-strong)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+            <h3 style={{ fontSize: "12px", fontWeight: 700, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>Moteur de raisonnement</h3>
+            {llmGatewayStatus.effectiveMode === "mock_only" || llmGatewayStatus.effectiveMode === "degraded_mock_only" ? (
+              <p style={{ fontSize: "12px", color: "var(--warn, orange)", lineHeight: 1.5 }}>
+                ⚠ Mode simulation (hors-ligne) actif — JON ne peut pas raisonner en temps réel sur des missions complexes.<br />
+                Pour activer un vrai LLM, lancez JON avec <code style={{ background: "var(--bg)", padding: "1px 4px", borderRadius: "4px" }}>COWORK_LLM_PROVIDER_MODE=openai_compatible</code> et configurez votre clé API.
+              </p>
+            ) : (
+              <p style={{ fontSize: "12px", color: "var(--success, green)" }}>
+                ✓ LLM actif — Mode : <strong>{llmGatewayStatus.effectiveMode}</strong>
+              </p>
+            )}
+          </section>
+        ) : null}
+
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <button type="button" className="primary small" onClick={handleSave} disabled={saving}>
+            {saving ? t.settingsSaving : t.settingsSave}
+          </button>
+          <button type="button" className="ghost small" onClick={onClose}>{t.settingsClose}</button>
+          {saved ? <span style={{ fontSize: "12px", color: "var(--success, green)" }}>{t.settingsSaved} ✓</span> : null}
+          {saveError ? <span style={{ fontSize: "12px", color: "var(--danger, red)" }}>{saveError}</span> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [locale, setLocale] = useState(() => detectInitialLocale());
   const t = useMemo(() => stringsForLocale(locale), [locale]);
@@ -399,27 +746,38 @@ function App() {
   const [recentActivity, setRecentActivity] = useState([]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [workspacePanel, setWorkspacePanel] = useState(null);
+  const [terminalViewMode, setTerminalViewMode] = useState("cards");
+  const [terminalRequestedView, setTerminalRequestedView] = useState(null);
+  const [terminalOverlayId, setTerminalOverlayId] = useState(null);
+  const [terminalOverlayFullscreen, setTerminalOverlayFullscreen] = useState(false);
   const [historyHydratedProjectId, setHistoryHydratedProjectId] = useState(null);
   const [conversationSessions, setConversationSessions] = useState(() => {
     const stored = sortConversations(loadStoredConversations());
     return stored;
   });
   const [activeConversationId, setActiveConversationId] = useState(null);
+  const [jonQueue, setJonQueue] = useState([]);
+  const [jonUnread, setJonUnread] = useState(0);
+  const [pairModalOpen, setPairModalOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const selectedProjectIdRef = useRef(null);
   const selectedRunIdRef = useRef(null);
+  const activeConversationIdRef = useRef(null);
+  const terminalViewPreferenceRef = useRef(null);
   const transcriptRef = useRef(null);
   const composerInputRef = useRef(null);
 
   const project = useMemo(() => currentProject(dashboard, selectedProjectId), [dashboard, selectedProjectId]);
   const runs = useMemo(() => latestRuns(dashboard, selectedProjectId), [dashboard, selectedProjectId]);
+  const configuredTerminalWorkspaceView = dashboard?.agentConfiguration?.guardrails?.terminalWorkspaceView ?? "cards";
   const availableBrowsers = dashboard?.desktopActionSupport?.availableBrowsers ?? [];
   const pendingApprovals = runDetail?.pendingApprovals ?? [];
   const run = runDetail?.run ?? null;
   const activeConversation = conversationSessions.find((conversation) => conversation.id === activeConversationId) ?? null;
   const activeConversationBackendId = conversationBackendId(activeConversation);
-  const hasConversation = messages.length > 0 || Boolean(selectedRunId);
+  const hasConversation = messages.length > 0 || Boolean(selectedRunId) || activeConversationId === JON_CONVERSATION_ID;
   const hasStreamingMessage = messages.some((message) => message.streaming);
   const activityEvents = useMemo(
     () => buildActivityEvents(runDetail, recentActivity, run),
@@ -526,6 +884,26 @@ function App() {
   }, [selectedRunId]);
 
   useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+    if (activeConversationId === JON_CONVERSATION_ID) {
+      setJonUnread(0);
+    }
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    if (!configuredTerminalWorkspaceView) {
+      return;
+    }
+    if (
+      terminalViewPreferenceRef.current == null
+      || terminalViewPreferenceRef.current !== configuredTerminalWorkspaceView
+    ) {
+      terminalViewPreferenceRef.current = configuredTerminalWorkspaceView;
+      setTerminalViewMode(configuredTerminalWorkspaceView);
+    }
+  }, [configuredTerminalWorkspaceView]);
+
+  useEffect(() => {
     if (!selectedProjectId || historyHydratedProjectId === selectedProjectId) {
       return;
     }
@@ -533,6 +911,19 @@ function App() {
   }, [historyHydratedProjectId, selectedProjectId]);
 
   async function selectConversation(conversationId) {
+    if (conversationId === JON_CONVERSATION_ID) {
+      setActiveConversationId(JON_CONVERSATION_ID);
+      setMessages(jonQueue);
+      setJonQueue([]);
+      setSelectedRunId(null);
+      setRunDetail(null);
+      setRecentActivity([]);
+      setPreflight(null);
+      setConfirmedDraft(null);
+      setFeedback(null);
+      selectedRunIdRef.current = null;
+      return;
+    }
     const conversation = conversationSessions.find((candidate) => candidate.id === conversationId);
     if (!conversation) {
       return;
@@ -635,7 +1026,6 @@ function App() {
     }
 
     const stream = new EventSource("/api/events");
-    stream.onopen = () => setLiveStatus("live");
     stream.onmessage = (message) => {
       setLiveStatus("live");
       let event;
@@ -650,6 +1040,97 @@ function App() {
           selectedRunIdRef.current = runId;
           setSelectedRunId(runId);
         }
+        const pushJonMessage = (msg) => {
+          const full = { id: id(), createdAt: new Date().toISOString(), ...msg };
+          if (activeConversationIdRef.current === JON_CONVERSATION_ID) {
+            setMessages((prev) => [...prev, full].slice(-32));
+          } else {
+            setJonQueue((prev) => [...prev, full].slice(-32));
+            setJonUnread((n) => n + 1);
+          }
+        };
+        if (event.type === "workspace.terminal.conversation_alert") {
+          const payload = event.payload ?? {};
+          pushJonMessage({
+            role: "assistant",
+            kind: "terminal_alert",
+            text: payload.alertText ?? `Terminal ${payload.terminalLabel ?? ""} : ${payload.terminalStatus ?? ""}`,
+            terminalAlert: {
+              terminalId: payload.terminalId,
+              terminalLabel: payload.terminalLabel,
+              terminalStatus: payload.terminalStatus,
+              agentKind: payload.agentKind,
+              decisionAction: payload.decisionAction,
+              requiresApproval: payload.requiresApproval,
+              reason: payload.reason,
+              recentOutput: payload.recentOutput,
+              autonomyMode: payload.autonomyMode,
+              missionObjective: payload.missionObjective,
+              suggestedInput: payload.suggestedInput ?? null,
+              suggestionReasoning: payload.suggestionReasoning ?? null,
+              projectId: payload.projectId
+            },
+            tone: payload.requiresApproval ? "warn" : payload.terminalStatus === "error" ? "danger" : "neutral"
+          });
+        }
+        if (event.type === "workspace.terminal.conversation_started") {
+          const payload = event.payload ?? {};
+          pushJonMessage({
+            role: "assistant",
+            kind: "terminal_started",
+            text: payload.startText ?? `Terminal ${payload.terminalLabel ?? ""} démarré.`,
+            terminalEvent: {
+              terminalId: payload.terminalId,
+              terminalLabel: payload.terminalLabel,
+              agentKind: payload.agentKind,
+              autonomyMode: payload.autonomyMode
+            }
+          });
+        }
+        if (event.type === "workspace.terminal.conversation_completion") {
+          const payload = event.payload ?? {};
+          pushJonMessage({
+            role: "assistant",
+            kind: "terminal_completion",
+            text: `Terminal **${payload.terminalLabel ?? ""}** terminé.`,
+            terminalEvent: {
+              terminalId: payload.terminalId,
+              terminalLabel: payload.terminalLabel,
+              agentKind: payload.agentKind ?? null,
+              exitCode: null,
+              recentOutput: null
+            }
+          });
+        }
+        if (event.type === "workspace.terminal.auto_action") {
+          const payload = event.payload ?? {};
+          pushJonMessage({
+            role: "assistant",
+            kind: "terminal_auto_action",
+            text: `JON a répondu au terminal **${payload.terminalLabel ?? ""}** : \`${payload.injectedInput ?? ""}\``,
+            terminalEvent: {
+              terminalId: payload.terminalId,
+              terminalLabel: payload.terminalLabel,
+              injectedInput: payload.injectedInput,
+              reasoning: null,
+              confidence: null
+            }
+          });
+        }
+        if (event.type === "mission.paused_for_manual_action") {
+          const payload = event.payload ?? {};
+          pushJonMessage({
+            role: "assistant",
+            kind: "mission_paused",
+            text: `⏸ **JON est en pause** — action manuelle requise : **${payload.actionLabel ?? ""}**`,
+            missionPause: {
+              runId: payload.runId,
+              approvalId: payload.approvalId,
+              actionLabel: payload.actionLabel,
+              reason: null
+            }
+          });
+        }
         setRecentActivity((current) => [
           {
             ...event,
@@ -661,7 +1142,8 @@ function App() {
       }
       refreshDashboard({ preferActive: Boolean(event.payload?.runId) }).catch(() => setLiveStatus("degraded"));
     };
-    stream.onerror = () => setLiveStatus("degraded");
+    stream.onerror = () => setLiveStatus("reconnecting");
+    stream.onopen = () => setLiveStatus("live");
 
     const poller = window.setInterval(() => {
       refreshDashboard().catch(() => setLiveStatus("degraded"));
@@ -763,7 +1245,7 @@ function App() {
     };
     setDraft((current) => ({
       ...current,
-      objective
+      objective: ""
     }));
     setFeedback(null);
     setPreflight(null);
@@ -838,6 +1320,10 @@ function App() {
             updatedAt: response.conversation.updatedAt ?? new Date().toISOString()
           };
         })));
+      }
+      if (response.autoLaunchedRunId) {
+        selectedRunIdRef.current = response.autoLaunchedRunId;
+        setSelectedRunId(response.autoLaunchedRunId);
       }
       updateMessage(assistantMessageId, {
         turn: response.turn,
@@ -919,6 +1405,27 @@ function App() {
     }
   }
 
+  async function sendTerminalInput(projectId, terminalId, input, { approved = false } = {}) {
+    if (!input?.trim() || !projectId || !terminalId) {
+      return;
+    }
+    try {
+      await api(`/api/projects/${projectId}/workspace/terminals/${encodeURIComponent(terminalId)}/input`, {
+        method: "POST",
+        body: JSON.stringify({ input: input.trim(), approved })
+      });
+      appendMessage({
+        role: "user",
+        kind: "terminal_reply",
+        text: `[Terminal reply → ${input.trim()}]`,
+        meta: t.terminalReplySent
+      });
+      await refreshDashboard();
+    } catch (error) {
+      appendMessage({ role: "assistant", kind: "error", text: error.message, tone: "danger", meta: t.error });
+    }
+  }
+
   async function resolveApproval(approval, decision) {
     setBusy((current) => ({ ...current, approvalId: approval.id }));
     try {
@@ -937,6 +1444,62 @@ function App() {
       appendMessage({ role: "assistant", kind: "error", text: error.message, tone: "danger", meta: t.error });
     } finally {
       setBusy((current) => ({ ...current, approvalId: null }));
+    }
+  }
+
+  function openTerminalWorkspace(view = null) {
+    setTerminalRequestedView(view);
+    setWorkspacePanel("terminals");
+  }
+
+  function openTraceWorkspace() {
+    setWorkspacePanel("trace");
+  }
+
+  function toggleTerminalSidebar() {
+    setWorkspacePanel((current) => {
+      const next = current === "terminals" ? null : "terminals";
+      if (!next) {
+        setTerminalRequestedView(null);
+        setTerminalOverlayId(null);
+        setTerminalOverlayFullscreen(false);
+      }
+      return next;
+    });
+  }
+
+  function toggleInspectorSidebar() {
+    setWorkspacePanel((current) => (current === "trace" ? null : "trace"));
+  }
+
+  function openBrowserWorkspace() {
+    setWorkspacePanel("browser");
+  }
+
+  function toggleBrowserSidebar() {
+    setWorkspacePanel((current) => (current === "browser" ? null : "browser"));
+  }
+
+  function openTerminalOverlay(terminalId) {
+    setTerminalOverlayId(terminalId);
+    setTerminalOverlayFullscreen(false);
+  }
+
+  function closeTerminalOverlay() {
+    setTerminalOverlayId(null);
+    setTerminalOverlayFullscreen(false);
+  }
+
+  async function stopWorkspaceTerminal(terminalId) {
+    if (!selectedProjectId) return;
+    try {
+      await api(`/api/projects/${selectedProjectId}/workspace/terminals/${encodeURIComponent(terminalId)}/stop`, {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+      refreshDashboard();
+    } catch {
+      // ignore — terminal may already be stopped
     }
   }
 
@@ -959,15 +1522,31 @@ function App() {
               ))}
             </select>
           </label>
-          <span className={`live-pill ${liveStatus}`}>{liveStatus === "live" ? t.live : liveStatus === "connecting" ? t.connecting : t.degraded}</span>
+          <span className={`live-pill ${liveStatus === "reconnecting" ? "degraded" : liveStatus}`}>{liveStatus === "live" ? t.live : liveStatus === "connecting" ? t.connecting : liveStatus === "reconnecting" ? (t.reconnecting ?? "…") : t.degraded}</span>
           <button type="button" className="ghost small" onClick={startNewMission}>{t.new}</button>
+          <button type="button" className="ghost small" onClick={() => setSettingsOpen(true)}>⚙ {t.openSettings}</button>
+          <button type="button" className="ghost small" onClick={() => setPairModalOpen(true)}>📱 {t.pairDevice}</button>
           <a className="secondary small link-button" href="/admin">{t.openAdmin}</a>
         </div>
       </header>
 
+      {pairModalOpen ? <PairDeviceModal t={t} onClose={() => setPairModalOpen(false)} /> : null}
+      {settingsOpen ? (
+        <SettingsModal
+          t={t}
+          projectId={selectedProjectId}
+          agentConfiguration={dashboard?.agentConfiguration ?? null}
+          availableApplications={dashboard?.desktopActionSupport?.availableApplications ?? []}
+          availableBrowsers={dashboard?.desktopActionSupport?.availableBrowsers ?? []}
+          project={project}
+          llmGatewayStatus={dashboard?.llmGatewayStatus ?? null}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
+
       {feedback ? <div className={`react-feedback ${feedback.tone ?? ""}`}>{feedback.text}</div> : null}
 
-      <main className={`react-cowork-main ${historyOpen ? "history-open" : "history-collapsed"} ${inspectorOpen ? "inspector-open" : "inspector-collapsed"}`}>
+      <main className={`react-cowork-main ${historyOpen ? "history-open" : "history-collapsed"} ${workspacePanel ? "workspace-open" : "workspace-collapsed"} ${workspacePanel === "terminals" && terminalViewMode === "surface" ? "terminal-surface-open" : ""}`}>
         <ConversationSidebar
           conversations={conversationSessions}
           activeConversationId={activeConversationId}
@@ -975,12 +1554,24 @@ function App() {
           onNew={startNewMission}
           open={historyOpen}
           onToggle={() => setHistoryOpen((current) => !current)}
+          jonUnread={jonUnread}
+          jonHasAlert={jonUnread > 0}
           locale={locale}
           t={t}
         />
         <section className="conversation-surface">
           <div className="conversation-thread" ref={transcriptRef} aria-live="polite">
             {!hasConversation ? <EmptyConversation t={t} /> : null}
+            {activeConversationId === JON_CONVERSATION_ID ? (
+              <WorkspaceTerminalMessage
+                workspace={dashboard?.workspace ?? null}
+                availableCliAgents={dashboard?.desktopActionSupport?.availableCliAgents ?? []}
+                onOpenTerminals={() => openTerminalWorkspace(null)}
+                onNewTerminal={() => openTerminalWorkspace("launch")}
+                onAttachTerminal={() => openTerminalWorkspace("attach")}
+                t={t}
+              />
+            ) : null}
             {selectedRunId && run ? <RunReviewIntro run={run} t={t} /> : null}
             {messages.map((message) => (
               <Message
@@ -988,6 +1579,7 @@ function App() {
                 message={message}
                 onStartMission={startMission}
                 onClarificationAnswer={stageClarificationAnswer}
+                onTerminalInput={sendTerminalInput}
                 busy={busy}
                 t={t}
               />
@@ -1031,33 +1623,107 @@ function App() {
             inputRef={composerInputRef}
             t={t}
           />
+          {terminalOverlayId ? (
+            <TerminalOverlay
+              terminalId={terminalOverlayId}
+              terminals={dashboard?.workspace?.terminals ?? []}
+              terminalEvents={dashboard?.workspace?.terminalEvents ?? []}
+              terminalDecisions={dashboard?.workspace?.decisions ?? []}
+              workspace={dashboard?.workspace ?? null}
+              projectId={selectedProjectId}
+              onInput={sendTerminalInput}
+              onStop={stopWorkspaceTerminal}
+              onClose={closeTerminalOverlay}
+              onSelectTerminal={setTerminalOverlayId}
+              fullscreen={terminalOverlayFullscreen}
+              onToggleFullscreen={() => setTerminalOverlayFullscreen((f) => !f)}
+              t={t}
+              locale={locale}
+            />
+          ) : null}
         </section>
-        <ActivityPanel
-          run={run}
-          runDetail={runDetail}
-          events={activityEvents}
-          runs={runs}
-          workspace={dashboard?.workspace ?? null}
-          selectedRunId={selectedRunId}
-          conversation={activeConversation}
-          conversationId={activeConversationBackendId}
-          onOpenRun={openRun}
-          open={inspectorOpen}
-          onToggle={() => setInspectorOpen((current) => !current)}
-          pendingApprovals={pendingApprovals}
-          liveStatus={liveStatus}
-          locale={locale}
-          t={t}
-        />
+        {!workspacePanel ? (
+          <WorkspaceRail
+            onOpenTerminals={() => openTerminalWorkspace(null)}
+            onOpenTrace={openTraceWorkspace}
+            onCreateTerminal={() => openTerminalWorkspace("launch")}
+            onOpenBrowser={openBrowserWorkspace}
+            workspace={dashboard?.workspace ?? null}
+            run={run}
+            t={t}
+          />
+        ) : null}
+        {workspacePanel === "terminals" ? (
+          <TerminalSidebar
+            projectId={selectedProjectId}
+            conversationId={activeConversationBackendId}
+            workspace={dashboard?.workspace ?? null}
+            onTerminalInput={sendTerminalInput}
+            onRefresh={refreshDashboard}
+            open
+            onToggle={toggleTerminalSidebar}
+            onOpenTrace={openTraceWorkspace}
+            requestedView={terminalRequestedView}
+            onViewHandled={() => setTerminalRequestedView(null)}
+            availableCliAgents={dashboard?.desktopActionSupport?.availableCliAgents ?? []}
+            onRequestOpenView={openTerminalWorkspace}
+            viewMode={terminalViewMode}
+            onViewModeChange={setTerminalViewMode}
+            onOpenOverlay={openTerminalOverlay}
+            activeOverlayId={terminalOverlayId}
+            t={t}
+            locale={locale}
+          />
+        ) : null}
+        {workspacePanel === "trace" ? (
+          <ActivityPanel
+            run={run}
+            runDetail={runDetail}
+            events={activityEvents}
+            runs={runs}
+            workspace={dashboard?.workspace ?? null}
+            selectedRunId={selectedRunId}
+            conversation={activeConversation}
+            conversationId={activeConversationBackendId}
+            onOpenRun={openRun}
+            open
+            onToggle={toggleInspectorSidebar}
+            onOpenTerminals={() => openTerminalWorkspace(null)}
+            pendingApprovals={pendingApprovals}
+            liveStatus={liveStatus}
+            locale={locale}
+            t={t}
+          />
+        ) : null}
+        {workspacePanel === "browser" ? (
+          <BrowserSurfacePanel
+            projectId={selectedProjectId}
+            dashboard={dashboard}
+            onToggle={toggleBrowserSidebar}
+            t={t}
+          />
+        ) : null}
       </main>
+      <TokenStatusBar projectId={selectedProjectId} dashboard={dashboard} t={t} />
     </div>
   );
 }
 
-function ConversationSidebar({ conversations, activeConversationId, onSelect, onNew, open, onToggle, locale, t }) {
+function ConversationSidebar({ conversations, activeConversationId, onSelect, onNew, open, onToggle, jonUnread, jonHasAlert, locale, t }) {
   if (!open) {
     return (
       <aside className="conversation-sidebar collapsed" aria-label={t.conversations} data-testid="conversation-sidebar">
+        <button
+          type="button"
+          className={`side-rail-button ${activeConversationId === JON_CONVERSATION_ID ? "active-button" : ""} ${jonHasAlert ? "jon-rail-alert" : ""}`}
+          onClick={() => onSelect(JON_CONVERSATION_ID)}
+          aria-label="JON"
+          title="JON"
+        >
+          <span className={jonHasAlert ? "jon-rail-icon-alert" : ""}>◈</span>
+          <small>JON</small>
+          {jonUnread > 0 ? <span className="rail-count-badge warn">{jonUnread}</span> : null}
+        </button>
         <button type="button" className="side-rail-button" onClick={onToggle} aria-label={t.openConversations} title={t.openConversations}>
           <span>≡</span>
           <small>{t.conversationsShort}</small>
@@ -1077,9 +1743,25 @@ function ConversationSidebar({ conversations, activeConversationId, onSelect, on
         </div>
         <div className="side-panel-actions">
           <button type="button" className="small" onClick={onNew}>{t.new}</button>
-          <button type="button" className="ghost small" onClick={onToggle}>{t.collapse}</button>
+          <button type="button" className="ghost small" onClick={onToggle} aria-label={t.collapseConversations} title={t.collapseConversations}>{t.collapse}</button>
         </div>
       </div>
+
+      <button
+        type="button"
+        className={`jon-conversation-item ${activeConversationId === JON_CONVERSATION_ID ? "selected" : ""}`}
+        onClick={() => onSelect(JON_CONVERSATION_ID)}
+        data-testid="jon-conversation-item"
+      >
+        <div className={`jon-conversation-bubble ${jonHasAlert ? "has-alert" : ""}`}>◈</div>
+        <div className="jon-conversation-info">
+          <strong>JON</strong>
+          <span>{t.jonPilotHint}</span>
+        </div>
+        {jonUnread > 0 ? <span className="jon-unread-badge">{jonUnread}</span> : null}
+      </button>
+      <div className="conversation-separator" />
+
       <p className="side-panel-hint">{t.localOnlyHint}</p>
       <div className="conversation-list">
         {conversations.length === 0 ? <p className="muted">{t.noConversation}</p> : null}
@@ -1096,6 +1778,32 @@ function ConversationSidebar({ conversations, activeConversationId, onSelect, on
           </button>
         ))}
       </div>
+    </aside>
+  );
+}
+
+function WorkspaceRail({ onOpenTerminals, onOpenTrace, onCreateTerminal, onOpenBrowser, workspace, run, t }) {
+  const terminals = workspace?.terminals ?? [];
+  const activeCount = terminals.filter((terminal) => ["running", "waiting_for_input", "needs_attention"].includes(terminal.status)).length;
+  return (
+    <aside className="workspace-rail collapsed" aria-label={t.workspacePanel ?? t.terminalSurfaces} data-testid="workspace-rail">
+      <button type="button" className="side-rail-button" onClick={onOpenTerminals} aria-label={t.openTerminals} title={t.openTerminals}>
+        <span>⌁</span>
+        <small>Term.</small>
+        {activeCount > 0 ? <span className="rail-count-badge warn">{activeCount}</span> : null}
+      </button>
+      <button type="button" className="side-rail-button" onClick={onOpenTrace} aria-label={t.openInspector} title={t.openInspector}>
+        <span>◎</span>
+        <small>{t.inspectorShort}</small>
+        {run ? <span className={`rail-status-dot ${statusTone(run.status)}`} title={run.status} /> : null}
+      </button>
+      <button type="button" className="side-rail-button" onClick={onOpenBrowser} aria-label="Browser" title="Browser workspace">
+        <span>⊡</span>
+        <small>Nav.</small>
+      </button>
+      <button type="button" className="side-rail-button subtle" onClick={onCreateTerminal} aria-label={t.newTerminal} title={t.newTerminal}>
+        <span>+</span>
+      </button>
     </aside>
   );
 }
@@ -1207,7 +1915,1068 @@ function terminalStatusTone(status) {
   return "neutral";
 }
 
-function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, pendingApprovals, liveStatus, locale, t }) {
+function TerminalCard({ terminal, projectId, onInput, onStop, t, locale }) {
+  const [reply, setReply] = React.useState("");
+  const [replySent, setReplySent] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const tone = terminalStatusTone(terminal.status);
+  const isInteractiveShell = terminal.agentKind === "generic_cli";
+
+  async function handleReply() {
+    if (!reply.trim() || busy) return;
+    setBusy(true);
+    try {
+      await onInput(projectId, terminal.id, reply, { approved: true });
+      setReply("");
+      if (!isInteractiveShell) {
+        setReplySent(true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStop() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await onStop(terminal.id);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canStop = !["detached", "completed", "error"].includes(terminal.status);
+  const canReply = terminal.status === "waiting_for_input"
+    || terminal.status === "needs_attention"
+    || (isInteractiveShell && terminal.status === "running");
+
+  return (
+    <div className={`terminal-card ${tone}`}>
+      <div className="terminal-card-header">
+        <div className="terminal-card-title">
+          <span className={`mini-badge ${tone}`}>{terminalStatusLabel(terminal.status, t)}</span>
+          <strong>{terminal.label}</strong>
+          <small className="terminal-kind">{terminal.agentKind}</small>
+        </div>
+        <div className="terminal-card-actions">
+          <span className="mini-badge neutral">{terminal.autonomyMode}</span>
+          {canStop ? (
+            <button type="button" className="tiny ghost danger" onClick={handleStop} disabled={busy}>
+              {t.terminalStop}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      {terminal.recentOutput ? (
+        <pre className="terminal-output-snippet">{terminal.recentOutput.slice(-800)}</pre>
+      ) : null}
+      {canReply && !replySent ? (
+        <div className="terminal-reply-row">
+          <input
+            type="text"
+            className="terminal-reply-input"
+            placeholder={isInteractiveShell ? (t.terminalShellPlaceholder ?? t.terminalReplyPlaceholder) : t.terminalReplyPlaceholder}
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleReply(); } }}
+            disabled={busy}
+          />
+          <button type="button" className="small" onClick={handleReply} disabled={busy || !reply.trim()}>
+            {busy ? t.sending : t.terminalReplySend}
+          </button>
+        </div>
+      ) : null}
+      {replySent ? <p className="terminal-alert-sent">{t.terminalReplySentConfirm}</p> : null}
+      <small className="terminal-card-meta">{t.updated}: {formatDate(terminal.updatedAt, locale)}</small>
+    </div>
+  );
+}
+
+function terminalEventTone(event) {
+  if (event.eventType === "process.error" || event.stream === "stderr") {
+    return "danger";
+  }
+  if (event.eventType === "process.input" || event.eventType === "process.stop_requested") {
+    return "warn";
+  }
+  if (event.eventType === "process.started" || event.eventType === "process.exit") {
+    return "ok";
+  }
+  return "neutral";
+}
+
+function terminalEventHeading(event, t) {
+  if (event.eventType === "process.output") {
+    const streamLabel = event.stream === "stdout"
+      ? t.terminalStdout
+      : event.stream === "stderr"
+        ? t.terminalStderr
+        : event.stream === "stdin"
+          ? t.terminalStdin
+          : event.stream;
+    const baseLabel = streamLabel ? `${t.terminalTranscript} · ${streamLabel}` : t.terminalTranscript;
+    return event.count && event.count > 1 ? `${baseLabel} · x${event.count}` : baseLabel;
+  }
+  if (event.eventType === "process.input") {
+    return event.count && event.count > 1 ? `${t.terminalLastPrompt} · x${event.count}` : t.terminalLastPrompt;
+  }
+  if (event.eventType === "process.started") {
+    return `${t.terminalEvent} · ${t.terminalEventStart}`;
+  }
+  if (event.eventType === "process.exit") {
+    return `${t.terminalEvent} · ${t.terminalEventExit}`;
+  }
+  if (event.eventType === "process.error") {
+    return `${t.terminalEvent} · ${t.terminalEventError}`;
+  }
+  if (event.eventType === "process.stop_requested") {
+    return `${t.terminalEvent} · ${t.terminalEventStop}`;
+  }
+  return event.eventType || t.terminalEvent;
+}
+
+function terminalEventContent(event, t) {
+  if (event.content) {
+    return event.content;
+  }
+  if (event.eventType === "process.started") {
+    const pid = event.metadata?.snapshot?.pid;
+    return pid ? `pid ${pid}` : t.terminalProcessStarted;
+  }
+  if (event.eventType === "process.exit") {
+    const exitCode = event.metadata?.exitCode;
+    const signal = event.metadata?.signal;
+    if (exitCode != null) {
+      return `${t.terminalExitCode} ${exitCode}`;
+    }
+    if (signal) {
+      return `${t.terminalSignal} ${signal}`;
+    }
+    return t.terminalProcessExited;
+  }
+  if (event.eventType === "process.error") {
+    return event.metadata?.message ?? t.terminalProcessError;
+  }
+  return "";
+}
+
+function activeTerminalProcess(terminal, workspace = null) {
+  const liveProcess = (workspace?.liveProcesses ?? []).find((candidate) => candidate.terminalId === terminal?.id);
+  return liveProcess ?? terminal?.metadata?.process ?? null;
+}
+
+function groupTerminalEvents(events = []) {
+  const ordered = [...events].sort((left, right) => String(left.createdAt ?? "").localeCompare(String(right.createdAt ?? "")));
+  const groups = [];
+  for (const event of ordered) {
+    const previous = groups.at(-1);
+    const mergeOutput = previous
+      && event.eventType === "process.output"
+      && previous.eventType === "process.output"
+      && previous.stream === event.stream;
+    const mergeInput = previous
+      && event.eventType === "process.input"
+      && previous.eventType === "process.input";
+    if (mergeOutput || mergeInput) {
+      previous.count += 1;
+      previous.updatedAt = event.createdAt;
+      previous.content = [previous.content, event.content].filter(Boolean).join("\n");
+      continue;
+    }
+    groups.push({
+      ...event,
+      count: 1,
+      updatedAt: event.createdAt
+    });
+  }
+  return groups;
+}
+
+function terminalDecisionTone(action) {
+  if (action === "request_human_approval" || action === "suggest_user_reply") {
+    return "warn";
+  }
+  if (action === "escalate_human") {
+    return "danger";
+  }
+  if (action === "auto_inject_context") {
+    return "ok";
+  }
+  return "neutral";
+}
+
+function terminalDecisionLabel(action, t) {
+  if (action === "request_human_approval") {
+    return t.terminalDecisionRequestApproval;
+  }
+  if (action === "suggest_user_reply") {
+    return t.terminalDecisionSuggestReply;
+  }
+  if (action === "auto_inject_context") {
+    return t.terminalDecisionAutoInject;
+  }
+  if (action === "escalate_human") {
+    return t.terminalDecisionEscalate;
+  }
+  return t.terminalDecisionObserve;
+}
+
+function terminalExpectation(terminal, latestDecision, missionObjective, t) {
+  if (latestDecision?.action === "request_human_approval") {
+    return {
+      tone: "warn",
+      title: t.terminalWhatJonNeeds,
+      detail: t.terminalAwaitingApproval,
+      next: latestDecision.reason || missionObjective || "",
+      canInject: false
+    };
+  }
+  if (latestDecision?.action === "suggest_user_reply") {
+    return {
+      tone: "warn",
+      title: t.terminalWhatJonNeeds,
+      detail: t.terminalAwaitingReply,
+      next: latestDecision.reason || terminal.recentOutput || "",
+      canInject: false
+    };
+  }
+  if (latestDecision?.action === "auto_inject_context") {
+    return {
+      tone: "ok",
+      title: t.terminalWhatJonNeeds,
+      detail: t.terminalMayInjectContext,
+      next: missionObjective || latestDecision.reason || "",
+      canInject: Boolean(missionObjective)
+    };
+  }
+  if (terminal.status === "error") {
+    return {
+      tone: "danger",
+      title: t.terminalWhatJonNeeds,
+      detail: t.terminalErrorStateSummary,
+      next: latestDecision?.reason || terminal.recentOutput || "",
+      canInject: false
+    };
+  }
+  if (terminal.status === "completed") {
+    return {
+      tone: "ok",
+      title: t.terminalWhatJonNeeds,
+      detail: t.terminalCompletedStateSummary,
+      next: latestDecision?.reason || "",
+      canInject: false
+    };
+  }
+  if (terminal.status === "running") {
+    return {
+      tone: "neutral",
+      title: t.terminalWhatJonNeeds,
+      detail: t.terminalRunningStateSummary,
+      next: latestDecision?.reason || terminal.recentOutput || "",
+      canInject: false
+    };
+  }
+  return {
+    tone: "neutral",
+    title: t.terminalWhatJonNeeds,
+    detail: t.terminalMonitoring,
+    next: latestDecision?.reason || "",
+    canInject: false
+  };
+}
+
+function XtermView({ projectId, terminalId, interactive = true }) {
+  const containerRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!containerRef.current || !projectId || !terminalId) return;
+    let term;
+    let source;
+    let fitAddon;
+    let ro;
+    let disposed = false;
+
+    Promise.all([
+      import("@xterm/xterm"),
+      import("@xterm/addon-fit")
+    ]).then(([xtermMod, fitMod]) => {
+      if (disposed || !containerRef.current) return;
+      const Terminal = xtermMod.Terminal;
+      const FitAddon = fitMod.FitAddon;
+      term = new Terminal({
+        cursorBlink: interactive,
+        fontSize: 13,
+        fontFamily: "Consolas, 'Courier New', monospace",
+        theme: { background: "#0d1117", foreground: "#e6edf3", cursor: "#58a6ff" },
+        disableStdin: !interactive
+      });
+      fitAddon = new FitAddon();
+      term.loadAddon(fitAddon);
+      term.open(containerRef.current);
+      fitAddon.fit();
+
+      source = new EventSource(
+        `/api/projects/${encodeURIComponent(projectId)}/workspace/terminals/${encodeURIComponent(terminalId)}/stream`
+      );
+      source.addEventListener("pty.data", (e) => {
+        try {
+          const { chunk } = JSON.parse(e.data);
+          term.write(atob(chunk));
+        } catch { /* malformed chunk */ }
+      });
+      source.addEventListener("pty.exit", () => {
+        term.write("\r\n\x1b[90m[process exited]\x1b[0m\r\n");
+        source.close();
+      });
+
+      if (interactive) {
+        term.onData((data) => {
+          fetch(
+            `/api/projects/${encodeURIComponent(projectId)}/workspace/terminals/${encodeURIComponent(terminalId)}/input`,
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ input: data, raw: true, approved: true })
+            }
+          ).catch(() => {});
+        });
+
+        term.onResize(({ cols, rows }) => {
+          fetch(
+            `/api/projects/${encodeURIComponent(projectId)}/workspace/terminals/${encodeURIComponent(terminalId)}/resize`,
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ cols, rows })
+            }
+          ).catch(() => {});
+        });
+      }
+
+      ro = new ResizeObserver(() => { try { fitAddon.fit(); } catch { /* ignore */ } });
+      ro.observe(containerRef.current);
+    }).catch(() => { /* import failed */ });
+
+    return () => {
+      disposed = true;
+      if (source) source.close();
+      if (ro) ro.disconnect();
+      if (term) term.dispose();
+    };
+  }, [projectId, terminalId, interactive]);
+
+  return <div ref={containerRef} className="xterm-container" />;
+}
+
+function TerminalSurfaceView({
+  terminal,
+  terminals = [],
+  terminalEvents = [],
+  terminalDecisions = [],
+  workspace,
+  projectId,
+  onSelectTerminal,
+  onInput,
+  onStop,
+  t,
+  locale
+}) {
+  const [reply, setReply] = React.useState("");
+  const [replySent, setReplySent] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const transcriptRef = React.useRef(null);
+
+  React.useEffect(() => {
+    setReply("");
+    setReplySent(false);
+  }, [terminal?.id]);
+
+  React.useEffect(() => {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+    }
+  }, [terminalEvents.length]);
+
+  if (!terminal) {
+    return (
+      <div className="terminal-surface-empty" data-testid="terminal-surface-view">
+        <strong>{t.terminalSurfaceTitle}</strong>
+        <p>{t.terminalNoSurfaceTerminal}</p>
+      </div>
+    );
+  }
+
+  const tone = terminalStatusTone(terminal.status);
+  const isInteractiveShell = terminal.agentKind === "generic_cli";
+  const isPipeTerminal = terminal.metadata?.terminalType === "pipe";
+  const canReply = terminal.status === "waiting_for_input"
+    || terminal.status === "needs_attention"
+    || (isInteractiveShell && terminal.status === "running")
+    || (isPipeTerminal && (terminal.status === "running" || terminal.status === "attached"));
+  const canStop = !["detached", "completed", "error"].includes(terminal.status);
+  const processSnapshot = activeTerminalProcess(terminal, workspace);
+  const launchMetadata = terminal.metadata?.launch ?? {};
+  const missionObjective = workspace?.missionBrief?.objective ?? null;
+  const events = terminalEvents
+    .filter((event) => event.terminalId === terminal.id)
+    .slice(0, 80)
+    .reverse();
+  const decisions = terminalDecisions
+    .filter((decision) => decision.terminalId === terminal.id)
+    .slice(0, 6);
+  const latestDecision = decisions.at(-1) ?? null;
+  const expectation = terminalExpectation(terminal, latestDecision, missionObjective, t);
+  const groupedEvents = groupTerminalEvents(events);
+
+  async function handleReply() {
+    if (!reply.trim() || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await onInput(projectId, terminal.id, reply, { approved: true });
+      setReply("");
+      if (!isInteractiveShell) {
+        setReplySent(true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStop() {
+    if (busy || !canStop) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await onStop(terminal.id);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleInjectContext() {
+    if (!missionObjective || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await onInput(projectId, terminal.id, missionObjective, { approved: true });
+      setReplySent(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="vsc-terminal" data-testid="terminal-surface-view">
+      {/* VS Code-style session tab bar */}
+      <div className="vsc-terminal-tabs">
+        {terminals.map((candidate) => (
+          <button
+            type="button"
+            key={candidate.id}
+            className={`vsc-terminal-tab ${candidate.id === terminal.id ? "active" : ""}`}
+            onClick={() => onSelectTerminal(candidate.id)}
+          >
+            <span className={`vsc-tab-dot ${terminalStatusTone(candidate.status)}`} />
+            <span>{candidate.label}</span>
+            <span className="vsc-tab-kind">{candidate.agentKind}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* JON context / current state bar */}
+      <div className={`vsc-terminal-jon-bar ${expectation.tone}`} data-testid="terminal-surface-current-state">
+        <span className="vsc-jon-icon">⌁</span>
+        <span className="vsc-jon-title">{expectation.title}</span>
+        <strong className="vsc-jon-detail">{expectation.detail}</strong>
+        {missionObjective ? <span className="vsc-jon-mission">{missionObjective}</span> : null}
+        {expectation.next && expectation.next !== missionObjective ? (
+          <span className="vsc-jon-next">{expectation.next}</span>
+        ) : null}
+      </div>
+
+      {/* Dark terminal body */}
+      {terminal.metadata?.terminalType === "pty" || terminal.metadata?.terminalType === "pipe" ? (
+        <XtermView
+          projectId={projectId}
+          terminalId={terminal.id}
+          interactive={terminal.metadata?.terminalType === "pty"}
+        />
+      ) : (
+        <div ref={transcriptRef} className="vsc-terminal-body" data-testid="terminal-transcript-grouped">
+          <div className="vsc-term-meta">
+            <span className="vsc-term-meta-item">$ {terminal.command || launchMetadata.command || terminal.agentKind}</span>
+            {(terminal.cwd || launchMetadata.cwd) ? (
+              <span className="vsc-term-meta-item">{terminal.cwd || launchMetadata.cwd}</span>
+            ) : null}
+            {processSnapshot?.pid ? (
+              <span className="vsc-term-meta-item">pid {processSnapshot.pid}</span>
+            ) : null}
+            {terminal.authorized ? (
+              <span className="vsc-term-meta-item vsc-term-ok">{t.terminalAuthorized}</span>
+            ) : null}
+          </div>
+
+          {groupedEvents.length === 0 ? (
+            terminal.recentOutput ? (
+              <div className="vsc-term-line neutral"><pre className="vsc-term-pre">{terminal.recentOutput}</pre></div>
+            ) : (
+              <div className="vsc-term-empty">{t.terminalNoTranscript}</div>
+            )
+          ) : (
+            groupedEvents.map((event) => (
+              <div key={event.id} className={`vsc-term-line ${terminalEventTone(event)}`}>
+                <span className="vsc-term-type">{terminalEventHeading(event, t)}</span>
+                {terminalEventContent(event, t) ? (
+                  <pre className="vsc-term-pre">{terminalEventContent(event, t)}</pre>
+                ) : null}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Reply input — VS Code terminal prompt style; hidden when xterm handles the session */}
+      {terminal.metadata?.terminalType !== "pty" ? (
+        canReply ? (
+          <div className="vsc-terminal-prompt">
+            <span className="vsc-prompt-glyph">$</span>
+            <input
+              type="text"
+              className="terminal-reply-input vsc-prompt-input"
+              placeholder={isInteractiveShell ? (t.terminalShellPlaceholder ?? t.terminalReplyPlaceholder) : t.terminalReplyPlaceholder}
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  handleReply();
+                }
+              }}
+              disabled={busy}
+            />
+            <button type="button" className="vsc-prompt-send" onClick={handleReply} disabled={busy || !reply.trim()}>
+              {busy ? t.sending : t.terminalReplySend}
+            </button>
+            {canStop ? (
+              <button type="button" className="vsc-prompt-stop" onClick={handleStop} disabled={busy}>
+                {t.terminalStop}
+              </button>
+            ) : null}
+            {expectation.canInject ? (
+              <button type="button" className="vsc-prompt-inject" onClick={handleInjectContext} disabled={busy}>
+                {t.terminalInjectContextNow}
+              </button>
+            ) : null}
+          </div>
+        ) : canStop ? (
+          <div className="vsc-terminal-actions">
+            <button type="button" className="ghost small" onClick={handleStop} disabled={busy}>
+              {t.terminalStop}
+            </button>
+            {expectation.canInject ? (
+              <button type="button" className="secondary small" onClick={handleInjectContext} disabled={busy}>
+                {t.terminalInjectContextNow}
+              </button>
+            ) : null}
+          </div>
+        ) : null
+      ) : canStop ? (
+        <div className="vsc-terminal-actions">
+          <button type="button" className="ghost small" onClick={handleStop} disabled={busy}>
+            {t.terminalStop}
+          </button>
+        </div>
+      ) : null}
+
+      {replySent ? <p className="terminal-alert-sent vsc-reply-sent">{t.terminalReplySentConfirm}</p> : null}
+    </section>
+  );
+}
+
+function parseCliArgs(raw) {
+  const args = [];
+  let current = "";
+  let inQuote = null;
+  for (const char of String(raw ?? "")) {
+    if (inQuote) {
+      if (char === inQuote) { inQuote = null; }
+      else { current += char; }
+    } else if (char === '"' || char === "'") {
+      inQuote = char;
+    } else if (char === " " || char === "\t") {
+      if (current) { args.push(current); current = ""; }
+    } else {
+      current += char;
+    }
+  }
+  if (current) { args.push(current); }
+  return args;
+}
+
+function TerminalOverlay({
+  terminalId,
+  terminals,
+  terminalEvents,
+  terminalDecisions,
+  workspace,
+  projectId,
+  onInput,
+  onStop,
+  onClose,
+  onSelectTerminal,
+  fullscreen,
+  onToggleFullscreen,
+  t,
+  locale
+}) {
+  const terminal = terminals.find((term) => term.id === terminalId) ?? null;
+  const tone = terminal ? terminalStatusTone(terminal.status) : "neutral";
+
+  return (
+    <div className={`terminal-overlay ${fullscreen ? "fullscreen" : "split"}`} data-testid="terminal-overlay">
+      <div className="terminal-overlay-bar">
+        <div className="terminal-overlay-bar-left">
+          {terminal ? (
+            <>
+              <span className={`mini-badge ${tone}`}>{terminalStatusLabel(terminal.status, t)}</span>
+              <strong className="terminal-overlay-label">{terminal.label}</strong>
+              <span className="terminal-kind">{terminal.agentKind}</span>
+            </>
+          ) : (
+            <strong className="terminal-overlay-label">{t.terminalSurfaceTitle}</strong>
+          )}
+        </div>
+        <div className="terminal-overlay-bar-right">
+          <button
+            type="button"
+            className="ghost small"
+            onClick={onToggleFullscreen}
+            title={fullscreen ? t.terminalExitFullscreen : t.terminalFullscreen}
+            aria-label={fullscreen ? t.terminalExitFullscreen : t.terminalFullscreen}
+          >
+            {fullscreen ? "⊡" : "⊞"}
+          </button>
+          <button
+            type="button"
+            className="ghost small"
+            onClick={onClose}
+            title={t.terminalClosePanel}
+            aria-label={t.terminalClosePanel}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+      <div className="terminal-overlay-body">
+        <TerminalSurfaceView
+          terminal={terminal}
+          terminals={terminals}
+          terminalEvents={terminalEvents}
+          terminalDecisions={terminalDecisions}
+          workspace={workspace}
+          projectId={projectId}
+          onSelectTerminal={onSelectTerminal}
+          onInput={onInput}
+          onStop={onStop}
+          t={t}
+          locale={locale}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TerminalSidebar({
+  projectId,
+  conversationId,
+  workspace,
+  onTerminalInput,
+  onRefresh,
+  open,
+  onToggle,
+  onOpenTrace,
+  requestedView,
+  onViewHandled,
+  availableCliAgents = [],
+  onRequestOpenView,
+  viewMode,
+  onViewModeChange,
+  onOpenOverlay,
+  activeOverlayId,
+  t,
+  locale
+}) {
+  const [showLaunch, setShowLaunch] = React.useState(false);
+  const [showAttach, setShowAttach] = React.useState(false);
+  const [showMission, setShowMission] = React.useState(false);
+  const [launchCommand, setLaunchCommand] = React.useState(availableCliAgents[0]?.command ?? "");
+  const [launchLabel, setLaunchLabel] = React.useState("");
+  const [launchArgs, setLaunchArgs] = React.useState("");
+  const [launchCwd, setLaunchCwd] = React.useState("");
+  const [launchAutonomy, setLaunchAutonomy] = React.useState("assisted");
+  const [launchError, setLaunchError] = React.useState(null);
+  const [launchBusy, setLaunchBusy] = React.useState(false);
+  const [attachLabel, setAttachLabel] = React.useState("");
+  const [attachKind, setAttachKind] = React.useState("generic_cli");
+  const [attachStatus, setAttachStatus] = React.useState("attached");
+  const [attachOutput, setAttachOutput] = React.useState("");
+  const [attachAuthorized, setAttachAuthorized] = React.useState(true);
+  const [attachAutonomy, setAttachAutonomy] = React.useState("assisted");
+  const [attachError, setAttachError] = React.useState(null);
+  const [attachBusy, setAttachBusy] = React.useState(false);
+  const [missionObjective, setMissionObjective] = React.useState("");
+  const [missionBusy, setMissionBusy] = React.useState(false);
+  const missionBrief = workspace?.missionBrief ?? null;
+  const terminals = workspace?.terminals ?? [];
+  const activeCount = terminals.filter((terminal) => ["running", "waiting_for_input", "needs_attention"].includes(terminal.status)).length;
+
+  const prevObjectiveRef = React.useRef(null);
+  React.useEffect(() => {
+    if (missionBrief?.objective && missionBrief.objective !== prevObjectiveRef.current) {
+      prevObjectiveRef.current = missionBrief.objective;
+      setMissionObjective(missionBrief.objective);
+    }
+  }, [missionBrief?.objective]);
+
+  React.useEffect(() => {
+    if (availableCliAgents.length === 0) {
+      setLaunchCommand("");
+      return;
+    }
+    if (!availableCliAgents.some((agent) => agent.command === launchCommand)) {
+      setLaunchCommand(availableCliAgents[0].command);
+    }
+  }, [availableCliAgents, launchCommand]);
+
+  React.useEffect(() => {
+    if (!open || !requestedView) {
+      return;
+    }
+    setShowLaunch(requestedView === "launch");
+    setShowAttach(requestedView === "attach");
+    setShowMission(requestedView === "mission");
+    if (requestedView === "launch") {
+      setLaunchError(null);
+    }
+    if (requestedView === "attach") {
+      setAttachError(null);
+    }
+    onViewHandled?.();
+  }, [open, requestedView, onViewHandled]);
+
+  async function handleLaunch() {
+    if (!projectId || !launchCommand || launchBusy) return;
+    setLaunchBusy(true);
+    setLaunchError(null);
+    try {
+      const response = await api(`/api/projects/${projectId}/workspace/terminal-processes`, {
+        method: "POST",
+        body: JSON.stringify({
+          command: launchCommand,
+          args: launchArgs.trim() ? parseCliArgs(launchArgs) : [],
+          label: launchLabel.trim() || launchCommand,
+          cwd: launchCwd.trim() || undefined,
+          autonomyMode: launchAutonomy,
+          conversationId: conversationId ?? undefined,
+          authorized: true
+        })
+      });
+      setShowLaunch(false);
+      setLaunchLabel("");
+      setLaunchArgs("");
+      setLaunchCwd("");
+      await onRefresh();
+      if (response?.terminal?.id) {
+        onOpenOverlay?.(response.terminal.id);
+      }
+    } catch (error) {
+      setLaunchError(error.message);
+    } finally {
+      setLaunchBusy(false);
+    }
+  }
+
+  async function handleAttach() {
+    if (!projectId || !attachLabel.trim() || attachBusy) return;
+    setAttachBusy(true);
+    setAttachError(null);
+    try {
+      const response = await api(`/api/projects/${projectId}/workspace/terminals`, {
+        method: "POST",
+        body: JSON.stringify({
+          label: attachLabel.trim(),
+          agentKind: attachKind,
+          status: attachStatus,
+          recentOutput: attachOutput.trim(),
+          authorized: attachAuthorized,
+          autonomyMode: attachAutonomy,
+          conversationId: conversationId ?? undefined,
+          processRunning: attachStatus === "running" || attachStatus === "waiting_for_input"
+        })
+      });
+      setShowAttach(false);
+      setAttachLabel("");
+      setAttachOutput("");
+      await onRefresh();
+      if (response?.terminal?.id) {
+        onOpenOverlay?.(response.terminal.id);
+      }
+    } catch (error) {
+      setAttachError(error.message);
+    } finally {
+      setAttachBusy(false);
+    }
+  }
+
+  async function handleMissionSave() {
+    if (!projectId || !missionObjective.trim() || missionBusy) return;
+    setMissionBusy(true);
+    try {
+      await api(`/api/projects/${projectId}/workspace/mission-brief`, {
+        method: "POST",
+        body: JSON.stringify({ objective: missionObjective.trim(), status: "active" })
+      });
+      setShowMission(false);
+      await onRefresh();
+    } catch {
+      // silent — mission brief is optional
+    } finally {
+      setMissionBusy(false);
+    }
+  }
+
+  async function handleStopTerminal(terminalId) {
+    if (!projectId) return;
+    try {
+      await api(`/api/projects/${projectId}/workspace/terminals/${encodeURIComponent(terminalId)}/stop`, {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+      await onRefresh();
+    } catch {
+      // ignore — terminal may already be stopped
+    }
+  }
+
+  const launchForm = (
+    <div className="workspace-form">
+      <label className="workspace-field">
+        <span>{t.terminalCommand}</span>
+        <select value={launchCommand} onChange={(e) => setLaunchCommand(e.target.value)} disabled={availableCliAgents.length === 0}>
+          {availableCliAgents.length === 0 ? <option value="">{t.noCliAgentsDetected}</option> : null}
+          {availableCliAgents.map((agent) => (
+            <option key={agent.id} value={agent.command}>{agent.label}</option>
+          ))}
+        </select>
+      </label>
+      {availableCliAgents.length > 0 ? (
+        <p className="workspace-form-hint">{t.availableCliAgents}: {availableCliAgents.map((agent) => agent.label).join(", ")}</p>
+      ) : (
+        <p className="workspace-form-error">{t.noCliAgentsDetected}</p>
+      )}
+      <label className="workspace-field">
+        <span>{t.terminalLabel}</span>
+        <input type="text" value={launchLabel} onChange={(e) => setLaunchLabel(e.target.value)} placeholder={launchCommand} />
+      </label>
+      <label className="workspace-field">
+        <span>{t.terminalArgs}</span>
+        <input type="text" value={launchArgs} onChange={(e) => setLaunchArgs(e.target.value)} placeholder='--no-ansi --print "hello world"' />
+      </label>
+      <label className="workspace-field">
+        <span>{t.terminalCwd}</span>
+        <input type="text" value={launchCwd} onChange={(e) => setLaunchCwd(e.target.value)} placeholder={t.terminalCwdPlaceholder} />
+      </label>
+      <label className="workspace-field">
+        <span>{t.terminalAutonomyMode}</span>
+        <select value={launchAutonomy} onChange={(e) => setLaunchAutonomy(e.target.value)}>
+          <option value="assisted">{t.autonomyAssisted}</option>
+          <option value="supervised_autonomy">{t.autonomySupervised}</option>
+          <option value="manual_only">{t.autonomyManual}</option>
+        </select>
+      </label>
+      {launchError ? <p className="workspace-form-error">{launchError}</p> : null}
+      <div className="workspace-form-actions">
+        <button type="button" className="small" onClick={handleLaunch} disabled={launchBusy || availableCliAgents.length === 0 || !launchCommand}>
+          {launchBusy ? t.sending : t.terminalLaunchBtn}
+        </button>
+        <button type="button" className="ghost small" onClick={() => { setShowLaunch(false); setLaunchError(null); }}>{t.hide}</button>
+      </div>
+    </div>
+  );
+
+  const attachForm = (
+    <div className="workspace-form">
+      <label className="workspace-field">
+        <span>{t.terminalLabel}</span>
+        <input type="text" value={attachLabel} onChange={(e) => setAttachLabel(e.target.value)} placeholder={t.terminalLabel} />
+      </label>
+      <label className="workspace-field">
+        <span>{t.terminalAgent}</span>
+        <select value={attachKind} onChange={(e) => setAttachKind(e.target.value)}>
+          <option value="codex_cli">{t.agentKindCodexCli}</option>
+          <option value="claude_code_cli">{t.agentKindClaudeCode}</option>
+          <option value="generic_cli">{t.agentKindGenericCli}</option>
+          <option value="unknown">{t.agentKindUnknown}</option>
+        </select>
+      </label>
+      <label className="workspace-field">
+        <span>{t.status}</span>
+        <select value={attachStatus} onChange={(e) => setAttachStatus(e.target.value)}>
+          <option value="attached">{t.statusAttachedLabel}</option>
+          <option value="running">{t.statusRunningLabel}</option>
+          <option value="waiting_for_input">{t.statusWaitingLabel}</option>
+          <option value="needs_attention">{t.statusNeedsAttentionLabel}</option>
+        </select>
+      </label>
+      <label className="workspace-field">
+        <span>{t.terminalAutonomyMode}</span>
+        <select value={attachAutonomy} onChange={(e) => setAttachAutonomy(e.target.value)}>
+          <option value="assisted">{t.autonomyAssisted}</option>
+          <option value="supervised_autonomy">{t.autonomySupervised}</option>
+          <option value="manual_only">{t.autonomyManual}</option>
+        </select>
+      </label>
+      <label className="workspace-field">
+        <span>{t.terminalTranscript}</span>
+        <textarea rows={3} value={attachOutput} onChange={(e) => setAttachOutput(e.target.value)} placeholder={t.terminalRecentOutputHint} />
+      </label>
+      <label className="workspace-field checkbox">
+        <input type="checkbox" checked={attachAuthorized} onChange={(e) => setAttachAuthorized(e.target.checked)} />
+        <span>{t.terminalAuthorizedLabel}</span>
+      </label>
+      {attachError ? <p className="workspace-form-error">{attachError}</p> : null}
+      <div className="workspace-form-actions">
+        <button type="button" className="small" onClick={handleAttach} disabled={attachBusy || !attachLabel.trim()}>
+          {attachBusy ? t.sending : t.terminalAttachBtn}
+        </button>
+        <button type="button" className="ghost small" onClick={() => { setShowAttach(false); setAttachError(null); }}>{t.hide}</button>
+      </div>
+    </div>
+  );
+
+  if (!open) {
+    return (
+      <aside className="terminal-sidebar collapsed" aria-label={t.terminalSurfaces} data-testid="terminal-sidebar">
+        <button type="button" className="side-rail-button" onClick={onToggle} aria-label={t.terminalSurfaces} title={t.terminalSurfaces}>
+          <span>⌁</span>
+          <small>Term.</small>
+          {activeCount > 0 ? <span className="rail-count-badge warn">{activeCount}</span> : null}
+        </button>
+        <button
+          type="button"
+          className="side-rail-button subtle"
+          title={t.newTerminal}
+          aria-label={t.newTerminal}
+          onClick={() => { if (onRequestOpenView) { onRequestOpenView("launch"); } else { onToggle(); } }}
+        >
+          <span>+</span>
+        </button>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="terminal-sidebar open" aria-label={t.terminalSurfaces} data-testid="terminal-sidebar">
+      <div className="side-panel-header">
+        <div>
+          <p className="eyebrow">Workspace AI</p>
+          <h2>{t.terminalSurfaces}</h2>
+        </div>
+        <div className="side-panel-actions">
+          <button type="button" className="ghost small" onClick={onOpenTrace}>{t.runInspector}</button>
+          <button type="button" className="ghost small" onClick={onToggle} aria-label={t.collapseTerminals} title={t.collapseTerminals}>{t.collapse}</button>
+        </div>
+      </div>
+
+      <section className="terminal-sidebar-mission">
+        <div className="activity-section-header">
+          <strong className="sidebar-section-label">{t.workspaceMission}</strong>
+          <button type="button" className="ghost tiny" onClick={() => setShowMission(!showMission)}>
+            {showMission ? t.hide : (missionBrief ? t.options : t.setMissionBrief)}
+          </button>
+        </div>
+        {showMission ? (
+          <div className="workspace-form">
+            <textarea
+              className="workspace-form-textarea"
+              placeholder={t.missionBriefPlaceholder}
+              value={missionObjective}
+              onChange={(e) => setMissionObjective(e.target.value)}
+              rows={3}
+            />
+            <div className="workspace-form-actions">
+              <button type="button" className="small" onClick={handleMissionSave} disabled={missionBusy || !missionObjective.trim()}>
+                {missionBusy ? t.sending : t.save}
+              </button>
+              <button type="button" className="ghost small" onClick={() => setShowMission(false)}>{t.hide}</button>
+            </div>
+          </div>
+        ) : missionBrief ? (
+          <div className="terminal-mission-card">
+            <p className="terminal-mission-objective">{missionBrief.objective}</p>
+            {missionBrief.blockers?.length > 0 ? (
+              <p className="terminal-mission-meta warn">{t.missionBriefBlockers}: {missionBrief.blockers[0]}</p>
+            ) : null}
+            {missionBrief.nextSteps?.length > 0 ? (
+              <p className="terminal-mission-meta">{t.nextSteps}: {missionBrief.nextSteps[0]}</p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="muted small-muted">{t.noWorkspaceMission}</p>
+        )}
+      </section>
+
+      <div className="terminal-sidebar-actions">
+        <button
+          type="button"
+          className={`terminal-action-btn ${showLaunch ? "active" : ""}`}
+          onClick={() => { setShowLaunch(!showLaunch); setShowAttach(false); setLaunchError(null); }}
+        >
+          <span>↗</span> {t.launchCli}
+        </button>
+        <button
+          type="button"
+          className={`terminal-action-btn ${showAttach ? "active" : ""}`}
+          onClick={() => { setShowAttach(!showAttach); setShowLaunch(false); setAttachError(null); }}
+        >
+          <span>⊕</span> {t.attachTerminal}
+        </button>
+      </div>
+
+      {showLaunch ? launchForm : null}
+      {showAttach ? attachForm : null}
+
+      <div className="terminal-sidebar-list" data-testid="terminal-list">
+        {terminals.length === 0 && !showLaunch && !showAttach ? (
+          <div className="terminal-empty-state">
+            <p>{t.noTerminals}</p>
+            <small>{t.terminalWorkspaceLead}</small>
+          </div>
+        ) : null}
+        {terminals.slice(0, 20).map((terminal) => (
+          <button
+            key={terminal.id}
+            type="button"
+            className={`terminal-row-item ${terminal.id === activeOverlayId ? "active" : ""}`}
+            onClick={() => onOpenOverlay?.(terminal.id)}
+          >
+            <span className={`terminal-row-dot ${terminalStatusTone(terminal.status)}`} />
+            <span className="terminal-row-label">{terminal.label}</span>
+            <span className="mini-badge neutral">{terminal.agentKind}</span>
+            <span className={`mini-badge ${terminalStatusTone(terminal.status)}`}>{terminalStatusLabel(terminal.status, t)}</span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, onOpenTerminals, pendingApprovals, liveStatus, locale, t }) {
   const linkedRunIds = new Set([
     ...(Array.isArray(conversation?.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : []),
     conversation?.metadata?.latestRunId,
@@ -1242,6 +3011,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
   const workspaceTerminals = workspace?.terminals ?? [];
   const workspaceDecisions = workspace?.decisions ?? [];
   const workspaceAlerts = workspace?.alerts ?? [];
+  const workspaceTerminalEvents = workspace?.terminalEvents ?? [];
   const traceItems = runTraceItems({
     scopedRun,
     events: scopedEvents,
@@ -1272,7 +3042,8 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
         </div>
         <div className="side-panel-actions">
           <span className={`mini-badge ${liveStatus === "live" ? "ok" : "warn"}`}>{liveStatus === "live" ? t.live : t.degraded}</span>
-          <button type="button" className="ghost small" onClick={onToggle}>{t.collapse}</button>
+          <button type="button" className="ghost small" onClick={onOpenTerminals}>{t.terminalSurfaces}</button>
+          <button type="button" className="ghost small" onClick={onToggle} aria-label={t.collapseInspector} title={t.collapseInspector}>{t.collapse}</button>
         </div>
       </div>
 
@@ -1305,41 +3076,11 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
         </ol>
       </section>
 
-      <section className="activity-section">
-        <h3>{t.workspaceMission}</h3>
-        {workspaceMission ? (
-          <div className="activity-card">
-            <strong>{workspaceMission.objective}</strong>
-            <span>{t.status}: {workspaceMission.status}</span>
-            {workspaceMission.nextSteps?.length > 0 ? (
-              <small>{t.nextSteps}: {workspaceMission.nextSteps.slice(0, 2).join(" · ")}</small>
-            ) : null}
-          </div>
-        ) : <p className="muted">{t.noWorkspaceMission}</p>}
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.terminalSurfaces}</h3>
-        {workspaceTerminals.length === 0 ? <p className="muted">{t.noTerminals}</p> : null}
-        {workspaceTerminals.slice(0, 6).map((terminal) => (
-          <div className="activity-card compact" key={terminal.id}>
-            <strong>{terminal.label}</strong>
-            <span>
-              <span className={`mini-badge ${terminalStatusTone(terminal.status)}`}>{terminalStatusLabel(terminal.status, t)}</span>
-              <span className="inline-separator">·</span>
-              {t.terminalAgent}: {terminal.agentKind}
-            </span>
-            <small>{t.terminalAutonomy}: {terminal.autonomyMode} · {t.terminalAuthorized}: {terminal.authorized ? "yes" : "no"}</small>
-            {terminal.lastPrompt ? <small>{terminal.lastPrompt}</small> : null}
-          </div>
-        ))}
-      </section>
-
-      {workspaceAlerts.length > 0 ? (
+      {workspace?.alerts?.length > 0 ? (
         <section className="activity-section">
           <h3>{t.terminalAlerts}</h3>
           <ol className="run-trace-list">
-            {workspaceAlerts.map((alert) => (
+            {workspace.alerts.map((alert) => (
               <li key={alert.id} className={alert.requiresApproval ? "warn" : "neutral"}>
                 <i aria-hidden="true" />
                 <div>
@@ -1463,6 +3204,19 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
       </section>
 
       <section className="activity-section">
+        <h3>{t.terminalTranscript}</h3>
+        {workspaceTerminalEvents.length === 0 ? <p className="muted">{t.noTerminalTranscript}</p> : null}
+        <ul className="activity-timeline compact">
+          {workspaceTerminalEvents.slice(-6).reverse().map((event) => (
+            <li key={event.id}>
+              <span>{event.eventType}{event.stream ? ` · ${event.stream}` : ""}</span>
+              <small>{event.content ? event.content.slice(0, 180) : formatDate(event.createdAt, locale)}</small>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="activity-section">
         <h3>{t.runHistory}</h3>
         {visibleRuns.length === 0 ? <p className="muted">{t.noRuns}</p> : null}
         <div className="compact-run-list">
@@ -1484,20 +3238,12 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 }
 
 function EmptyConversation({ t }) {
-  const examples = [
-    "Ouvre mon navigateur et cherche les dernières informations sur un sujet.",
-    "Observe la fenêtre active et dis-moi ce qui manque.",
-    "Fais une recherche puis capture une preuve exploitable."
-  ];
   return (
     <div className="empty-conversation">
       <div className="orbital-mark" aria-hidden="true" />
       <p className="eyebrow">{t.jonDesktop}</p>
       <h1>{t.emptyTitle}</h1>
       <p>{t.emptySubtitle}</p>
-      <div className="example-row">
-        {examples.map((example) => <span key={example}>{example}</span>)}
-      </div>
     </div>
   );
 }
@@ -1512,9 +3258,11 @@ function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, 
           value={draft.objective}
           onChange={(event) => onDraftChange({ objective: event.target.value })}
           onKeyDown={(event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              onReview();
+              if (!disabled && draft.objective.trim()) {
+                onReview();
+              }
             }
           }}
           placeholder={t.composerPlaceholder}
@@ -1573,7 +3321,58 @@ function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, 
   );
 }
 
-function Message({ message, onStartMission, onClarificationAnswer, busy, t }) {
+function TerminalEventMessage({ message, t }) {
+  const ev = message.terminalEvent ?? {};
+  const kindMeta = {
+    terminal_started: { icon: "⌁", labelKey: "terminalStartedTitle", tone: "neutral" },
+    terminal_completion: { icon: "✓", labelKey: "terminalCompletionTitle", tone: "ok" },
+    terminal_auto_action: { icon: "⚡", labelKey: "terminalAutoActionTitle", tone: "neutral" }
+  }[message.kind] ?? { icon: "⌁", labelKey: "terminalAlertTitle", tone: "neutral" };
+  return (
+    <article className={`react-message assistant terminal-event-message ${kindMeta.tone}`}>
+      <div className="react-avatar">{kindMeta.icon}</div>
+      <div className="react-bubble terminal-event-bubble">
+        <p className="chat-meta">{t[kindMeta.labelKey] ?? kindMeta.labelKey}</p>
+        <strong>{ev.terminalLabel ?? ev.terminalId ?? "Terminal"}</strong>
+        {ev.agentKind ? <span className="mini-badge neutral" style={{marginLeft:"6px"}}>{ev.agentKind}</span> : null}
+        {ev.recentOutput ? <pre className="terminal-output-snippet">{ev.recentOutput}</pre> : null}
+        {ev.injectedInput ? (
+          <p className="terminal-alert-reason">
+            <span className="mini-badge ok">→</span> <code>{ev.injectedInput}</code>
+            {ev.reasoning ? <span style={{marginLeft:"6px",opacity:0.7}}>— {ev.reasoning}</span> : null}
+          </p>
+        ) : null}
+        {ev.exitCode != null ? <span className="mini-badge neutral">exit {ev.exitCode}</span> : null}
+      </div>
+    </article>
+  );
+}
+
+function MissionPausedMessage({ message, t }) {
+  const pause = message.missionPause ?? {};
+  return (
+    <article className="react-message assistant terminal-event-message warn">
+      <div className="react-avatar">⏸</div>
+      <div className="react-bubble terminal-event-bubble">
+        <p className="chat-meta">{t.missionPausedTitle ?? "Mission en pause"}</p>
+        <strong>{pause.actionLabel ?? "Action manuelle requise"}</strong>
+        {pause.reason ? <p style={{marginTop:"4px",opacity:0.8}}>{pause.reason}</p> : null}
+        <p style={{marginTop:"6px",fontSize:"0.82em",opacity:0.7}}>{t.missionPausedHint ?? "Effectuez l'action puis cliquez sur Continuer dans le panneau de mission."}</p>
+      </div>
+    </article>
+  );
+}
+
+function Message({ message, onStartMission, onClarificationAnswer, onTerminalInput, busy, t }) {
+  if (message.kind === "terminal_alert") {
+    return <TerminalAlertMessage message={message} onTerminalInput={onTerminalInput} t={t} />;
+  }
+  if (message.kind === "terminal_started" || message.kind === "terminal_completion" || message.kind === "terminal_auto_action") {
+    return <TerminalEventMessage message={message} t={t} />;
+  }
+  if (message.kind === "mission_paused") {
+    return <MissionPausedMessage message={message} t={t} />;
+  }
   if (message.kind === "turn") {
     return <TurnMessage
       message={message}
@@ -1602,6 +3401,171 @@ function Message({ message, onStartMission, onClarificationAnswer, busy, t }) {
         {message.meta ? <p className="chat-meta">{message.meta}</p> : null}
         <p>{message.text}</p>
         {message.eventType ? <span className="mini-badge">{message.eventType}</span> : null}
+      </div>
+    </article>
+  );
+}
+
+function WorkspaceTerminalMessage({
+  workspace,
+  availableCliAgents = [],
+  onOpenTerminals,
+  onNewTerminal,
+  onAttachTerminal,
+  t
+}) {
+  const terminals = Array.isArray(workspace?.terminals) ? workspace.terminals : [];
+  const hasContent = terminals.length > 0 || availableCliAgents.length > 0;
+  if (!hasContent) {
+    return null;
+  }
+  const activeCount = terminals.filter((terminal) => ["running", "waiting_for_input", "needs_attention"].includes(terminal.status)).length;
+  const waitingCount = terminals.filter((terminal) => ["waiting_for_input", "needs_attention"].includes(terminal.status)).length;
+  const leadingTerminals = terminals.slice(0, 3);
+  return (
+    <article className="react-message assistant workspace-terminal-message">
+      <div className="react-avatar">⌁</div>
+      <div className="react-bubble workspace-terminal-bubble" data-testid="workspace-terminal-bubble">
+        <div className="workspace-terminal-bubble-head">
+          <div>
+            <p className="chat-meta">{t.terminalWorkspaceTitle}</p>
+            <strong>{t.terminalWorkspaceLead}</strong>
+          </div>
+          <button type="button" className="bubble-icon-button" onClick={onNewTerminal} aria-label={t.createTerminal} title={t.createTerminal}>+</button>
+        </div>
+        <div className="pill-row">
+          <span className="mini-badge neutral">{terminals.length} terminal{terminals.length > 1 ? "s" : ""}</span>
+          {activeCount > 0 ? <span className="mini-badge ok">{activeCount} {t.terminalRunning}</span> : null}
+          {waitingCount > 0 ? <span className="mini-badge warn">{waitingCount} {t.terminalWaiting}</span> : null}
+        </div>
+        {availableCliAgents.length > 0 ? (
+          <div className="workspace-terminal-agent-row">
+            <span>{t.availableCliAgents}</span>
+            <div className="workspace-terminal-agent-list">
+              {availableCliAgents.map((agent) => (
+                <span key={agent.id} className="mini-badge neutral">{agent.label}</span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="terminal-alert-reason">{t.noCliAgentsDetected}</p>
+        )}
+        {leadingTerminals.length > 0 ? (
+          <div className="workspace-terminal-mini-list">
+            {leadingTerminals.map((terminal) => (
+              <div key={terminal.id} className="workspace-terminal-mini-card">
+                <strong>{terminal.label}</strong>
+                <span>{terminalStatusLabel(terminal.status, t)} · {terminal.agentKind}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="terminal-alert-reason">{t.terminalBubbleEmpty}</p>
+        )}
+        <div className="workspace-terminal-actions">
+          <button type="button" className="secondary small" onClick={onOpenTerminals}>{t.openTerminals}</button>
+          <button type="button" className="ghost small" onClick={onAttachTerminal}>{t.attachTerminal}</button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function TerminalAlertMessage({ message, onTerminalInput, t }) {
+  const alert = message.terminalAlert ?? {};
+  const [replyInput, setReplyInput] = React.useState(alert.suggestedInput ?? "");
+  const [replySent, setReplySent] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const statusToneMap = {
+    waiting_for_input: "warn",
+    needs_attention: "warn",
+    error: "danger",
+    completed: "ok",
+    running: "neutral"
+  };
+  const tone = statusToneMap[alert.terminalStatus] ?? "neutral";
+
+  const [contextInjected, setContextInjected] = React.useState(false);
+
+  async function handleSendReply() {
+    if (!replyInput.trim() || busy) return;
+    setBusy(true);
+    try {
+      await onTerminalInput?.(alert.projectId, alert.terminalId, replyInput, { approved: true });
+      setReplySent(true);
+      setReplyInput("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleInjectContext() {
+    if (!alert.missionObjective || busy || contextInjected) return;
+    setBusy(true);
+    try {
+      await onTerminalInput?.(alert.projectId, alert.terminalId, alert.missionObjective, { approved: true });
+      setContextInjected(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const showInjectContext = alert.autonomyMode === "supervised_autonomy"
+    && alert.decisionAction === "auto_inject_context"
+    && alert.missionObjective
+    && !contextInjected;
+
+  return (
+    <article className={`react-message assistant terminal-alert-message ${tone}`}>
+      <div className="react-avatar">⌁</div>
+      <div className="react-bubble terminal-alert-bubble">
+        <p className="chat-meta">{t.terminalAlertTitle}</p>
+        <div className="terminal-alert-header">
+          <span className={`mini-badge ${tone}`}>{t[`terminal${alert.terminalStatus === "waiting_for_input" ? "Waiting" : alert.terminalStatus === "error" ? "Error" : "Running"}`] ?? alert.terminalStatus}</span>
+          <strong>{alert.terminalLabel ?? alert.agentKind}</strong>
+        </div>
+        {alert.reason ? <p className="terminal-alert-reason">{alert.reason}</p> : null}
+        {alert.recentOutput ? (
+          <pre className="terminal-output-snippet">{alert.recentOutput}</pre>
+        ) : null}
+        {alert.suggestedInput ? (
+          <p className="terminal-alert-reason">
+            <span className="mini-badge ok">{t.terminalSuggestedInput ?? "Suggestion JON"}</span>{" "}
+            <code>{alert.suggestedInput}</code>
+            {alert.suggestionReasoning ? <span style={{marginLeft:"6px",opacity:0.7}}>— {alert.suggestionReasoning}</span> : null}
+          </p>
+        ) : null}
+        {alert.decisionAction ? (
+          <p className="terminal-alert-action">
+            <span className="mini-badge neutral">{alert.decisionAction}</span>
+          </p>
+        ) : null}
+        {showInjectContext ? (
+          <div className="terminal-inject-row">
+            <button type="button" className="small warn" onClick={handleInjectContext} disabled={busy}>
+              {busy ? t.sending : t.terminalInjectContext}
+            </button>
+            <span className="terminal-inject-hint">{alert.missionObjective}</span>
+          </div>
+        ) : null}
+        {contextInjected ? <p className="terminal-alert-sent">{t.terminalContextInjected}</p> : null}
+        {(alert.terminalStatus === "waiting_for_input" || alert.terminalStatus === "needs_attention") && !replySent && !showInjectContext ? (
+          <div className="terminal-reply-row">
+            <input
+              type="text"
+              className="terminal-reply-input"
+              placeholder={t.terminalReplyPlaceholder}
+              value={replyInput}
+              onChange={(e) => setReplyInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendReply(); } }}
+              disabled={busy}
+            />
+            <button type="button" className="small" onClick={handleSendReply} disabled={busy || !replyInput.trim()}>
+              {busy ? t.sending : t.terminalReplySend}
+            </button>
+          </div>
+        ) : null}
+        {replySent ? <p className="terminal-alert-sent">{t.terminalReplySentConfirm}</p> : null}
       </div>
     </article>
   );
@@ -2149,6 +4113,275 @@ function OutcomeMessage({ run, runDetail, t }) {
         ))}
       </div>
     </article>
+  );
+}
+
+function fmtK(n) {
+  if (!n && n !== 0) return "—";
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
+function fmtUsd(n) {
+  if (!n && n !== 0) return "—";
+  if (n < 0.001) return "<$0.001";
+  return `$${n.toFixed(3)}`;
+}
+
+function usagePercent(used, budget) {
+  if (!Number.isFinite(used) || !Number.isFinite(budget) || budget <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((used / budget) * 100)));
+}
+
+function usageColor(used, budget) {
+  if (!budget || budget <= 0) return "";
+  const pct = used / budget;
+  if (pct >= 0.8) return "token-bar-danger";
+  if (pct >= 0.5) return "token-bar-warn";
+  return "token-bar-ok";
+}
+
+function BrowserSurfacePanel({ projectId, dashboard, onToggle, t }) {
+  const [state, setState] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState(null);
+
+  useEffect(() => {
+    if (!projectId) { setState(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    api(`/api/projects/${encodeURIComponent(projectId)}/workspace/browser`)
+      .then((data) => { if (!cancelled) { setState(data); setLoading(false); } })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [projectId, dashboard]);
+
+  async function handleStartBrowser() {
+    if (!projectId || starting) return;
+    setStarting(true);
+    setStartError(null);
+    try {
+      await api(`/api/projects/${encodeURIComponent(projectId)}/workspace/browser/open`, { method: "POST", body: JSON.stringify({}) });
+      const data = await api(`/api/projects/${encodeURIComponent(projectId)}/workspace/browser`);
+      setState(data);
+    } catch (err) {
+      setStartError(t.browserStartError);
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  const active = state?.activeSession ?? null;
+  const recent = state?.recentSessions ?? [];
+
+  function statusBadge(status) {
+    if (status === "active") return "ok";
+    if (status === "navigating") return "warn";
+    if (status === "error") return "danger";
+    return "muted";
+  }
+
+  return (
+    <aside className="browser-surface-panel open" aria-label="Browser workspace" data-testid="browser-surface-panel">
+      <div className="side-panel-header">
+        <div>
+          <p className="eyebrow">Workspace AI</p>
+          <h2 className="side-panel-title">Navigateur</h2>
+        </div>
+        <button type="button" className="ghost icon-only" onClick={onToggle} aria-label="Fermer">✕</button>
+      </div>
+
+      {loading && !state ? (
+        <div className="browser-panel-loading">Chargement…</div>
+      ) : null}
+
+      {active ? (
+        <section className="browser-panel-active">
+          <div className="browser-panel-status-row">
+            <span className={`browser-status-dot ${statusBadge(active.status)}`} />
+            <span className="browser-status-label">{active.status}</span>
+            <span className="browser-mode-badge">{active.mode === "workspace_browser" ? "workspace" : active.mode}</span>
+          </div>
+          {active.currentUrl ? (
+            <div className="browser-panel-url" title={active.currentUrl}>
+              <span className="browser-url-title">{active.currentTitle || active.currentUrl}</span>
+              <span className="browser-url-text">{active.currentUrl}</span>
+            </div>
+          ) : null}
+          {active.hasScreenshot && active.screenshotBase64 ? (
+            <div className="browser-panel-screenshot">
+              <img
+                src={`data:image/png;base64,${active.screenshotBase64}`}
+                alt="Capture navigateur"
+                className="browser-screenshot-img"
+              />
+            </div>
+          ) : null}
+          {active.navigationHistory?.length > 0 ? (
+            <div className="browser-panel-history">
+              <p className="browser-history-label">Historique récent</p>
+              {active.navigationHistory.slice(-5).reverse().map((nav, i) => (
+                <div key={i} className="browser-history-entry">
+                  <span className="browser-history-title">{nav.title || nav.url}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : (
+        <div className="browser-panel-inactive">
+          <p>Aucune session browser active.</p>
+          <p className="browser-panel-hint">JON ouvrira un navigateur automatiquement lors d{"'"}une mission web.</p>
+          <button
+            type="button"
+            className="primary small"
+            onClick={handleStartBrowser}
+            disabled={starting}
+            style={{ marginTop: "12px" }}
+          >
+            {starting ? t.browserStarting : t.browserStartSession}
+          </button>
+          {startError ? <p className="browser-panel-error">{startError}</p> : null}
+        </div>
+      )}
+
+      {recent.length > 0 && !active ? (
+        <section className="browser-panel-recent">
+          <p className="browser-history-label">Sessions récentes</p>
+          {recent.slice(0, 3).map((s) => (
+            <div key={s.id} className="browser-recent-entry">
+              <span className={`browser-status-dot muted`} />
+              <span className="browser-recent-url">{s.currentUrl ?? "—"}</span>
+              <span className="browser-recent-status">{s.status}</span>
+            </div>
+          ))}
+        </section>
+      ) : null}
+    </aside>
+  );
+}
+
+function TokenStatusBar({ projectId, dashboard, t }) {
+  const [usage, setUsage] = useState(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!projectId) { setUsage(null); return; }
+    let cancelled = false;
+    const load = () => {
+      api(`/api/projects/${encodeURIComponent(projectId)}/token-usage`)
+        .then((data) => { if (!cancelled) setUsage(data); })
+        .catch(() => {});
+    };
+    load();
+    const timer = setInterval(load, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [projectId, dashboard]);
+
+  const session = usage?.session ?? null;
+  const activeRun = usage?.activeRun ?? null;
+  const budgets = usage?.budgets ?? null;
+  const llmDashboard = dashboard?.llmDashboard ?? null;
+  const topStages = (llmDashboard?.topTokenDrivers?.length
+    ? llmDashboard.topTokenDrivers
+    : llmDashboard?.stageBreakdown ?? []).slice(0, 3);
+
+  const sessionTokenColor = session && budgets ? usageColor(session.totalTokens, budgets.perSessionTokens) : "";
+  const sessionCostColor = session && budgets ? usageColor(session.estimatedCost, budgets.perSessionUsd) : "";
+  const runTokenColor = activeRun && budgets ? usageColor(activeRun.totalTokens, budgets.perRunTokens) : "";
+  const runCostColor = activeRun && budgets ? usageColor(activeRun.estimatedCost, budgets.perRunUsd) : "";
+  const sessionTokenPct = usagePercent(session?.totalTokens, budgets?.perSessionTokens);
+  const sessionCostPct = usagePercent(session?.estimatedCost, budgets?.perSessionUsd);
+  const runTokenPct = usagePercent(activeRun?.totalTokens, budgets?.perRunTokens);
+  const totalCalls = session?.callCount ?? llmDashboard?.callCount ?? 0;
+
+  return (
+    <section className="token-status-bar" aria-label="Token usage">
+      <button
+        type="button"
+        className="token-dashboard-toggle"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setExpanded(false);
+        }}
+        title="Token dashboard"
+      >
+        <span className="token-dashboard-title">{t?.tokens ?? "tokens"}</span>
+        <span className={`token-dashboard-pill ${sessionTokenColor}`}>
+          <span className="token-bar-label">session</span>
+          <span>{fmtK(session?.totalTokens)}{budgets ? `/${fmtK(budgets.perSessionTokens)}` : ""}</span>
+        </span>
+        <span className="token-mini-meter" aria-hidden="true">
+          <span className={`token-mini-meter-fill ${sessionTokenColor}`} style={{ width: `${sessionTokenPct}%` }} />
+        </span>
+        <span className={`token-bar-value ${sessionCostColor}`}>
+          {fmtUsd(session?.estimatedCost)}{budgets ? `/${fmtUsd(budgets.perSessionUsd)}` : ""}
+        </span>
+        {activeRun ? (
+          <span className={`token-dashboard-pill active ${runTokenColor}`}>
+            <span className="token-bar-label">run</span>
+            <span>{fmtK(activeRun.totalTokens)}{budgets ? `/${fmtK(budgets.perRunTokens)}` : ""}</span>
+          </span>
+        ) : null}
+        <span className="token-dashboard-caret" aria-hidden="true">{expanded ? "▾" : "▴"}</span>
+      </button>
+      {expanded ? (
+        <aside className="token-dashboard-popover" aria-label="Token usage details">
+          <div className="token-dashboard-header">
+            <strong>Token dashboard</strong>
+            <span>{totalCalls} calls</span>
+          </div>
+          <div className="token-dashboard-grid">
+            <div>
+              <span className="token-detail-label">Session tokens</span>
+              <strong className={sessionTokenColor}>{fmtK(session?.totalTokens)}</strong>
+              <div className="token-detail-meter">
+                <span className={`token-detail-meter-fill ${sessionTokenColor}`} style={{ width: `${sessionTokenPct}%` }} />
+              </div>
+              <small>{sessionTokenPct}% budget</small>
+            </div>
+            <div>
+              <span className="token-detail-label">Coût session</span>
+              <strong className={sessionCostColor}>{fmtUsd(session?.estimatedCost)}</strong>
+              <div className="token-detail-meter">
+                <span className={`token-detail-meter-fill ${sessionCostColor}`} style={{ width: `${sessionCostPct}%` }} />
+              </div>
+              <small>{sessionCostPct}% budget</small>
+            </div>
+            <div>
+              <span className="token-detail-label">Run actif</span>
+              <strong className={runTokenColor}>{activeRun ? fmtK(activeRun.totalTokens) : "—"}</strong>
+              <div className="token-detail-meter">
+                <span className={`token-detail-meter-fill ${runTokenColor}`} style={{ width: `${runTokenPct}%` }} />
+              </div>
+              <small>{activeRun ? `${runTokenPct}% budget` : "aucun run"}</small>
+            </div>
+            <div>
+              <span className="token-detail-label">Coût run</span>
+              <strong className={runCostColor}>{activeRun ? fmtUsd(activeRun.estimatedCost) : "—"}</strong>
+              <small>{budgets ? `${fmtUsd(budgets.perRunUsd)} max` : "budget non défini"}</small>
+            </div>
+          </div>
+          {topStages.length > 0 ? (
+            <div className="token-stage-list">
+              <span className="token-detail-label">Postes principaux</span>
+              {topStages.map((stage, index) => (
+                <div key={`${stage.label ?? stage.stage ?? stage.stageLabel ?? "stage"}-${index}`} className="token-stage-row">
+                  <span>{stage.label ?? stage.stageLabel ?? stage.stage}</span>
+                  <strong>{fmtK(stage.totalTokens)}</strong>
+                  <small>{fmtUsd(stage.estimatedCost)}</small>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </aside>
+      ) : null}
+    </section>
   );
 }
 

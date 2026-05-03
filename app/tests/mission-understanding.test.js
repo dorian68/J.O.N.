@@ -105,6 +105,47 @@ export async function run() {
   assert.equal(browserSearch.nextRunRecommendation?.parameters?.computerAction?.type, "capture_browser_window");
   assert.equal(browserSearch.nextRunRecommendation?.parameters?.browserLaunch?.browserId, "edge");
 
+  const upworkFlatParameters = buildDeterministicMissionUnderstanding({
+    mission: "Ouvrir Upwork et lister 5 postes autour de Excel.",
+    deliverable: "Liste de 5 postes Excel sur Upwork",
+    parameters: {
+      website: "Upwork",
+      searchQuery: "Excel",
+      resultCount: 5,
+      application: "Google Chrome"
+    },
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" },
+      { id: "chrome", label: "Google Chrome", processName: "chrome" }
+    ]
+  });
+  assert.equal(upworkFlatParameters.chosenExecutionFrame, "computer_observation");
+  assert.equal(upworkFlatParameters.computerActionType, "launch_browser_search");
+  assert.equal(upworkFlatParameters.requiresClarification, false);
+  assert.equal(upworkFlatParameters.selectedBrowser?.id, "chrome");
+  assert.equal(upworkFlatParameters.browserSearchQuery, "Excel");
+  assert.equal(upworkFlatParameters.browserLaunchUrl.includes("google.com/search"), true);
+  assert.equal(upworkFlatParameters.browserLaunchUrl.includes("Upwork"), true);
+  assert.equal(upworkFlatParameters.browserLaunchUrl.includes("Excel"), true);
+
+  const linkedinFlatParameters = buildDeterministicMissionUnderstanding({
+    mission: "Open LinkedIn and list 3 data analyst jobs.",
+    parameters: {
+      website: "linkedin.com",
+      searchQuery: "data analyst",
+      resultCount: 3,
+      browser: "Chrome"
+    },
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" },
+      { id: "chrome", label: "Google Chrome", processName: "chrome" }
+    ]
+  });
+  assert.equal(linkedinFlatParameters.chosenExecutionFrame, "computer_observation");
+  assert.equal(linkedinFlatParameters.computerActionType, "launch_browser_search");
+  assert.equal(linkedinFlatParameters.selectedBrowser?.id, "chrome");
+  assert.equal(linkedinFlatParameters.browserLaunchUrl.includes("site%3Alinkedin.com"), true);
+
   const browserCaptureFollowUp = buildDeterministicMissionUnderstanding({
     mission: "Capture a visible screenshot from Microsoft Edge after the browser step completes.",
     parameters: {

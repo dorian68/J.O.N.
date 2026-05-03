@@ -106,6 +106,22 @@ Severity vocabulary:
 - Severity: high
 - Recommended action: expand from local runtime controls to release-grade operational governance only after pilot proof.
 
+### 5. Workspace browser surface — agent + approval integration partielle
+
+- Description: WorkspaceBrowserProvider est implémenté et branché à operator-service. La primitive `open_workspace_browser` est disponible. L'intégration approval-engine pour URLs hors allowlist n'est pas encore branchée sur WorkspaceBrowserProvider.
+- Source document: [workspace-browser-v1.md](./workspace-browser-v1.md)
+- Status: partially covered
+- Severity: low
+- Recommended action: brancher WorkspaceBrowserProvider.navigate sur PolicyEngine pour les URLs hors allowlist dans V2.
+
+### 6. Mobile companion — WebRTC et push notifications natifs hors scope V1
+
+- Description: la mobile gateway V1 (pairing, session, events SSE, commands, PWA) est implémentée. WebRTC screen streaming et push notifications natives (VAPID) sont hors scope V1.
+- Source document: [mobile-companion-v1.md](./mobile-companion-v1.md), [remote-control-security-model-v1.md](./remote-control-security-model-v1.md)
+- Status: partially covered
+- Severity: low
+- Recommended action: implémenter WebRTC en V2 après validation du modèle de pairing V1 en conditions réelles.
+
 ## Summary
 
 ### What is materially complete enough now

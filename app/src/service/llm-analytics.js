@@ -68,6 +68,29 @@ function estimatedCostSnapshot(call) {
   };
 }
 
+function providerModeForCall(call) {
+  const providerAlias = String(call?.providerAlias ?? "").trim();
+  const resultStatus = String(call?.resultStatus ?? "").trim();
+  const executionMode = call?.metadata?.tokenGovernance?.executionMode ?? null;
+
+  if (executionMode === "suppressed" || providerAlias === "governance") {
+    return "suppressed";
+  }
+  if (resultStatus === "failed") {
+    return "failed";
+  }
+  if (providerAlias === "openai_compatible") {
+    return "live";
+  }
+  if (providerAlias === "mock_offline") {
+    return "mock";
+  }
+  if (providerAlias === "deterministic_fallback") {
+    return "deterministic";
+  }
+  return "other";
+}
+
 function buildEmptyStageSummary(stage) {
   return {
     stage,
@@ -83,6 +106,12 @@ function buildEmptyStageSummary(stage) {
     downgradedCalls: 0,
     fallbackCalls: 0,
     degradedCalls: 0,
+    liveCalls: 0,
+    mockCalls: 0,
+    deterministicCalls: 0,
+    suppressedProviderCalls: 0,
+    failedProviderCalls: 0,
+    otherProviderCalls: 0,
     compactionCalls: 0
   };
 }
@@ -100,6 +129,12 @@ function buildEmptySummary() {
     downgradedCalls: 0,
     fallbackCalls: 0,
     degradedCalls: 0,
+    liveCalls: 0,
+    mockCalls: 0,
+    deterministicCalls: 0,
+    suppressedProviderCalls: 0,
+    failedProviderCalls: 0,
+    otherProviderCalls: 0,
     compactionCalls: 0,
     exactTokenCalls: 0,
     estimatedTokenCalls: 0,
@@ -108,6 +143,14 @@ function buildEmptySummary() {
     estimatedCostCalls: 0,
     unavailableCostCalls: 0,
     stageBreakdown: [],
+    providerModeBreakdown: {
+      live: 0,
+      mock: 0,
+      deterministic: 0,
+      suppressed: 0,
+      failed: 0,
+      other: 0
+    },
     topCostDrivers: [],
     topTokenDrivers: [],
     recentRuns: [],
@@ -129,6 +172,7 @@ function summarizeSingleCall(call, stageSummary, summary) {
   const fallbackUsed = Boolean(call?.metadata?.fallbackUsed);
   const degradedModeUsed = Boolean(call?.metadata?.degradedModeUsed);
   const compacted = Boolean(call?.metadata?.inputCompaction?.applied);
+  const providerMode = providerModeForCall(call);
 
   summary.callCount += 1;
   summary.inputTokens += tokenSnapshot.inputTokens;
@@ -165,6 +209,33 @@ function summarizeSingleCall(call, stageSummary, summary) {
     summary.degradedCalls += 1;
     stageSummary.degradedCalls += 1;
   }
+  switch (providerMode) {
+    case "live":
+      summary.liveCalls += 1;
+      stageSummary.liveCalls += 1;
+      break;
+    case "mock":
+      summary.mockCalls += 1;
+      stageSummary.mockCalls += 1;
+      break;
+    case "deterministic":
+      summary.deterministicCalls += 1;
+      stageSummary.deterministicCalls += 1;
+      break;
+    case "suppressed":
+      summary.suppressedProviderCalls += 1;
+      stageSummary.suppressedProviderCalls += 1;
+      break;
+    case "failed":
+      summary.failedProviderCalls += 1;
+      stageSummary.failedProviderCalls += 1;
+      break;
+    default:
+      summary.otherProviderCalls += 1;
+      stageSummary.otherProviderCalls += 1;
+      break;
+  }
+  summary.providerModeBreakdown[providerMode] = (summary.providerModeBreakdown[providerMode] ?? 0) + 1;
   if (compacted) {
     summary.compactionCalls += 1;
     stageSummary.compactionCalls += 1;
@@ -209,6 +280,13 @@ function buildRecentRunSummaries(runs, calls) {
       estimatedCost: runSummary.estimatedCost,
       fallbackCalls: runSummary.fallbackCalls,
       degradedCalls: runSummary.degradedCalls,
+      liveCalls: runSummary.liveCalls,
+      mockCalls: runSummary.mockCalls,
+      deterministicCalls: runSummary.deterministicCalls,
+      suppressedCalls: runSummary.suppressedCalls,
+      suppressedProviderCalls: runSummary.suppressedProviderCalls,
+      failedProviderCalls: runSummary.failedProviderCalls,
+      providerModeBreakdown: runSummary.providerModeBreakdown,
       blockedCalls: runSummary.blockedCalls,
       reusedCalls: runSummary.reusedCalls
     };

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "ui:build": "vite build --config ui/vite.config.mjs",
+    "ui:build:mobile": "vite build --config ui/mobile/vite.mobile.config.mjs",
     "test": "node src/scripts/run-tests.js",
     "preoperator:server": "npm run ui:build --silent",
     "fixtures:server": "node src/scripts/start-fixture-server.js",
@@ -19,6 +20,8 @@
     "smoke:agentic-desktop": "node src/scripts/run-agentic-desktop-smoke.js",
     "smoke:browser-operator": "node src/scripts/run-browser-operator-smoke.js",
     "smoke:browser-planner": "node src/scripts/run-browser-planner-smoke.js",
+    "smoke:cowork": "node src/scripts/run-cowork-smoke-pipeline.js",
+    "smoke:real-surfaces": "node src/scripts/run-real-surface-smoke-pipeline.js",
     "mission:sample": "node src/scripts/run-sample-mission.js",
     "llm:smoke": "node src/scripts/run-llm-smoke-validation.js",
     "secret:llm": "node src/scripts/manage-llm-secret.js",
@@ -37,9 +40,14 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.1",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0",
     "playwright": "^1.54.2",
+    "qrcode": "^1.5.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "vite": "^8.0.9"
+    "vite": "^8.0.9",
+    "ws": "^8.20.0"
   }
 }

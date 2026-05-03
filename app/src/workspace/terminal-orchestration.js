@@ -50,15 +50,28 @@ function includesPattern(text, patterns) {
 }
 
 export function detectCliAgentKind({ command = "", title = "", recentOutput = "" } = {}) {
-  const haystack = `${command}\n${title}\n${recentOutput}`.toLowerCase();
-  if (/\bcodex\b/.test(haystack) || haystack.includes("openai codex")) {
+  // Primary check: command name and title (authoritative, not noisy)
+  const commandAndTitle = `${command}\n${title}`.toLowerCase();
+  if (/\bcodex\b/.test(commandAndTitle) || commandAndTitle.includes("openai codex")) {
     return TERMINAL_AGENT_KIND.CODEX_CLI;
   }
-  if (haystack.includes("claude code") || /\bclaude\b/.test(haystack)) {
+  // Match 'claude' only in command/title; recentOutput can contain the word "claude" in any context
+  if (commandAndTitle.includes("claude code") || /\bclaude\b/.test(commandAndTitle)) {
     return TERMINAL_AGENT_KIND.CLAUDE_CODE_CLI;
   }
-  if (haystack.includes("powershell") || haystack.includes("cmd.exe") || haystack.includes("bash") || haystack.includes("terminal")) {
+  if (commandAndTitle.includes("powershell") || commandAndTitle.includes("cmd.exe") || commandAndTitle.includes("bash") || commandAndTitle.includes("terminal")) {
     return TERMINAL_AGENT_KIND.GENERIC_CLI;
+  }
+  // Secondary check: recentOutput only for unambiguous patterns
+  const output = String(recentOutput ?? "").toLowerCase();
+  if (output.includes("openai codex") || output.includes("codex cli")) {
+    return TERMINAL_AGENT_KIND.CODEX_CLI;
+  }
+  if (output.includes("claude code cli") || output.includes("claude code is")) {
+    return TERMINAL_AGENT_KIND.CLAUDE_CODE_CLI;
+  }
+  if (/\bcodex\b/.test(commandAndTitle)) {
+    return TERMINAL_AGENT_KIND.CODEX_CLI;
   }
   return TERMINAL_AGENT_KIND.UNKNOWN;
 }
@@ -76,7 +89,7 @@ export function detectTerminalState({
       confidence: 1
     };
   }
-  const text = compactText(recentOutput).toLowerCase();
+  // Process exit codes take priority over text-based heuristics.
   if (exitCode != null && exitCode !== 0) {
     return {
       status: TERMINAL_STATUS.ERROR,
@@ -84,6 +97,15 @@ export function detectTerminalState({
       confidence: 0.95
     };
   }
+  if (exitCode === 0) {
+    return {
+      status: TERMINAL_STATUS.COMPLETED,
+      reason: "Terminal exited successfully.",
+      confidence: 0.95
+    };
+  }
+  // Text-based heuristics for live processes (exitCode === null).
+  const text = compactText(recentOutput).toLowerCase();
   if (includesPattern(text, ERROR_PATTERNS)) {
     return {
       status: TERMINAL_STATUS.ERROR,
@@ -98,11 +120,11 @@ export function detectTerminalState({
       confidence: 0.86
     };
   }
-  if (exitCode === 0 || includesPattern(text, COMPLETED_PATTERNS)) {
+  if (includesPattern(text, COMPLETED_PATTERNS)) {
     return {
       status: TERMINAL_STATUS.COMPLETED,
-      reason: exitCode === 0 ? "Terminal exited successfully." : "Recent terminal output contains a completion marker.",
-      confidence: exitCode === 0 ? 0.95 : 0.78
+      reason: "Recent terminal output contains a completion marker.",
+      confidence: 0.78
     };
   }
   if (processRunning) {

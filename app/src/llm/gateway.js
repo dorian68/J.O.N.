@@ -5,6 +5,7 @@ import {
 } from "../config.js";
 import { createId, nowIso } from "../utils/ids.js";
 import { TokenGovernanceController } from "./token-governance.js";
+import { auditLlmOutput } from "../observability/audit-logger.js";
 
 function estimateSize(value) {
   return JSON.stringify(value ?? null).length;
@@ -71,6 +72,22 @@ function shouldTriggerCircuit(category) {
   return ["timeout", "provider_unavailable", "rate_limit"].includes(category);
 }
 
+function productionStrict(runtimeConfig = null, publicConfigStatus = null) {
+  return Boolean(runtimeConfig?.productionStrict ?? publicConfigStatus?.productionStrict);
+}
+
+function buildSchemaRepairMessage({ callType, error }) {
+  return {
+    role: "user",
+    content: [
+      "Your previous response was valid JSON but failed this schema/contract validation.",
+      `Call type: ${callType}.`,
+      `Validation error: ${String(error?.message ?? "malformed_output").slice(0, 1000)}.`,
+      "Return a corrected valid JSON object only. Do not explain the correction."
+    ].join("\n")
+  };
+}
+
 export class LlmGatewayError extends Error {
   constructor(message, options = {}) {
     super(message);
@@ -123,6 +140,7 @@ export class InternalLlmGateway {
       promptEnvironment: this.promptRegistry.environment,
       configIssues: this.publicConfigStatus.configIssues ?? [],
       budgets: this.publicConfigStatus.budgets ?? null,
+      vision: this.publicConfigStatus.vision ?? null,
       sessionUsage: summarizeBudgetUsage(this.sessionUsage),
       tokenGovernance: this.tokenGovernance?.getStatus() ?? null,
       providerStates: this.providerOrder.map((alias) => ({
@@ -132,6 +150,7 @@ export class InternalLlmGateway {
       })),
       deterministicFallback: this.publicConfigStatus.deterministicFallback ?? false,
       allowMockFallback: this.publicConfigStatus.allowMockFallback ?? false,
+      productionStrict: productionStrict(this.runtimeConfig, this.publicConfigStatus),
       providerDetails: this.publicConfigStatus.providers ?? {}
     };
   }
@@ -144,7 +163,8 @@ export class InternalLlmGateway {
     promptRefs,
     input,
     validateOutput,
-    metadata = {}
+    metadata = {},
+    extraMessages = []
   }) {
     const governanceDecision = this.tokenGovernance.prepareRequest({
       runId,
@@ -250,6 +270,7 @@ export class InternalLlmGateway {
       });
     }
 
+    const strictMode = productionStrict(this.runtimeConfig, this.publicConfigStatus);
     const candidates = this.providerOrder
       .map((alias) => ({
         alias,
@@ -258,8 +279,25 @@ export class InternalLlmGateway {
       .filter((entry) => entry.provider);
 
     for (const candidate of candidates) {
+      if (strictMode && candidate.alias === LLM_PROVIDER_ALIAS.MOCK_OFFLINE) {
+        fallbackChain.push({
+          providerAlias: candidate.alias,
+          errorCategory: "mock_forbidden",
+          message: "mock_offline is forbidden in production strict mode."
+        });
+        await this.#log({
+          type: "llm.gateway.provider.skipped",
+          requestId,
+          runId,
+          providerAlias: candidate.alias,
+          reason: "production_strict_mock_forbidden",
+          reasoningStage: metadata.reasoningStage ?? null
+        });
+        continue;
+      }
       const providerState = this.#getProviderState(candidate.alias);
       const now = Date.now();
+      const providerExtraMessages = [...(extraMessages ?? [])];
       if (candidate.alias === LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE && governanceDecision.skipLiveProvider) {
         fallbackChain.push({
           providerAlias: candidate.alias,
@@ -333,6 +371,7 @@ export class InternalLlmGateway {
             callType,
             modelAlias: selectedModelAlias,
             messages,
+            extraMessages: providerExtraMessages,
             input: governanceDecision.input ?? input,
             metadata
           });
@@ -377,6 +416,7 @@ export class InternalLlmGateway {
               promptEnvironment: this.promptRegistry.environment,
               fallbackUsed: fallbackChain.length > 0,
               degradedModeUsed: candidate.alias !== LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE,
+              schemaRepairAttempted: fallbackChain.some((entry) => entry.errorCategory === "malformed_output" && entry.repairRetry === true),
               usageSnapshotBefore,
               providerAttempt: attempt,
               tokenGovernance: {
@@ -416,6 +456,16 @@ export class InternalLlmGateway {
             fallbackChain: callRecord.fallbackChain,
             degradedModeUsed: callRecord.metadata.degradedModeUsed
           });
+          auditLlmOutput({
+            requestId,
+            runId,
+            projectId,
+            callType,
+            providerAlias: candidate.alias,
+            modelAlias: selectedModelAlias,
+            latencyMs: callRecord.latencyMs,
+            outputText: typeof output === "string" ? output : JSON.stringify(output)
+          });
           if (callRecord.metadata.fallbackUsed || callRecord.metadata.degradedModeUsed) {
             await this.#log({
               type: "llm.gateway.degraded_mode",
@@ -441,6 +491,12 @@ export class InternalLlmGateway {
             message: error.message,
             retryAfterMs: error.retryAfterMs ?? null
           };
+          const shouldRepairMalformedOutput = category === "malformed_output"
+            && candidate.alias === LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE
+            && attempt < this.runtimeConfig.retryPolicy.maxAttemptsPerProvider;
+          if (shouldRepairMalformedOutput) {
+            failureEntry.repairRetry = true;
+          }
           fallbackChain.push(failureEntry);
           this.#markProviderFailure(candidate.alias, category, error.retryAfterMs ?? null);
 
@@ -457,6 +513,23 @@ export class InternalLlmGateway {
             message: error.message,
             retryAfterMs: error.retryAfterMs ?? null
           });
+
+          if (shouldRepairMalformedOutput) {
+            providerExtraMessages.push(buildSchemaRepairMessage({ callType, error }));
+            await this.#log({
+              type: "llm.gateway.output_repair_retry",
+              requestId,
+              runId,
+              projectId,
+              callType,
+              providerAlias: candidate.alias,
+              modelAlias: selectedModelAlias,
+              attempt,
+              errorCategory: category,
+              message: error.message
+            });
+            continue;
+          }
 
           const shouldRetrySameProvider = isTransientCategory(category) && attempt < this.runtimeConfig.retryPolicy.maxAttemptsPerProvider;
           if (shouldRetrySameProvider) {

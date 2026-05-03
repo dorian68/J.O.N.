@@ -4,6 +4,23 @@ function normalizeText(value) {
 
 export async function captureDomSnapshot(page) {
   return page.evaluate(() => {
+    const inferRole = (element) => {
+      const explicitRole = element.getAttribute("role");
+      if (explicitRole) return explicitRole;
+      const tagName = element.tagName.toLowerCase();
+      if (tagName === "button") return "button";
+      if (tagName === "a") return "link";
+      if (tagName === "textarea") return "textbox";
+      if (tagName === "select") return "combobox";
+      if (tagName === "input") {
+        const type = (element.getAttribute("type") || "text").toLowerCase();
+        if (["button", "submit", "reset"].includes(type)) return "button";
+        if (type === "checkbox") return "checkbox";
+        if (type === "radio") return "radio";
+        return "textbox";
+      }
+      return null;
+    };
     const main = document.querySelector("main");
     const interactiveSelector = [
       "a[href]",
@@ -18,7 +35,7 @@ export async function captureDomSnapshot(page) {
     const interactiveElements = Array.from(document.querySelectorAll(interactiveSelector)).slice(0, 50).map((element) => ({
       tagName: element.tagName.toLowerCase(),
       text: (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim(),
-      role: element.getAttribute("role"),
+      role: inferRole(element),
       label: element.getAttribute("aria-label"),
       testId: element.getAttribute("data-testid"),
       id: element.id || null,
@@ -37,6 +54,23 @@ export async function captureDomSnapshot(page) {
 
 export async function listInteractiveElements(page) {
   return page.evaluate(() => {
+    const inferRole = (element) => {
+      const explicitRole = element.getAttribute("role");
+      if (explicitRole) return explicitRole;
+      const tagName = element.tagName.toLowerCase();
+      if (tagName === "button") return "button";
+      if (tagName === "a") return "link";
+      if (tagName === "textarea") return "textbox";
+      if (tagName === "select") return "combobox";
+      if (tagName === "input") {
+        const type = (element.getAttribute("type") || "text").toLowerCase();
+        if (["button", "submit", "reset"].includes(type)) return "button";
+        if (type === "checkbox") return "checkbox";
+        if (type === "radio") return "radio";
+        return "textbox";
+      }
+      return null;
+    };
     const candidates = Array.from(document.querySelectorAll("a[href], button, input, select, textarea, [role='button'], [role='link']"));
     return candidates.map((element, index) => {
       const rect = element.getBoundingClientRect();
@@ -46,7 +80,7 @@ export async function listInteractiveElements(page) {
         index,
         tagName: element.tagName.toLowerCase(),
         text: (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim(),
-        role: element.getAttribute("role"),
+        role: inferRole(element),
         ariaLabel: element.getAttribute("aria-label"),
         label: labelElement?.innerText?.replace(/\s+/g, " ").trim() || null,
         testId: element.getAttribute("data-testid"),
@@ -65,6 +99,10 @@ export async function listInteractiveElements(page) {
 }
 
 export function rankCandidates(candidates, selectorSpec = {}) {
+  const expectedRole = normalizeText(selectorSpec.role).toLowerCase();
+  const expectedName = normalizeText(selectorSpec.name).toLowerCase();
+  const expectedText = normalizeText(selectorSpec.text).toLowerCase();
+  const expectedLabel = normalizeText(selectorSpec.label).toLowerCase();
   const ranked = candidates.map((candidate) => {
     let score = 0;
     const reasons = [];
@@ -73,21 +111,33 @@ export function rankCandidates(candidates, selectorSpec = {}) {
       score += 100;
       reasons.push("testId");
     }
-    if (selectorSpec.role && candidate.role === selectorSpec.role) {
+    if (expectedRole && normalizeText(candidate.role).toLowerCase() === expectedRole) {
       score += 60;
       reasons.push("role");
     }
-    if (selectorSpec.label && normalizeText(candidate.label).toLowerCase() === normalizeText(selectorSpec.label).toLowerCase()) {
+    if (expectedLabel && normalizeText(candidate.label).toLowerCase() === expectedLabel) {
       score += 50;
       reasons.push("label");
     }
-    if (selectorSpec.name && normalizeText(candidate.text).toLowerCase().includes(normalizeText(selectorSpec.name).toLowerCase())) {
-      score += 40;
-      reasons.push("name");
+    if (expectedName) {
+      const candidateName = normalizeText(candidate.ariaLabel || candidate.label || candidate.text).toLowerCase();
+      if (candidateName === expectedName) {
+        score += 55;
+        reasons.push("exact_name");
+      } else if (candidateName.includes(expectedName)) {
+        score += 40;
+        reasons.push("name");
+      }
     }
-    if (selectorSpec.text && normalizeText(candidate.text).toLowerCase().includes(normalizeText(selectorSpec.text).toLowerCase())) {
-      score += 35;
-      reasons.push("text");
+    if (expectedText) {
+      const candidateText = normalizeText(candidate.text || candidate.ariaLabel || candidate.label).toLowerCase();
+      if (candidateText === expectedText) {
+        score += 48;
+        reasons.push("exact_text");
+      } else if (candidateText.includes(expectedText)) {
+        score += 35;
+        reasons.push("text");
+      }
     }
     if (selectorSpec.tagName && candidate.tagName === selectorSpec.tagName) {
       score += 20;
@@ -115,7 +165,14 @@ export function rankCandidates(candidates, selectorSpec = {}) {
 
   const best = ranked[0];
   const second = ranked[1];
-  const ambiguous = Boolean(best && second && best.score > 0 && best.score - second.score < 15);
+  const hasDirectReason = (candidate) => (candidate?.reasons ?? []).some((reason) => reason.startsWith("exact_") || reason === "testId");
+  const ambiguous = Boolean(
+    best
+    && second
+    && best.score > 0
+    && best.score - second.score < 15
+    && !(hasDirectReason(best) && !hasDirectReason(second))
+  );
 
   return {
     best,

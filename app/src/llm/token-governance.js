@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { LLM_MODEL_ALIAS, REASONING_STAGE } from "../config.js";
+import { DEFAULT_LLM_BUDGETS, LLM_MODEL_ALIAS, REASONING_STAGE } from "../config.js";
 
 const DEFAULT_RECORD_LIMIT = 5;
 const DEFAULT_EVENT_REDUCTION_ORDER = ["events", "evidence", "artifacts", "sources"];
@@ -79,11 +79,11 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 1_650,
-    hardStopTokenTarget: 3_400,
-    stageBudgetTokens: 3_900,
-    stageBudgetUsd: 0.055,
-    maxOutputTokensTarget: 430,
+    requestTokenTarget: 8_000,
+    hardStopTokenTarget: 18_000,
+    stageBudgetTokens: 20_000,
+    stageBudgetUsd: 0.14,
+    maxOutputTokensTarget: 900,
     cacheEligible: true,
     reuseEligible: true,
     suppressUnderBudgetPressure: false,
@@ -93,12 +93,12 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
       sources: 0,
       artifacts: 0,
       evidence: 0,
-      events: 4,
-      observations: 5,
-      guidelines: 4,
-      variables: 6,
-      policyConstraints: 4,
-      maxContextChars: 7_200
+      events: 12,
+      observations: 12,
+      guidelines: 8,
+      variables: 12,
+      policyConstraints: 8,
+      maxContextChars: 32_000
     },
     inputLimits: {
       records: 0,
@@ -111,9 +111,9 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 1_400,
-    hardStopTokenTarget: 2_100,
-    stageBudgetTokens: 2_200,
+    requestTokenTarget: 3_000,
+    hardStopTokenTarget: 8_000,
+    stageBudgetTokens: 8_000,
     stageBudgetUsd: 0.035,
     maxOutputTokensTarget: 260,
     cacheEligible: true,
@@ -125,12 +125,12 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
       sources: 0,
       artifacts: 1,
       evidence: 1,
-      events: 4,
-      observations: 5,
-      guidelines: 4,
-      variables: 8,
-      policyConstraints: 4,
-      maxContextChars: 6_800
+      events: 10,
+      observations: 8,
+      guidelines: 6,
+      variables: 10,
+      policyConstraints: 6,
+      maxContextChars: 18_000
     },
     inputLimits: {
       records: 0,
@@ -143,11 +143,11 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 1_600,
-    hardStopTokenTarget: 2_600,
-    stageBudgetTokens: 2_800,
+    requestTokenTarget: 6_000,
+    hardStopTokenTarget: 16_000,
+    stageBudgetTokens: 18_000,
     stageBudgetUsd: 0.045,
-    maxOutputTokensTarget: 450,
+    maxOutputTokensTarget: 1_200,
     cacheEligible: true,
     reuseEligible: true,
     suppressUnderBudgetPressure: false,
@@ -156,13 +156,13 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     contextLimits: {
       sources: 0,
       artifacts: 0,
-      evidence: 1,
-      events: 6,
-      observations: 8,
-      guidelines: 5,
-      variables: 8,
-      policyConstraints: 5,
-      maxContextChars: 8_000
+      evidence: 4,
+      events: 12,
+      observations: 12,
+      guidelines: 8,
+      variables: 12,
+      policyConstraints: 8,
+      maxContextChars: 28_000
     },
     inputLimits: {
       records: 0,
@@ -175,11 +175,11 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 2_300,
-    hardStopTokenTarget: 4_200,
-    stageBudgetTokens: 5_000,
+    requestTokenTarget: 8_000,
+    hardStopTokenTarget: 18_000,
+    stageBudgetTokens: 20_000,
     stageBudgetUsd: 0.1,
-    maxOutputTokensTarget: 820,
+    maxOutputTokensTarget: 1_400,
     cacheEligible: true,
     reuseEligible: true,
     suppressUnderBudgetPressure: false,
@@ -188,13 +188,45 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     contextLimits: {
       sources: 0,
       artifacts: 0,
-      evidence: 1,
-      events: 6,
-      observations: 6,
-      guidelines: 5,
-      variables: 8,
-      policyConstraints: 5,
-      maxContextChars: 10_500
+      evidence: 4,
+      events: 12,
+      observations: 12,
+      guidelines: 8,
+      variables: 12,
+      policyConstraints: 8,
+      maxContextChars: 32_000
+    },
+    inputLimits: {
+      records: 0,
+      sourceReferences: 0
+    }
+  },
+  [REASONING_STAGE.BROWSER_REPLAN]: {
+    id: "stage.browser_replan",
+    priority: "critical",
+    mandatory: true,
+    preferredModelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
+    downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
+    requestTokenTarget: 8_000,
+    hardStopTokenTarget: 18_000,
+    stageBudgetTokens: 22_000,
+    stageBudgetUsd: 0.12,
+    maxOutputTokensTarget: 1_400,
+    cacheEligible: false,
+    reuseEligible: false,
+    suppressUnderBudgetPressure: false,
+    deterministicFallbackEligible: true,
+    operatorDisclosureRequired: true,
+    contextLimits: {
+      sources: 0,
+      artifacts: 0,
+      evidence: 4,
+      events: 14,
+      observations: 14,
+      guidelines: 8,
+      variables: 12,
+      policyConstraints: 8,
+      maxContextChars: 34_000
     },
     inputLimits: {
       records: 0,
@@ -207,26 +239,26 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
     downgradeModelAlias: null,
-    requestTokenTarget: 2_700,
-    hardStopTokenTarget: 4_600,
-    stageBudgetTokens: 5_200,
+    requestTokenTarget: 8_000,
+    hardStopTokenTarget: 18_000,
+    stageBudgetTokens: 20_000,
     stageBudgetUsd: 0.11,
-    maxOutputTokensTarget: 720,
+    maxOutputTokensTarget: 1_200,
     cacheEligible: true,
     reuseEligible: true,
     suppressUnderBudgetPressure: false,
     deterministicFallbackEligible: true,
     operatorDisclosureRequired: true,
     contextLimits: {
-      sources: 1,
+      sources: 3,
       artifacts: 0,
       evidence: 0,
-      events: 6,
-      observations: 6,
-      guidelines: 5,
-      variables: 8,
-      policyConstraints: 4,
-      maxContextChars: 10_500
+      events: 12,
+      observations: 12,
+      guidelines: 8,
+      variables: 12,
+      policyConstraints: 8,
+      maxContextChars: 30_000
     },
     inputLimits: {
       records: 0,
@@ -239,30 +271,30 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
     downgradeModelAlias: null,
-    requestTokenTarget: 3_400,
-    hardStopTokenTarget: 5_200,
-    stageBudgetTokens: 5_600,
+    requestTokenTarget: 10_000,
+    hardStopTokenTarget: 22_000,
+    stageBudgetTokens: 24_000,
     stageBudgetUsd: 0.14,
-    maxOutputTokensTarget: 950,
+    maxOutputTokensTarget: 1_600,
     cacheEligible: true,
     reuseEligible: true,
     suppressUnderBudgetPressure: false,
     deterministicFallbackEligible: true,
     operatorDisclosureRequired: true,
     contextLimits: {
-      sources: 4,
-      artifacts: 2,
-      evidence: 4,
-      events: 6,
-      observations: 8,
-      guidelines: 6,
-      variables: 8,
-      policyConstraints: 4,
-      maxContextChars: 14_000
+      sources: 8,
+      artifacts: 4,
+      evidence: 8,
+      events: 14,
+      observations: 14,
+      guidelines: 8,
+      variables: 12,
+      policyConstraints: 8,
+      maxContextChars: 40_000
     },
     inputLimits: {
-      records: 5,
-      sourceReferences: 5
+      records: 10,
+      sourceReferences: 10
     }
   },
   [REASONING_STAGE.EVALUATION_SUPPORT]: {
@@ -271,9 +303,9 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: false,
     preferredModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 1_700,
-    hardStopTokenTarget: 2_400,
-    stageBudgetTokens: 2_000,
+    requestTokenTarget: 4_000,
+    hardStopTokenTarget: 8_000,
+    stageBudgetTokens: 8_000,
     stageBudgetUsd: 0.05,
     maxOutputTokensTarget: 500,
     cacheEligible: true,
@@ -290,11 +322,75 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
       guidelines: 6,
       variables: 8,
       policyConstraints: 4,
-      maxContextChars: 10_000
+      maxContextChars: 18_000
     },
     inputLimits: {
       records: 4,
       sourceReferences: 4
+    }
+  },
+  [REASONING_STAGE.WINDOW_DESCRIPTION]: {
+    id: "stage.window_description",
+    priority: "important_optional",
+    mandatory: false,
+    preferredModelAlias: LLM_MODEL_ALIAS.VISION_FALLBACK,
+    downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
+    requestTokenTarget: 1_200,
+    hardStopTokenTarget: 2_000,
+    stageBudgetTokens: 2_200,
+    stageBudgetUsd: 0.015,
+    maxOutputTokensTarget: 420,
+    cacheEligible: false,
+    reuseEligible: false,
+    suppressUnderBudgetPressure: false,
+    deterministicFallbackEligible: true,
+    operatorDisclosureRequired: true,
+    contextLimits: {
+      sources: 0,
+      artifacts: 0,
+      evidence: 0,
+      events: 2,
+      observations: 4,
+      guidelines: 2,
+      variables: 4,
+      policyConstraints: 2,
+      maxContextChars: 6_000
+    },
+    inputLimits: {
+      records: 0,
+      sourceReferences: 0
+    }
+  },
+  [REASONING_STAGE.WORKSPACE_TERMINAL_REASONING]: {
+    id: "stage.workspace_terminal_reasoning",
+    priority: "core",
+    mandatory: true,
+    preferredModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
+    downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
+    requestTokenTarget: 1_400,
+    hardStopTokenTarget: 2_800,
+    stageBudgetTokens: 8_000,
+    stageBudgetUsd: 0.12,
+    maxOutputTokensTarget: 320,
+    cacheEligible: false,
+    reuseEligible: false,
+    suppressUnderBudgetPressure: false,
+    deterministicFallbackEligible: true,
+    operatorDisclosureRequired: true,
+    contextLimits: {
+      sources: 0,
+      artifacts: 0,
+      evidence: 0,
+      events: 2,
+      observations: 2,
+      guidelines: 2,
+      variables: 4,
+      policyConstraints: 2,
+      maxContextChars: 5_000
+    },
+    inputLimits: {
+      records: 0,
+      sourceReferences: 0
     }
   },
   [REASONING_STAGE.AMBIGUITY_NOTE]: {
@@ -303,9 +399,9 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: false,
     preferredModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 1_200,
-    hardStopTokenTarget: 1_800,
-    stageBudgetTokens: 1_500,
+    requestTokenTarget: 3_000,
+    hardStopTokenTarget: 6_000,
+    stageBudgetTokens: 6_000,
     stageBudgetUsd: 0.03,
     maxOutputTokensTarget: 350,
     cacheEligible: true,
@@ -322,7 +418,7 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
       guidelines: 5,
       variables: 7,
       policyConstraints: 4,
-      maxContextChars: 8_000
+      maxContextChars: 14_000
     },
     inputLimits: {
       records: 4,
@@ -588,10 +684,13 @@ export function normalizeReasoningStage(value) {
     case REASONING_STAGE.RUN_HANDOFF_DECISION:
     case REASONING_STAGE.DESKTOP_PLAN:
     case REASONING_STAGE.BROWSER_PLAN:
+    case REASONING_STAGE.BROWSER_REPLAN:
     case REASONING_STAGE.PLAN_GENERATION:
     case REASONING_STAGE.DECISION_NOTE_DRAFT:
     case REASONING_STAGE.EVALUATION_SUPPORT:
     case REASONING_STAGE.AMBIGUITY_NOTE:
+    case REASONING_STAGE.WINDOW_DESCRIPTION:
+    case REASONING_STAGE.WORKSPACE_TERMINAL_REASONING:
       return value;
     default:
       return REASONING_STAGE.PLAN_GENERATION;
@@ -770,12 +869,7 @@ export class TokenGovernanceController {
     runtimeConfig
   }) {
     this.runtimeConfig = runtimeConfig ?? {
-      budgets: {
-        perRunTokens: 12_000,
-        perSessionTokens: 50_000,
-        perRunUsd: 0.5,
-        perSessionUsd: 2
-      }
+      budgets: DEFAULT_LLM_BUDGETS
     };
     this.cache = new Map();
     this.runStageUsage = new Map();

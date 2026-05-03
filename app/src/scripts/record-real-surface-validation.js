@@ -1,4 +1,8 @@
-import { recordRealSurfaceValidationResult } from "../validation/real-surface-harness.js";
+import { PrototypeDatabase } from "../storage/database.js";
+import {
+  recordRealSurfaceValidationFromRun,
+  recordRealSurfaceValidationResult
+} from "../validation/real-surface-harness.js";
 
 function parseArgs(argv) {
   const options = {
@@ -6,6 +10,7 @@ function parseArgs(argv) {
     reviewer: "operator",
     result: null,
     notes: "",
+    fromRunId: null,
     traceability: {}
   };
 
@@ -30,6 +35,10 @@ function parseArgs(argv) {
         break;
       case "--notes":
         options.notes = next;
+        index += 1;
+        break;
+      case "--from-run":
+        options.fromRunId = next;
         index += 1;
         break;
       case "--run-id":
@@ -75,17 +84,37 @@ function parseArgs(argv) {
 
 const options = parseArgs(process.argv.slice(2));
 
-if (!options.scenarioId || !options.result) {
-  console.error("Usage: node src/scripts/record-real-surface-validation.js --scenario <id> --result <pass|partial|fail|blocked> [--notes ...]");
+if (!options.scenarioId || (!options.result && !options.fromRunId)) {
+  console.error("Usage: node src/scripts/record-real-surface-validation.js --scenario <id> (--result <pass|partial|fail|blocked> | --from-run <runId>) [--notes ...]");
   process.exit(1);
 }
 
-const { outputPath, payload } = await recordRealSurfaceValidationResult(options);
+let recorded;
+if (options.fromRunId) {
+  const database = new PrototypeDatabase();
+  await database.open();
+  try {
+    recorded = await recordRealSurfaceValidationFromRun({
+      scenarioId: options.scenarioId,
+      runId: options.fromRunId,
+      database,
+      reviewer: options.reviewer,
+      result: options.result,
+      notes: options.notes
+    });
+  } finally {
+    database.close();
+  }
+} else {
+  recorded = await recordRealSurfaceValidationResult(options);
+}
+
+const { outputPath, payload } = recorded;
 
 console.log(JSON.stringify({
   status: "recorded",
   outputPath,
   scenarioId: payload.scenarioId,
-  result: payload.result
+  result: payload.result,
+  traceabilityPassed: payload.traceabilityReview?.passed ?? false
 }, null, 2));
-

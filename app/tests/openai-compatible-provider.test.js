@@ -60,4 +60,52 @@ export async function run() {
   assert.equal(body.messages[0].role, "system");
   assert.match(body.messages[0].content, /\bjson\b/i);
   assert.equal(capturedRequest.headers.authorization, "Bearer runtime-only-secret");
+
+  let visionRequest = null;
+  const visionProvider = new OpenAiCompatibleProvider({
+    baseUrl: "https://api.openai.com/v1",
+    apiKey: "runtime-only-secret",
+    fetchImpl: async (_url, request) => {
+      visionRequest = request;
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  description: "Fixture image",
+                  keyElements: ["Fixture"],
+                  pageType: "browser_page"
+                })
+              }
+            }
+          ],
+          usage: {
+            prompt_tokens: 10,
+            completion_tokens: 6,
+            total_tokens: 16
+          }
+        })
+      };
+    }
+  });
+  const visionResponse = await visionProvider.generateStructured({
+    modelAlias: "vision_fallback",
+    messages: [{ role: "user", content: "Describe image as JSON." }],
+    extraMessages: [{
+      role: "user",
+      content: [{
+        type: "image_url",
+        image_url: {
+          url: "data:image/png;base64,ZmFrZQ==",
+          detail: "low"
+        }
+      }]
+    }]
+  });
+  const visionBody = JSON.parse(visionRequest.body);
+  assert.equal(visionResponse.providerModel, "gpt-5-mini");
+  assert.equal("temperature" in visionBody, false);
+  assert.equal(visionBody.messages.at(-1).content[0].image_url.detail, "low");
 }

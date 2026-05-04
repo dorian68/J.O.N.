@@ -2892,6 +2892,15 @@ export class OperatorService extends EventEmitter {
         artifactsCreated: artifacts.length,
         evidenceRecorded: evidence.length,
         durationSeconds: durationMs != null ? Math.round(durationMs / 1000) : null
+      },
+      semanticVerification: run.metadata?.semanticVerification ?? null,
+      missionProgress: run.metadata?.missionProgress ?? null,
+      whereAreWe: run.metadata?.missionProgress?.steps
+        ? `${run.metadata.missionProgress.steps.completed ?? 0}/${run.metadata.missionProgress.steps.total ?? "?"} steps — ${run.metadata.semanticVerification?.verificationVerdict ?? "unverified"}`
+        : null,
+      falseCompletionGuard: {
+        verifiedByOutcomes: run.metadata?.semanticVerification?.verifiedByOutcomes ?? null,
+        wouldBefalseCompleted: run.status === "completed" && run.metadata?.semanticVerification?.verifiedByOutcomes === false
       }
     };
   }

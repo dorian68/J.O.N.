@@ -5,7 +5,9 @@ const DEFAULT_RECORD_LIMIT = 5;
 const DEFAULT_EVENT_REDUCTION_ORDER = ["events", "evidence", "artifacts", "sources"];
 const NON_BLOCKING_MANDATORY_BUDGET_REASONS = Object.freeze(new Set([
   "stage_token_budget_would_be_exceeded",
-  "stage_usd_budget_would_be_exceeded"
+  "stage_usd_budget_would_be_exceeded",
+  // Hard ceiling exceeded but context was already trimmed — let the API decide
+  "request_over_stage_hard_ceiling"
 ]));
 
 export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
@@ -175,11 +177,11 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 8_000,
-    hardStopTokenTarget: 18_000,
-    stageBudgetTokens: 20_000,
-    stageBudgetUsd: 0.1,
-    maxOutputTokensTarget: 1_400,
+    requestTokenTarget: 12_000,
+    hardStopTokenTarget: 48_000,
+    stageBudgetTokens: 60_000,
+    stageBudgetUsd: 0.35,
+    maxOutputTokensTarget: 2_000,
     cacheEligible: true,
     reuseEligible: true,
     suppressUnderBudgetPressure: false,
@@ -194,7 +196,7 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
       guidelines: 8,
       variables: 12,
       policyConstraints: 8,
-      maxContextChars: 32_000
+      maxContextChars: 80_000
     },
     inputLimits: {
       records: 0,
@@ -207,11 +209,11 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
     mandatory: true,
     preferredModelAlias: LLM_MODEL_ALIAS.PRIMARY_REASONING,
     downgradeModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-    requestTokenTarget: 8_000,
-    hardStopTokenTarget: 18_000,
-    stageBudgetTokens: 22_000,
-    stageBudgetUsd: 0.12,
-    maxOutputTokensTarget: 1_400,
+    requestTokenTarget: 12_000,
+    hardStopTokenTarget: 48_000,
+    stageBudgetTokens: 60_000,
+    stageBudgetUsd: 0.35,
+    maxOutputTokensTarget: 2_000,
     cacheEligible: false,
     reuseEligible: false,
     suppressUnderBudgetPressure: false,
@@ -226,7 +228,7 @@ export const TOKEN_GOVERNANCE_STAGE_POLICIES = Object.freeze({
       guidelines: 8,
       variables: 12,
       policyConstraints: 8,
-      maxContextChars: 34_000
+      maxContextChars: 80_000
     },
     inputLimits: {
       records: 0,

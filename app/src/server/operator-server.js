@@ -511,6 +511,40 @@ export async function createOperatorServer({
         sendJson(response, 200, audit);
         return;
       }
+
+      const runProgressRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/runs\/(?<runId>[^/]+)\/progress$/);
+      if (runProgressRoute && request.method === "GET") {
+        const detail = await operatorService.getRunDetail(runProgressRoute.runId).catch(() => null);
+        if (!detail) { sendError(response, 404, "Run not found"); return; }
+        const sv = detail.run.metadata?.semanticVerification ?? null;
+        const mp = detail.run.metadata?.missionProgress ?? null;
+        sendJson(response, 200, {
+          runId: runProgressRoute.runId,
+          status: detail.run.status,
+          lifecycleStage: detail.run.lifecycleStage,
+          summary: detail.run.summary,
+          mission: detail.run.mission,
+          objectiveSatisfied: sv?.objectiveSatisfied ?? null,
+          verificationVerdict: sv?.verificationVerdict ?? null,
+          confidence: sv?.confidence ?? null,
+          failureReason: sv?.failureReason ?? null,
+          nextBestAction: sv?.nextBestAction ?? null,
+          satisfiedOutcomes: sv?.satisfiedOutcomes ?? [],
+          unsatisfiedOutcomes: sv?.unsatisfiedOutcomes ?? [],
+          whereAreWe: mp ? {
+            progress: mp.steps ? `${mp.steps.completed}/${mp.steps.total ?? "?"} steps` : null,
+            consecutiveFailures: mp.steps?.consecutiveFailures ?? 0,
+            activeSurface: mp.surfaces?.active ?? null,
+            finalStatus: mp.finalStatus ?? null
+          } : null,
+          userNeed: sv && !sv.objectiveSatisfied
+            ? (sv.failureReason ? `Mission non vérifiée : ${sv.failureReason}` : null)
+            : null,
+          evidenceCount: detail.evidence?.length ?? 0,
+          artifactCount: detail.artifacts?.length ?? 0
+        });
+        return;
+      }
       if (projectRunsRoute && request.method === "POST") {
         const body = await readJsonBody(request);
         sendJson(response, 202, await operatorService.startScenario(projectRunsRoute.projectId, body.scenarioId));

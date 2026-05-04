@@ -1615,6 +1615,8 @@ function App() {
             onDraftChange={updateDraft}
             inputRef={composerInputRef}
             disabled={busy.loading || busy.reviewing || busy.starting || !project}
+            locale={locale}
+            t={t}
           />
           <Composer
             draft={draft}
@@ -2987,27 +2989,27 @@ function TerminalSidebar({
 const PANEL_CONFIG_KEY = "jon.panel.widgets.v1";
 
 const PANEL_WIDGET_REGISTRY = [
-  { id: "mission_state",       label: "Mission & Progression",     category: "mission",   defaultOn: true  },
-  { id: "jon_needs",           label: "Ce que JON attend",         category: "mission",   defaultOn: true  },
-  { id: "semantic_verify",     label: "Vérification sémantique",   category: "mission",   defaultOn: true  },
-  { id: "token_budget",        label: "Budget tokens & DOM",       category: "telemetry", defaultOn: true  },
-  { id: "browser_state",       label: "État du navigateur",        category: "surfaces",  defaultOn: true  },
-  { id: "desktop_state",       label: "État du desktop",           category: "surfaces",  defaultOn: false },
-  { id: "approval_queue",      label: "Approbations en attente",   category: "mission",   defaultOn: true  },
-  { id: "run_narrative",       label: "Trace de la mission",       category: "trace",     defaultOn: true  },
-  { id: "llm_stages",         label: "Appels LLM",                category: "telemetry", defaultOn: true  },
-  { id: "evidence",            label: "Preuves & captures",        category: "trace",     defaultOn: true  },
-  { id: "artifacts",           label: "Artefacts",                 category: "trace",     defaultOn: false },
-  { id: "terminal_alerts",     label: "Alertes terminal",          category: "surfaces",  defaultOn: false },
-  { id: "terminal_transcript", label: "Transcript terminal",       category: "surfaces",  defaultOn: false },
-  { id: "run_history",         label: "Historique des missions",   category: "trace",     defaultOn: false },
+  { id: "mission_state",       labelKey: "panelWidgetMissionState",  category: "mission",   defaultOn: true  },
+  { id: "jon_needs",           labelKey: "panelWidgetJonNeeds",      category: "mission",   defaultOn: true  },
+  { id: "semantic_verify",     labelKey: "panelWidgetSemanticVerify",category: "mission",   defaultOn: true  },
+  { id: "token_budget",        labelKey: "panelWidgetTokenBudget",   category: "telemetry", defaultOn: true  },
+  { id: "browser_state",       labelKey: "browserState",             category: "surfaces",  defaultOn: true  },
+  { id: "desktop_state",       labelKey: "panelWidgetDesktopState",  category: "surfaces",  defaultOn: false },
+  { id: "approval_queue",      labelKey: "panelWidgetApprovalQueue", category: "mission",   defaultOn: true  },
+  { id: "run_narrative",       labelKey: "runNarrative",             category: "trace",     defaultOn: true  },
+  { id: "llm_stages",          labelKey: "panelWidgetLlmStages",     category: "telemetry", defaultOn: true  },
+  { id: "evidence",            labelKey: "evidence",                 category: "trace",     defaultOn: true  },
+  { id: "artifacts",           labelKey: "artifacts",                category: "trace",     defaultOn: false },
+  { id: "terminal_alerts",     labelKey: "terminalAlerts",           category: "surfaces",  defaultOn: false },
+  { id: "terminal_transcript", labelKey: "terminalTranscript",       category: "surfaces",  defaultOn: false },
+  { id: "run_history",         labelKey: "runHistory",               category: "trace",     defaultOn: false },
 ];
 
 const PANEL_CATEGORIES = [
-  { id: "mission",   label: "Mission" },
-  { id: "surfaces",  label: "Surfaces" },
-  { id: "telemetry", label: "Télémétrie" },
-  { id: "trace",     label: "Trace" },
+  { id: "mission",   labelKey: "panelCatMission" },
+  { id: "surfaces",  labelKey: "panelCatSurfaces" },
+  { id: "telemetry", labelKey: "panelCatTelemetry" },
+  { id: "trace",     labelKey: "panelCatTrace" },
 ];
 
 function loadPanelConfig() {
@@ -3033,11 +3035,11 @@ function WMissionState({ scopedRun, t, locale }) {
 
   return (
     <section className="activity-section">
-      <h3>Mission &amp; Progression</h3>
+      <h3>{t.panelWidgetMissionState}</h3>
       {scopedRun ? (
         <div className="widget-mission-state">
           <div className="widget-objective">
-            <span className="widget-label">Objectif</span>
+            <span className="widget-label">{t.objective}</span>
             <strong>{scopedRun.metadata?.missionSpec?.objective ?? scopedRun.mission ?? "—"}</strong>
           </div>
           {steps && (
@@ -3049,12 +3051,14 @@ function WMissionState({ scopedRun, t, locale }) {
                 />
               </div>
               <span className="widget-progress-label">
-                {steps.completed ?? 0}/{steps.total ?? "?"} étapes
-                {steps.consecutiveFailures > 0 ? <span className="mini-badge danger"> {steps.consecutiveFailures} échecs consécutifs</span> : null}
+                {steps.completed ?? 0}/{steps.total ?? "?"} {t.panelSteps}
+                {steps.consecutiveFailures > 0 ? <span className="mini-badge danger"> {steps.consecutiveFailures}✗</span> : null}
               </span>
             </div>
           )}
-          {steps?.dynamicReplans > 0 && <p className="widget-hint">↺ {steps.dynamicReplans} replan{steps.dynamicReplans > 1 ? "s" : ""}</p>}
+          {steps?.dynamicReplans > 0 && (
+            <p className="widget-hint">↺ {steps.dynamicReplans} {steps.dynamicReplans > 1 ? t.panelReplansPlural : t.panelReplans}</p>
+          )}
           <div className="widget-status-row">
             <span className={`mini-badge ${verdictTone}`}>{verdict ?? scopedRun.status}</span>
             <small>{t.updated}: {formatDate(scopedRun.updatedAt ?? scopedRun.createdAt, locale)}</small>
@@ -3077,11 +3081,11 @@ function WJonNeeds({ scopedRun, scopedPendingApprovals, t }) {
 
   return (
     <section className="activity-section">
-      <h3>Ce que JON attend</h3>
+      <h3>{t.panelWidgetJonNeeds}</h3>
       <div className="widget-jon-needs">
         {needsApproval && (
           <div className="card warning widget-need-card">
-            <strong>⏳ Approbation requise</strong>
+            <strong>⏳ {t.panelApprovalRequired}</strong>
             {scopedPendingApprovals.slice(0, 2).map((a) => (
               <span key={a.id}>{a.actionLabel ?? a.category} <span className={`mini-badge ${a.riskLevel === "high" ? "danger" : "warn"}`}>{a.riskLevel}</span></span>
             ))}
@@ -3089,13 +3093,13 @@ function WJonNeeds({ scopedRun, scopedPendingApprovals, t }) {
         )}
         {verificationFailed && failureReason && (
           <div className="card warning widget-need-card">
-            <strong>✗ Objectif non vérifié</strong>
+            <strong>✗ {t.panelObjectiveUnverified}</strong>
             <span>{failureReason}</span>
           </div>
         )}
         {nextAction && (
           <div className="card widget-need-card">
-            <strong>→ Prochaine action</strong>
+            <strong>→ {t.panelNextAction}</strong>
             <span>{nextAction}</span>
           </div>
         )}
@@ -3104,23 +3108,28 @@ function WJonNeeds({ scopedRun, scopedPendingApprovals, t }) {
   );
 }
 
-function WSemanticVerify({ scopedRun }) {
+function WSemanticVerify({ scopedRun, t }) {
   const sv = scopedRun?.metadata?.semanticVerification ?? null;
   if (!scopedRun) return null;
 
-  const verdictLabel = { pass: "✓ Vérifié", partial: "~ Partiel", fail: "✗ Échec", degraded: "⚠ Dégradé" };
+  const verdictLabel = {
+    pass: t.panelVerdictPass,
+    partial: t.panelVerdictPartial,
+    fail: t.panelVerdictFail,
+    degraded: t.panelVerdictDegraded,
+  };
   const verdictTone = { pass: "ok", partial: "warn", fail: "danger", degraded: "warn" };
 
   return (
     <section className="activity-section">
-      <h3>Vérification sémantique</h3>
+      <h3>{t.panelWidgetSemanticVerify}</h3>
       {sv ? (
         <div className="widget-semantic">
           <div className="widget-verdict-row">
             <span className={`mini-badge ${verdictTone[sv.verificationVerdict] ?? "neutral"}`}>
               {verdictLabel[sv.verificationVerdict] ?? sv.verificationVerdict}
             </span>
-            <span className="mini-badge neutral">confiance: {sv.confidence ?? "?"}</span>
+            <span className="mini-badge neutral">{t.panelConfidence}: {sv.confidence ?? "?"}</span>
           </div>
           {sv.satisfiedOutcomes?.length > 0 && (
             <ul className="widget-outcome-list ok">
@@ -3133,12 +3142,12 @@ function WSemanticVerify({ scopedRun }) {
             </ul>
           )}
         </div>
-      ) : <p className="muted">Pas encore vérifié</p>}
+      ) : <p className="muted">{t.panelNotVerified}</p>}
     </section>
   );
 }
 
-function WTokenBudget({ calls, scopedRun }) {
+function WTokenBudget({ calls, t }) {
   const totalTokens = calls.reduce((acc, c) => acc + (c.tokenUsage?.totalTokens ?? 0), 0);
   const totalCost = calls.reduce((acc, c) => acc + (c.estimatedCost ?? 0), 0);
   const browserPlanCall = [...calls].reverse().find((c) => c.callType === "browser_plan" || c.callType === "browser_replan");
@@ -3157,23 +3166,23 @@ function WTokenBudget({ calls, scopedRun }) {
 
   return (
     <section className="activity-section">
-      <h3>Budget tokens &amp; DOM</h3>
+      <h3>{t.panelWidgetTokenBudget}</h3>
       <div className="widget-token-budget">
         <div className="widget-progress-bar-track">
           <div className={`widget-progress-bar-fill ${budgetTone}`} style={{ width: `${usagePct}%` }} />
         </div>
         <div className="inspector-grid">
           <span>Run total<strong className={`mini-badge ${budgetTone}`}>{totalTokens.toLocaleString()} tok</strong></span>
-          <span>Coût<strong>${(totalCost).toFixed(4)}</strong></span>
-          <span>Appels LLM<strong>{calls.length}</strong></span>
-          {domInputTokens && <span>DOM estimé<strong className="mini-badge warn">{domInputTokens.toLocaleString()} tok</strong></span>}
+          <span>{t.panelCost}<strong>${totalCost.toFixed(4)}</strong></span>
+          <span>{t.panelWidgetLlmStages}<strong>{calls.length}</strong></span>
+          {domInputTokens && <span>{t.panelDomEstimate}<strong className="mini-badge warn">{domInputTokens.toLocaleString()} tok</strong></span>}
         </div>
         {topStages.length > 0 && (
           <ul className="activity-timeline compact">
             {topStages.map(([stage, data]) => (
               <li key={stage}>
                 <span>{stage}</span>
-                <small>{data.tokens.toLocaleString()} tok · {data.count} appel{data.count > 1 ? "s" : ""}</small>
+                <small>{data.tokens.toLocaleString()} tok · {data.count}</small>
               </li>
             ))}
           </ul>
@@ -3185,17 +3194,17 @@ function WTokenBudget({ calls, scopedRun }) {
 
 // ── Panel configure drawer ───────────────────────────────────────────────────
 
-function PanelConfigDrawer({ config, onClose, onChange }) {
+function PanelConfigDrawer({ config, onClose, onChange, t }) {
   return (
     <div className="panel-config-drawer">
       <div className="panel-config-header">
-        <strong>Configurer le panel</strong>
-        <button type="button" className="ghost small" onClick={onClose}>Fermer</button>
+        <strong>{t.panelConfigTitle}</strong>
+        <button type="button" className="ghost small" onClick={onClose}>{t.close}</button>
       </div>
       <div className="panel-config-body">
         {PANEL_CATEGORIES.map((cat) => (
           <div key={cat.id} className="panel-config-category">
-            <p className="eyebrow">{cat.label}</p>
+            <p className="eyebrow">{t[cat.labelKey]}</p>
             {PANEL_WIDGET_REGISTRY.filter((w) => w.category === cat.id).map((w) => (
               <label key={w.id} className="panel-config-toggle">
                 <input
@@ -3203,7 +3212,7 @@ function PanelConfigDrawer({ config, onClose, onChange }) {
                   checked={config[w.id] ?? w.defaultOn}
                   onChange={(e) => onChange(w.id, e.target.checked)}
                 />
-                <span>{w.label}</span>
+                <span>{t[w.labelKey]}</span>
               </label>
             ))}
           </div>
@@ -3211,9 +3220,8 @@ function PanelConfigDrawer({ config, onClose, onChange }) {
       </div>
       <div className="panel-config-footer">
         <button type="button" className="ghost small" onClick={() => {
-          const reset = Object.fromEntries(PANEL_WIDGET_REGISTRY.map((w) => [w.id, w.defaultOn]));
-          PANEL_WIDGET_REGISTRY.forEach((w) => onChange(w.id, w.defaultOn, reset));
-        }}>Réinitialiser</button>
+          PANEL_WIDGET_REGISTRY.forEach((w) => onChange(w.id, w.defaultOn));
+        }}>{t.panelConfigReset}</button>
       </div>
     </div>
   );
@@ -3271,16 +3279,16 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
         return <WJonNeeds key={widgetId} scopedRun={scopedRun} scopedPendingApprovals={scopedPendingApprovals} t={t} />;
 
       case "semantic_verify":
-        return <WSemanticVerify key={widgetId} scopedRun={scopedRun} />;
+        return <WSemanticVerify key={widgetId} scopedRun={scopedRun} t={t} />;
 
       case "token_budget":
-        return <WTokenBudget key={widgetId} calls={calls} scopedRun={scopedRun} />;
+        return <WTokenBudget key={widgetId} calls={calls} t={t} />;
 
       case "approval_queue":
         if (scopedPendingApprovals.length === 0) return null;
         return (
           <section key={widgetId} className="activity-section">
-            <h3>Approbations <span className="mini-badge warn">{scopedPendingApprovals.length}</span></h3>
+            <h3>{t.panelApprovals} <span className="mini-badge warn">{scopedPendingApprovals.length}</span></h3>
             <div className="compact-run-list">
               {scopedPendingApprovals.slice(0, 5).map((a) => (
                 <div key={a.id} className="activity-card">
@@ -3509,7 +3517,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
         <div className="side-panel-actions">
           <span className={`mini-badge ${liveStatus === "live" ? "ok" : "warn"}`}>{liveStatus === "live" ? t.live : t.degraded}</span>
           <button type="button" className="ghost small" onClick={onOpenTerminals}>{t.terminalSurfaces}</button>
-          <button type="button" className="ghost small" onClick={() => setConfigOpen((v) => !v)} title="Configurer le panel" aria-label="Configurer le panel">⚙</button>
+          <button type="button" className="ghost small" onClick={() => setConfigOpen((v) => !v)} title={t.panelConfigTitle} aria-label={t.panelConfigTitle}>⚙</button>
           <button type="button" className="ghost small" onClick={onToggle} aria-label={t.collapseInspector} title={t.collapseInspector}>{t.collapse}</button>
         </div>
       </div>
@@ -3519,6 +3527,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
           config={panelConfig}
           onClose={() => setConfigOpen(false)}
           onChange={handleWidgetToggle}
+          t={t}
         />
       )}
 
@@ -3539,6 +3548,228 @@ function EmptyConversation({ t }) {
 }
 
 // ── Prompt suggestion bubbles ────────────────────────────────────────────────
+
+const SUGGESTION_POOL_EN = [
+  // 🔍 Research & news
+  { icon: "🔍", cat: "Research", text: "Go to Hacker News and summarize the 3 most commented threads today" },
+  { icon: "🔍", cat: "Research", text: "Find the latest generative AI news published today on TechCrunch and The Verge" },
+  { icon: "🔍", cat: "Research", text: "Go to Reddit r/MachineLearning and summarize the 3 most upvoted posts this week" },
+  { icon: "🔍", cat: "Research", text: "Find the 5 most shared AI articles this week on Medium" },
+  { icon: "🔍", cat: "Research", text: "Go to Twitter/X and find the 5 most viral tweets about 'AI agent' in the last 24 hours" },
+  { icon: "🔍", cat: "Research", text: "Find the major tech product announcements this week on The Verge and Wired" },
+  { icon: "🔍", cat: "Research", text: "Find the 3 best tech entrepreneurship podcasts released this month" },
+  { icon: "🔍", cat: "Research", text: "Go to Substack and find the most popular tech newsletters with their main topics" },
+  { icon: "🔍", cat: "Research", text: "Find Google Trends for 'artificial intelligence' in the US this month" },
+  { icon: "🔍", cat: "Research", text: "Go to VentureBeat and collect the 5 most read articles about LLMs this week" },
+  { icon: "🔍", cat: "Research", text: "Find upcoming tech conferences in Europe for the next 3 months with dates" },
+  { icon: "🔍", cat: "Research", text: "Go to Techmeme and list the most covered tech topics today" },
+  { icon: "🔍", cat: "Research", text: "Find the 5 most recommended newsletters on no-code and automation" },
+  { icon: "🔍", cat: "Research", text: "Go to the EU website and find the latest AI regulatory decisions published this month" },
+  { icon: "🔍", cat: "Research", text: "Find published market research on AI in enterprise in 2025" },
+  { icon: "🔍", cat: "Research", text: "Go to Axios and list the main tech news from the last 48 hours" },
+  { icon: "🔍", cat: "Research", text: "Find the 3 most cited reports on AI's impact on jobs published in 2025" },
+  { icon: "🔍", cat: "Research", text: "Go to Anthropic's blog and summarize the 3 latest articles" },
+  { icon: "🔍", cat: "Research", text: "Find upcoming AI events in San Francisco or New York on Eventbrite and Meetup" },
+  { icon: "🔍", cat: "Research", text: "Go to MIT Technology Review and list the most read articles this month" },
+  { icon: "🔍", cat: "Research", text: "Find the 5 most engaged LinkedIn threads on digital transformation this week" },
+  { icon: "🔍", cat: "Research", text: "Go to Ars Technica and collect the 5 AI articles published this week" },
+  { icon: "🔍", cat: "Research", text: "Find the key announcements from the latest Google I/O keynote" },
+  { icon: "🔍", cat: "Research", text: "Go to TechCrunch and list the startups that raised funding this month" },
+  { icon: "🔍", cat: "Research", text: "Find the 10 most active LinkedIn influencers on AI globally" },
+
+  // 💼 Jobs & freelance
+  { icon: "💼", cat: "Jobs", text: "Go to Upwork and find 5 AI freelance missions posted this week with their budgets" },
+  { icon: "💼", cat: "Jobs", text: "Go to LinkedIn and get 'AI Product Manager' job offers in London or New York this month" },
+  { icon: "💼", cat: "Jobs", text: "Find the 5 top-rated React developers on Toptal with their rates" },
+  { icon: "💼", cat: "Jobs", text: "Go to Glassdoor and find average salaries for a senior React developer in the US" },
+  { icon: "💼", cat: "Jobs", text: "Find data science internship offers in New York on Indeed starting in September" },
+  { icon: "💼", cat: "Jobs", text: "Go to RemoteOK and list remote tech jobs with a salary above $80k/year" },
+  { icon: "💼", cat: "Jobs", text: "Find the 10 best-rated tech companies to work for in the US on Glassdoor" },
+  { icon: "💼", cat: "Jobs", text: "Go to Freelancer.com and get Python development missions posted this week" },
+  { icon: "💼", cat: "Jobs", text: "Find senior 'Machine Learning Engineer' job offers in the US on LinkedIn and Indeed" },
+  { icon: "💼", cat: "Jobs", text: "Go to AngelList Talent and find early-stage startups hiring CTOs" },
+  { icon: "💼", cat: "Jobs", text: "Find the best coding bootcamps in the US with prices and reviews" },
+  { icon: "💼", cat: "Jobs", text: "Go to Toptal and explain the selection process and most in-demand profiles" },
+  { icon: "💼", cat: "Jobs", text: "Find average salaries for a senior UX/UI designer in San Francisco" },
+  { icon: "💼", cat: "Jobs", text: "Find AI Engineer job offers posted this week on LinkedIn in the US" },
+  { icon: "💼", cat: "Jobs", text: "Go to RemoteOK and list the highest-paying remote tech jobs this month" },
+  { icon: "💼", cat: "Jobs", text: "Find companies sponsoring H1-B visas for tech profiles on Glassdoor" },
+  { icon: "💼", cat: "Jobs", text: "Go to 99designs and find active logo design contests with their prizes" },
+  { icon: "💼", cat: "Jobs", text: "Find the most active AI recruiters on LinkedIn globally" },
+  { icon: "💼", cat: "Jobs", text: "Go to Fiverr and collect the 5 best-rated prompt engineering services" },
+  { icon: "💼", cat: "Jobs", text: "Find data science apprenticeship programs at major US companies" },
+  { icon: "💼", cat: "Jobs", text: "Go to Hacker News 'Who is Hiring?' and list the most interesting AI roles this month" },
+
+  // 💰 Finance & crypto
+  { icon: "💰", cat: "Finance", text: "Find the current price of Bitcoin, Ethereum and Solana on CoinGecko with their 7-day change" },
+  { icon: "💰", cat: "Finance", text: "Go to Polymarket and list the 5 markets with the highest trading volume right now" },
+  { icon: "💰", cat: "Finance", text: "Find the current exchange rates EUR/USD, GBP/USD and JPY/USD" },
+  { icon: "💰", cat: "Finance", text: "Go to CoinMarketCap and identify the 5 cryptos with the biggest 24h gain" },
+  { icon: "💰", cat: "Finance", text: "Find the best high-yield savings accounts available in the US right now" },
+  { icon: "💰", cat: "Finance", text: "Go to TradingView and capture the key S&P 500 indicators today" },
+  { icon: "💰", cat: "Finance", text: "Find the latest Federal Reserve decisions on interest rates published this month" },
+  { icon: "💰", cat: "Finance", text: "Go to Yahoo Finance and get the 5 most traded US stocks today" },
+  { icon: "💰", cat: "Finance", text: "Find the best-performing global ETFs available in the US with their fees" },
+  { icon: "💰", cat: "Finance", text: "Go to Defillama and list the 5 DeFi protocols with the largest TVL right now" },
+  { icon: "💰", cat: "Finance", text: "Find the new crypto regulations in the US announced in 2025" },
+  { icon: "💰", cat: "Finance", text: "Go to CoinGecko and compare the fees of the 5 main crypto exchanges" },
+  { icon: "💰", cat: "Finance", text: "Find Ethereum price predictions for end of 2025 on specialized sites" },
+  { icon: "💰", cat: "Finance", text: "Go to Numbeo and compare cost of living in New York, London, Paris and Berlin" },
+  { icon: "💰", cat: "Finance", text: "Find the best tax calculators for US freelancers and contractors" },
+  { icon: "💰", cat: "Finance", text: "Go to Binance and capture the crypto/USDT pairs with the highest 24h volume" },
+  { icon: "💰", cat: "Finance", text: "Find the best investment apps for beginners compared by fees and features" },
+  { icon: "💰", cat: "Finance", text: "Go to Investing.com and capture the key macro-economic indicators for the US" },
+  { icon: "💰", cat: "Finance", text: "Find the best broker platforms for stock trading in Europe for non-professionals" },
+  { icon: "💰", cat: "Finance", text: "Go to Morningstar and compare the 3-year performance of the top 5 global equity funds" },
+
+  // 🖥️ Tech & dev
+  { icon: "🖥️", cat: "Tech", text: "Go to GitHub Trending and list the 5 most popular repos this week with their descriptions" },
+  { icon: "🖥️", cat: "Tech", text: "Go to Product Hunt and get the 5 top-rated products launched this week" },
+  { icon: "🖥️", cat: "Tech", text: "Find the latest OpenAI API updates in their changelog for the past 30 days" },
+  { icon: "🖥️", cat: "Tech", text: "Go to Stack Overflow and find the 'React Server Components' questions most viewed this month" },
+  { icon: "🖥️", cat: "Tech", text: "Find benchmarks for the latest Nvidia RTX 4000 GPUs on Tom's Hardware" },
+  { icon: "🖥️", cat: "Tech", text: "Go to Dev.to and list the most liked TypeScript articles published this week" },
+  { icon: "🖥️", cat: "Tech", text: "Find the 10 best VS Code extensions for Python development in 2025" },
+  { icon: "🖥️", cat: "Tech", text: "Go to Vercel and collect the new features announced in their release notes this month" },
+  { icon: "🖥️", cat: "Tech", text: "Find the latest Next.js framework updates and summarize the major changes" },
+  { icon: "🖥️", cat: "Tech", text: "Go to npm and list the most downloaded JavaScript packages this week" },
+  { icon: "🖥️", cat: "Tech", text: "Find the 5 best open-source alternatives to popular SaaS tools released in 2025" },
+  { icon: "🖥️", cat: "Tech", text: "Find browser support for CSS Container Queries on Can I Use" },
+  { icon: "🖥️", cat: "Tech", text: "Find the new features in Python 3.13 from the official changelog" },
+  { icon: "🖥️", cat: "Tech", text: "Go to Hugging Face and list the most downloaded open-source models this week" },
+  { icon: "🖥️", cat: "Tech", text: "Find the latest Cloudflare announcements from their tech blog this month" },
+  { icon: "🖥️", cat: "Tech", text: "Find prices for Supabase, PlanetScale and Neon plans for an early-stage project" },
+  { icon: "🖥️", cat: "Tech", text: "Find the 5 most popular CSS framework alternatives to Tailwind on GitHub" },
+  { icon: "🖥️", cat: "Tech", text: "Find performance comparisons between Bun, Deno and Node.js published in 2025" },
+  { icon: "🖥️", cat: "Tech", text: "Go to TLDR Newsletter and summarize the 5 most important dev news of the week" },
+  { icon: "🖥️", cat: "Tech", text: "Find the 5 most active Rust projects on GitHub outside web development" },
+  { icon: "🖥️", cat: "Tech", text: "Find the changelog for React 19 and list the major changes since release" },
+  { icon: "🖥️", cat: "Tech", text: "Find the best open-source observability tools for a Node.js stack in 2025" },
+  { icon: "🖥️", cat: "Tech", text: "Find the top 5 AI coding tools compared by accuracy and price in 2025" },
+  { icon: "🖥️", cat: "Tech", text: "Go to MDN and get the documentation on Web Workers and summarize the key APIs" },
+  { icon: "🖥️", cat: "Tech", text: "Find the most popular developer podcasts this month on Changelog.fm" },
+
+  // 🛒 Shopping & price comparison
+  { icon: "🛒", cat: "Shopping", text: "Find wireless headphones with the best value under $100 on Amazon" },
+  { icon: "🛒", cat: "Shopping", text: "Find prices for all plans of Notion, Linear and Jira and create a comparison table" },
+  { icon: "🛒", cat: "Shopping", text: "Find the prices of Claude, ChatGPT Plus and Gemini Advanced subscriptions" },
+  { icon: "🛒", cat: "Shopping", text: "Find the 5 best-rated laptops under $1000 on Amazon or Best Buy" },
+  { icon: "🛒", cat: "Shopping", text: "Compare fiber internet deals in major US cities from the 4 main providers" },
+  { icon: "🛒", cat: "Shopping", text: "Find 4K 27-inch monitor prices on Amazon, B&H and Newegg and compare them" },
+  { icon: "🛒", cat: "Shopping", text: "Go to eBay and list current deals on high-end Android smartphones" },
+  { icon: "🛒", cat: "Shopping", text: "Find the best .com domain deals on GoDaddy, Namecheap and Cloudflare Registrar" },
+  { icon: "🛒", cat: "Shopping", text: "Find pricing of main cloud providers (AWS, GCP, Azure) for a 2 vCPU VPS" },
+  { icon: "🛒", cat: "Shopping", text: "Go to Swappa and list available MacBook Pro M3 units under $1,500" },
+  { icon: "🛒", cat: "Shopping", text: "Compare prices for Slack, Teams and Discord Nitro for a team of 10" },
+  { icon: "🛒", cat: "Shopping", text: "Find the best refurbished iPhone 14 options with warranty on Back Market" },
+  { icon: "🛒", cat: "Shopping", text: "Compare Adobe Creative Cloud vs Affinity Suite pricing for a freelancer" },
+  { icon: "🛒", cat: "Shopping", text: "Find the best mechanical keyboard deals under $150 on Amazon" },
+  { icon: "🛒", cat: "Shopping", text: "Compare Datadog, New Relic and Sentry monitoring plans for a startup" },
+  { icon: "🛒", cat: "Shopping", text: "Find the best standing desk options under $500 with user reviews" },
+  { icon: "🛒", cat: "Shopping", text: "Go to Wirecutter and get the top-rated home office chair recommendations" },
+  { icon: "🛒", cat: "Shopping", text: "Find JetBrains IntelliJ vs VS Code vs WebStorm pricing for a team of 5" },
+  { icon: "🛒", cat: "Shopping", text: "Find the best no-contract mobile plans under $15/month in the US" },
+  { icon: "🛒", cat: "Shopping", text: "Go to Idealo and compare Sony WH-1000XM5 prices across online retailers" },
+
+  // ✈️ Travel & local
+  { icon: "✈️", cat: "Travel", text: "Go to Booking.com and find a 4-star hotel in Rome for this weekend under €150/night" },
+  { icon: "✈️", cat: "Travel", text: "Get ratings and reviews of the 3 best vegetarian restaurants in London on Google Maps" },
+  { icon: "✈️", cat: "Travel", text: "Go to Skyscanner and find the cheapest London-Barcelona flights for the next 2 months" },
+  { icon: "✈️", cat: "Travel", text: "Find the best neighborhoods to live in Lisbon according to expats on Expatica" },
+  { icon: "✈️", cat: "Travel", text: "Go to Airbnb and list unique places available in Amsterdam this weekend under €100/night" },
+  { icon: "✈️", cat: "Travel", text: "Find entry and visa requirements for US citizens traveling to Japan in 2025" },
+  { icon: "✈️", cat: "Travel", text: "Go to TripAdvisor and find the 5 best-rated activities in Tokyo" },
+  { icon: "✈️", cat: "Travel", text: "Find the cheapest direct NYC-Paris flights on Kayak for July" },
+  { icon: "✈️", cat: "Travel", text: "Go to Google Maps and list highly-rated coworking spaces open on weekends in NYC" },
+  { icon: "✈️", cat: "Travel", text: "Find the best travel insurance for a 3-month trip through Southeast Asia" },
+  { icon: "✈️", cat: "Travel", text: "Go to Hostelworld and find the best-rated hostels in Bali under $30/night" },
+  { icon: "✈️", cat: "Travel", text: "Find Michelin-starred restaurants in New York with table availability this month" },
+  { icon: "✈️", cat: "Travel", text: "Go to Rome2Rio and compare train/flight/bus options London to Edinburgh with prices" },
+  { icon: "✈️", cat: "Travel", text: "Find the best surf spots in Europe accessible by train from major cities" },
+  { icon: "✈️", cat: "Travel", text: "Go to Booking.com and find apartments with a kitchen in Barcelona for 7 nights in August" },
+
+  // 📚 Learn & academic
+  { icon: "📚", cat: "Learn", text: "Go to Coursera and list all AI certification courses with their price and duration" },
+  { icon: "📚", cat: "Learn", text: "Find the latest academic papers on multimodal LLMs on arXiv this week" },
+  { icon: "📚", cat: "Learn", text: "Go to Udemy and collect the highest-rated Python courses with over 50,000 students" },
+  { icon: "📚", cat: "Learn", text: "Find the 10 best-rated English tech podcasts on Spotify and Apple Podcasts" },
+  { icon: "📚", cat: "Learn", text: "Go to Khan Academy and list available modules on statistics and probability" },
+  { icon: "📚", cat: "Learn", text: "Find the 5 best books on product management published in 2024-2025" },
+  { icon: "📚", cat: "Learn", text: "Go to Google Scholar and find the most cited Transformer papers since 2023" },
+  { icon: "📚", cat: "Learn", text: "Find free machine learning MOOCs available in English in 2025" },
+  { icon: "📚", cat: "Learn", text: "Go to YouTube and find the 5 most popular channels on personal finance in English" },
+  { icon: "📚", cat: "Learn", text: "Find the AWS certifications most in demand on LinkedIn job listings" },
+  { icon: "📚", cat: "Learn", text: "Go to O'Reilly and list the most read technical books on cloud engineering" },
+  { icon: "📚", cat: "Learn", text: "Find the best resources to learn Rust in 2025 according to the community" },
+  { icon: "📚", cat: "Learn", text: "Go to edX and compare online master's programs in data science" },
+  { icon: "📚", cat: "Learn", text: "Find the 5 most popular YouTube channels on tech entrepreneurship in English" },
+  { icon: "📚", cat: "Learn", text: "Go to fast.ai and summarize the topics covered in their free deep learning course" },
+  { icon: "📚", cat: "Learn", text: "Go to LinkedIn Learning and list the most followed data visualization courses" },
+  { icon: "📚", cat: "Learn", text: "Find the 5 best YouTube channels on stock market investing in English" },
+  { icon: "📚", cat: "Learn", text: "Go to Brilliant.org and capture the available modules on computational thinking" },
+  { icon: "📚", cat: "Learn", text: "Find the best community resources for learning prompt engineering in 2025" },
+
+  // 🚀 Business & startups
+  { icon: "🚀", cat: "Business", text: "Find the 5 latest AI startup funding rounds globally on Crunchbase this week" },
+  { icon: "🚀", cat: "Business", text: "Go to Y Combinator and list the last batch startups working on AI agents" },
+  { icon: "🚀", cat: "Business", text: "Go to IndieHackers and get the 3 most recent success stories with their revenues" },
+  { icon: "🚀", cat: "Business", text: "Find the 10 most valued SaaS startups globally in 2025 on Crunchbase" },
+  { icon: "🚀", cat: "Business", text: "Go to Product Hunt and identify product trends emerging this quarter" },
+  { icon: "🚀", cat: "Business", text: "Find the most active early-stage AI investors in the US with their portfolios" },
+  { icon: "🚀", cat: "Business", text: "Go to Dealroom and list European tech unicorns founded since 2020" },
+  { icon: "🚀", cat: "Business", text: "Find accelerators and incubators focused on AI accepting applications this quarter" },
+  { icon: "🚀", cat: "Business", text: "Go to SaaStr and list the most shared B2B SaaS growth articles this month" },
+  { icon: "🚀", cat: "Business", text: "Find the major tech acquisitions announced this month with their deal amounts" },
+  { icon: "🚀", cat: "Business", text: "Go to Tracxn and compare the leading AI agent startups with their funding" },
+  { icon: "🚀", cat: "Business", text: "Find the 5 most followed US tech founders on LinkedIn" },
+  { icon: "🚀", cat: "Business", text: "Go to Capterra and collect the best-rated CRM software for small businesses" },
+  { icon: "🚀", cat: "Business", text: "Find the 5 most popular invoicing tools for US freelancers with their pricing" },
+  { icon: "🚀", cat: "Business", text: "Go to Trustpilot and compare reviews of online banking for entrepreneurs" },
+  { icon: "🚀", cat: "Business", text: "Find market size statistics for the AI agent market in 2025-2030" },
+  { icon: "🚀", cat: "Business", text: "Go to USPTO and explain the steps to file a trademark for a US startup" },
+  { icon: "🚀", cat: "Business", text: "Find the most active startup programs at major US universities in 2025" },
+  { icon: "🚀", cat: "Business", text: "Find the latest UK or US tech funding data published this month on Beauhurst or Crunchbase" },
+  { icon: "🚀", cat: "Business", text: "Find the top 5 business plan generators powered by AI and compare their output quality" },
+
+  // 🎨 Design & creative
+  { icon: "🎨", cat: "Design", text: "Go to Dribbble and collect the 5 most liked UI designs this week" },
+  { icon: "🎨", cat: "Design", text: "Go to Figma Community and list the 5 most downloaded UI kit templates this week" },
+  { icon: "🎨", cat: "Design", text: "Find the best-rated Figma plugins for WCAG accessibility compliance" },
+  { icon: "🎨", cat: "Design", text: "Go to Behance and collect the 5 most viewed branding projects this month" },
+  { icon: "🎨", cat: "Design", text: "Find the 5 best AI image generation tools rated in 2025 with their pricing" },
+  { icon: "🎨", cat: "Design", text: "Go to Awwwards and list the nominated websites this week with their categories" },
+  { icon: "🎨", cat: "Design", text: "Find the color palette trends for 2025 according to major design sites" },
+  { icon: "🎨", cat: "Design", text: "Go to Coolors.co and capture the most popular palettes right now" },
+  { icon: "🎨", cat: "Design", text: "Find the 5 most popular free icon libraries among designers" },
+  { icon: "🎨", cat: "Design", text: "Go to Unsplash and identify the most downloaded photo categories this week" },
+  { icon: "🎨", cat: "Design", text: "Find the 5 best prototyping tools as alternatives to Figma for 2025" },
+  { icon: "🎨", cat: "Design", text: "Go to Lottie Files and list the most downloaded free animations right now" },
+  { icon: "🎨", cat: "Design", text: "Go to Mobbin and collect the most common UI navigation patterns in fintech apps" },
+  { icon: "🎨", cat: "Design", text: "Find the 5 most popular CSS gradient generators used by designers" },
+  { icon: "🎨", cat: "Design", text: "Go to Spline.design and capture the most impressive 3D web examples this month" },
+
+  // 📊 Analysis & benchmarks
+  { icon: "📊", cat: "Analysis", text: "Compare the features and pricing of Notion, Obsidian and Roam Research" },
+  { icon: "📊", cat: "Analysis", text: "Find the most recent LLM benchmarks on LMSYS Chatbot Arena and compare models" },
+  { icon: "📊", cat: "Analysis", text: "Go to G2 and collect user reviews of the 5 best project management tools" },
+  { icon: "📊", cat: "Analysis", text: "Find comparative studies on remote vs in-office productivity published in 2025" },
+  { icon: "📊", cat: "Analysis", text: "Go to Statista and get AI adoption statistics in enterprise in North America" },
+  { icon: "📊", cat: "Analysis", text: "Compare GPT-4o, Claude 3.7 and Gemini 2.0 performance on public benchmarks" },
+  { icon: "📊", cat: "Analysis", text: "Go to SimilarWeb and analyze the monthly traffic of the 5 leading AI platforms" },
+  { icon: "📊", cat: "Analysis", text: "Find NPS studies on the most used developer tools in 2025" },
+  { icon: "📊", cat: "Analysis", text: "Go to Gartner and find the latest reports on the autonomous AI agent market" },
+  { icon: "📊", cat: "Analysis", text: "Compare speech-to-text APIs (Whisper, Deepgram, AssemblyAI) on price and accuracy" },
+  { icon: "📊", cat: "Analysis", text: "Find search trends around 'generative AI' in the US on SEMrush" },
+  { icon: "📊", cat: "Analysis", text: "Find usage studies on ChatGPT vs Claude vs Gemini published in 2025" },
+  { icon: "📊", cat: "Analysis", text: "Go to AppFollow and compare ratings of AI productivity apps on the App Store" },
+  { icon: "📊", cat: "Analysis", text: "Find a ranking of countries by AI adoption in SMEs" },
+  { icon: "📊", cat: "Analysis", text: "Go to Similarweb and compare monthly traffic of Upwork, Toptal and Fiverr globally" },
+  { icon: "📊", cat: "Analysis", text: "Find the latest public benchmarks on coding models (Copilot, Cursor, Codeium)" },
+  { icon: "📊", cat: "Analysis", text: "Go to Builtwith.com and analyze the tech stack of the top 100 Y Combinator startups" },
+  { icon: "📊", cat: "Analysis", text: "Find studies on user retention rates of consumer AI apps in 2025" },
+  { icon: "📊", cat: "Analysis", text: "Compare the business models of Midjourney, DALL·E and Stable Diffusion for creators" },
+  { icon: "📊", cat: "Analysis", text: "Find the top keywords searched around 'AI agent' in the US on SEMrush or Ahrefs" },
+];
 
 const SUGGESTION_POOL = [
   // 🔍 Veille & actualités
@@ -3776,21 +4007,30 @@ const SUGGESTION_POOL = [
   { icon: "📊", cat: "Analyse", text: "Compare les modèles économiques de Midjourney, DALL·E et Stable Diffusion pour les créateurs" },
 ];
 
-function pickSuggestions(exclude = []) {
+const SUGGESTION_POOLS = { fr: SUGGESTION_POOL, en: SUGGESTION_POOL_EN };
+
+function pickSuggestions(locale = "fr", exclude = []) {
+  const pool = SUGGESTION_POOLS[locale] ?? SUGGESTION_POOLS.fr;
   const excludeTexts = new Set(exclude.map((s) => s.text));
-  const available = SUGGESTION_POOL.filter((s) => !excludeTexts.has(s.text));
+  const available = pool.filter((s) => !excludeTexts.has(s.text));
   const picked = [];
-  const pool = [...available];
-  while (picked.length < 3 && pool.length > 0) {
-    const i = Math.floor(Math.random() * pool.length);
-    picked.push(pool.splice(i, 1)[0]);
+  const remaining = [...available];
+  while (picked.length < 3 && remaining.length > 0) {
+    const i = Math.floor(Math.random() * remaining.length);
+    picked.push(remaining.splice(i, 1)[0]);
   }
   return picked;
 }
 
-function PromptSuggestions({ draft, onDraftChange, inputRef, disabled }) {
-  const [suggestions, setSuggestions] = React.useState(() => pickSuggestions());
+function PromptSuggestions({ draft, onDraftChange, inputRef, disabled, locale, t }) {
+  const [suggestions, setSuggestions] = React.useState(() => pickSuggestions(locale));
   const [refreshKey, setRefreshKey] = React.useState(0);
+
+  // Re-pick when locale changes
+  React.useEffect(() => {
+    setSuggestions(pickSuggestions(locale));
+    setRefreshKey((k) => k + 1);
+  }, [locale]);
 
   if (draft.objective) return null;
 
@@ -3800,7 +4040,7 @@ function PromptSuggestions({ draft, onDraftChange, inputRef, disabled }) {
   };
 
   const handleRefresh = () => {
-    setSuggestions((prev) => pickSuggestions(prev));
+    setSuggestions((prev) => pickSuggestions(locale, prev));
     setRefreshKey((k) => k + 1);
   };
 
@@ -3830,11 +4070,11 @@ function PromptSuggestions({ draft, onDraftChange, inputRef, disabled }) {
           type="button"
           className="psc-refresh"
           onClick={handleRefresh}
-          title="Nouvelles idées"
-          aria-label="Nouvelles idées"
+          title={t.suggestionRefresh}
+          aria-label={t.suggestionRefresh}
         >
           <span className="psc-refresh-icon">↻</span>
-          <span>Autres idées</span>
+          <span>{t.suggestionRefresh}</span>
         </button>
       </div>
     </div>

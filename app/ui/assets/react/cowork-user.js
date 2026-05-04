@@ -10184,7 +10184,38 @@ var STRINGS = Object.freeze({
 		statusRunningLabel: "En cours d'exécution",
 		statusWaitingLabel: "Attend une entrée utilisateur",
 		statusNeedsAttentionLabel: "Attention requise",
-		terminalAuthorizedLabel: "Autoriser JON à interagir avec ce terminal"
+		terminalAuthorizedLabel: "Autoriser JON à interagir avec ce terminal",
+		objective: "Objectif",
+		panelWidgetMissionState: "Mission & Progression",
+		panelWidgetJonNeeds: "Ce que JON attend",
+		panelWidgetSemanticVerify: "Vérification sémantique",
+		panelWidgetTokenBudget: "Budget tokens & DOM",
+		panelWidgetDesktopState: "État du desktop",
+		panelWidgetApprovalQueue: "Approbations en attente",
+		panelWidgetLlmStages: "Appels LLM",
+		panelCatMission: "Mission",
+		panelCatSurfaces: "Surfaces",
+		panelCatTelemetry: "Télémétrie",
+		panelCatTrace: "Trace",
+		panelConfigTitle: "Configurer le panel",
+		panelConfigReset: "Réinitialiser",
+		panelApprovalRequired: "Approbation requise",
+		panelObjectiveUnverified: "Objectif non vérifié",
+		panelNextAction: "Prochaine action",
+		panelNotVerified: "Pas encore vérifié",
+		panelConfidence: "confiance",
+		panelVerdictPass: "✓ Vérifié",
+		panelVerdictPartial: "~ Partiel",
+		panelVerdictFail: "✗ Échec",
+		panelVerdictDegraded: "⚠ Dégradé",
+		panelCost: "Coût",
+		panelDomEstimate: "DOM estimé",
+		panelApprovals: "Approbations",
+		panelSteps: "étapes",
+		panelReplans: "replan",
+		panelReplansPlural: "replans",
+		suggestionRefresh: "Autres idées",
+		newConversationTitle: "Nouvelle conversation"
 	},
 	en: {
 		appSubtitle: "Local desktop agent",
@@ -10484,7 +10515,38 @@ var STRINGS = Object.freeze({
 		statusRunningLabel: "Running",
 		statusWaitingLabel: "Waiting for user input",
 		statusNeedsAttentionLabel: "Needs attention",
-		terminalAuthorizedLabel: "Authorize JON to interact with this terminal"
+		terminalAuthorizedLabel: "Authorize JON to interact with this terminal",
+		objective: "Objective",
+		panelWidgetMissionState: "Mission & Progress",
+		panelWidgetJonNeeds: "What JON needs",
+		panelWidgetSemanticVerify: "Semantic verification",
+		panelWidgetTokenBudget: "Token budget & DOM",
+		panelWidgetDesktopState: "Desktop state",
+		panelWidgetApprovalQueue: "Pending approvals",
+		panelWidgetLlmStages: "LLM calls",
+		panelCatMission: "Mission",
+		panelCatSurfaces: "Surfaces",
+		panelCatTelemetry: "Telemetry",
+		panelCatTrace: "Trace",
+		panelConfigTitle: "Configure panel",
+		panelConfigReset: "Reset",
+		panelApprovalRequired: "Approval required",
+		panelObjectiveUnverified: "Objective unverified",
+		panelNextAction: "Next action",
+		panelNotVerified: "Not yet verified",
+		panelConfidence: "confidence",
+		panelVerdictPass: "✓ Verified",
+		panelVerdictPartial: "~ Partial",
+		panelVerdictFail: "✗ Failed",
+		panelVerdictDegraded: "⚠ Degraded",
+		panelCost: "Cost",
+		panelDomEstimate: "Est. DOM",
+		panelApprovals: "Approvals",
+		panelSteps: "steps",
+		panelReplans: "replan",
+		panelReplansPlural: "replans",
+		suggestionRefresh: "More ideas",
+		newConversationTitle: "New conversation"
 	}
 });
 function normalizeLocale(value) {
@@ -12337,7 +12399,9 @@ function App() {
 								draft,
 								onDraftChange: updateDraft,
 								inputRef: composerInputRef,
-								disabled: busy.loading || busy.reviewing || busy.starting || !project
+								disabled: busy.loading || busy.reviewing || busy.starting || !project,
+								locale,
+								t
 							}),
 							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, {
 								draft,
@@ -13727,85 +13791,85 @@ var PANEL_CONFIG_KEY = "jon.panel.widgets.v1";
 var PANEL_WIDGET_REGISTRY = [
 	{
 		id: "mission_state",
-		label: "Mission & Progression",
+		labelKey: "panelWidgetMissionState",
 		category: "mission",
 		defaultOn: true
 	},
 	{
 		id: "jon_needs",
-		label: "Ce que JON attend",
+		labelKey: "panelWidgetJonNeeds",
 		category: "mission",
 		defaultOn: true
 	},
 	{
 		id: "semantic_verify",
-		label: "Vérification sémantique",
+		labelKey: "panelWidgetSemanticVerify",
 		category: "mission",
 		defaultOn: true
 	},
 	{
 		id: "token_budget",
-		label: "Budget tokens & DOM",
+		labelKey: "panelWidgetTokenBudget",
 		category: "telemetry",
 		defaultOn: true
 	},
 	{
 		id: "browser_state",
-		label: "État du navigateur",
+		labelKey: "browserState",
 		category: "surfaces",
 		defaultOn: true
 	},
 	{
 		id: "desktop_state",
-		label: "État du desktop",
+		labelKey: "panelWidgetDesktopState",
 		category: "surfaces",
 		defaultOn: false
 	},
 	{
 		id: "approval_queue",
-		label: "Approbations en attente",
+		labelKey: "panelWidgetApprovalQueue",
 		category: "mission",
 		defaultOn: true
 	},
 	{
 		id: "run_narrative",
-		label: "Trace de la mission",
+		labelKey: "runNarrative",
 		category: "trace",
 		defaultOn: true
 	},
 	{
 		id: "llm_stages",
-		label: "Appels LLM",
+		labelKey: "panelWidgetLlmStages",
 		category: "telemetry",
 		defaultOn: true
 	},
 	{
 		id: "evidence",
-		label: "Preuves & captures",
+		labelKey: "evidence",
 		category: "trace",
 		defaultOn: true
 	},
 	{
 		id: "artifacts",
-		label: "Artefacts",
+		labelKey: "artifacts",
 		category: "trace",
 		defaultOn: false
 	},
 	{
 		id: "terminal_alerts",
-		label: "Alertes terminal",
+		labelKey: "terminalAlerts",
 		category: "surfaces",
 		defaultOn: false
 	},
 	{
 		id: "terminal_transcript",
-		label: "Transcript terminal",
+		labelKey: "terminalTranscript",
 		category: "surfaces",
 		defaultOn: false
 	},
 	{
 		id: "run_history",
-		label: "Historique des missions",
+		labelKey: "runHistory",
 		category: "trace",
 		defaultOn: false
 	}
@@ -13813,19 +13877,19 @@ var PANEL_WIDGET_REGISTRY = [
 var PANEL_CATEGORIES = [
 	{
 		id: "mission",
-		label: "Mission"
+		labelKey: "panelCatMission"
 	},
 	{
 		id: "surfaces",
-		label: "Surfaces"
+		labelKey: "panelCatSurfaces"
 	},
 	{
 		id: "telemetry",
-		label: "Télémétrie"
+		labelKey: "panelCatTelemetry"
 	},
 	{
 		id: "trace",
-		label: "Trace"
+		labelKey: "panelCatTrace"
 	}
 ];
 function loadPanelConfig() {
@@ -13852,14 +13916,14 @@ function WMissionState({ scopedRun, t, locale }) {
 	}[verdict] ?? "neutral";
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 		className: "activity-section",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Mission & Progression" }), scopedRun ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.panelWidgetMissionState }), scopedRun ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "widget-mission-state",
 			children: [
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "widget-objective",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 						className: "widget-label",
-						children: "Objectif"
+						children: t.objective
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: scopedRun.metadata?.missionSpec?.objective ?? scopedRun.mission ?? "—" })]
 				}),
 				steps && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -13876,13 +13940,14 @@ function WMissionState({ scopedRun, t, locale }) {
 							steps.completed ?? 0,
 							"/",
 							steps.total ?? "?",
-							" étapes",
+							" ",
+							t.panelSteps,
 							steps.consecutiveFailures > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
 								className: "mini-badge danger",
 								children: [
 									" ",
 									steps.consecutiveFailures,
-									" échecs consécutifs"
+									"✗"
 								]
 							}) : null
 						]
@@ -13893,8 +13958,8 @@ function WMissionState({ scopedRun, t, locale }) {
 					children: [
 						"↺ ",
 						steps.dynamicReplans,
-						" replan",
-						steps.dynamicReplans > 1 ? "s" : ""
+						" ",
+						steps.dynamicReplans > 1 ? t.panelReplansPlural : t.panelReplans
 					]
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -13925,12 +13990,12 @@ function WJonNeeds({ scopedRun, scopedPendingApprovals, t }) {
 	if (!needsApproval && !verificationFailed && !nextAction) return null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 		className: "activity-section",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Ce que JON attend" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.panelWidgetJonNeeds }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "widget-jon-needs",
 			children: [
 				needsApproval && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "card warning widget-need-card",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "⏳ Approbation requise" }), scopedPendingApprovals.slice(0, 2).map((a) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: ["⏳ ", t.panelApprovalRequired] }), scopedPendingApprovals.slice(0, 2).map((a) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
 						a.actionLabel ?? a.category,
 						" ",
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
@@ -13941,22 +14006,28 @@ function WJonNeeds({ scopedRun, scopedPendingApprovals, t }) {
 				}),
 				verificationFailed && failureReason && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "card warning widget-need-card",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "✗ Objectif non vérifié" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: failureReason })]
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: ["✗ ", t.panelObjectiveUnverified] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: failureReason })]
 				}),
 				nextAction && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "card widget-need-card",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "→ Prochaine action" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: nextAction })]
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: ["→ ", t.panelNextAction] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: nextAction })]
 				})
 			]
 		})]
 	});
 }
-function WSemanticVerify({ scopedRun }) {
+function WSemanticVerify({ scopedRun, t }) {
 	const sv = scopedRun?.metadata?.semanticVerification ?? null;
 	if (!scopedRun) return null;
+	const verdictLabel = {
+		pass: t.panelVerdictPass,
+		partial: t.panelVerdictPartial,
+		fail: t.panelVerdictFail,
+		degraded: t.panelVerdictDegraded
+	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 		className: "activity-section",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Vérification sémantique" }), sv ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.panelWidgetSemanticVerify }), sv ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "widget-semantic",
 			children: [
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -13968,15 +14039,14 @@ function WSemanticVerify({ scopedRun }) {
 							fail: "danger",
 							degraded: "warn"
 						}[sv.verificationVerdict] ?? "neutral"}`,
-						children: {
-							pass: "✓ Vérifié",
-							partial: "~ Partiel",
-							fail: "✗ Échec",
-							degraded: "⚠ Dégradé"
-						}[sv.verificationVerdict] ?? sv.verificationVerdict
+						children: verdictLabel[sv.verificationVerdict] ?? sv.verificationVerdict
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
 						className: "mini-badge neutral",
-						children: ["confiance: ", sv.confidence ?? "?"]
+						children: [
+							t.panelConfidence,
+							": ",
+							sv.confidence ?? "?"
+						]
 					})]
 				}),
 				sv.satisfiedOutcomes?.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
@@ -13990,11 +14060,11 @@ function WSemanticVerify({ scopedRun }) {
 			]
 		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 			className: "muted",
-			children: "Pas encore vérifié"
+			children: t.panelNotVerified
 		})]
 	});
 }
-function WTokenBudget({ calls, scopedRun }) {
+function WTokenBudget({ calls, t }) {
 	const totalTokens = calls.reduce((acc, c) => acc + (c.tokenUsage?.totalTokens ?? 0), 0);
 	const totalCost = calls.reduce((acc, c) => acc + (c.estimatedCost ?? 0), 0);
 	const domInputTokens = [...calls].reverse().find((c) => c.callType === "browser_plan" || c.callType === "browser_replan")?.tokenUsage?.inputTokens ?? null;
@@ -14013,7 +14083,7 @@ function WTokenBudget({ calls, scopedRun }) {
 	const budgetTone = usagePct > 85 ? "danger" : usagePct > 60 ? "warn" : "ok";
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 		className: "activity-section",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Budget tokens & DOM" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.panelWidgetTokenBudget }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "widget-token-budget",
 			children: [
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
@@ -14030,9 +14100,9 @@ function WTokenBudget({ calls, scopedRun }) {
 							className: `mini-badge ${budgetTone}`,
 							children: [totalTokens.toLocaleString(), " tok"]
 						})] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["Coût", /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: ["$", totalCost.toFixed(4)] })] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["Appels LLM", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: calls.length })] }),
-						domInputTokens && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["DOM estimé", /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", {
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.panelCost, /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: ["$", totalCost.toFixed(4)] })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.panelWidgetLlmStages, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: calls.length })] }),
+						domInputTokens && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.panelDomEstimate, /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", {
 							className: "mini-badge warn",
 							children: [domInputTokens.toLocaleString(), " tok"]
 						})] })
@@ -14043,26 +14113,24 @@ function WTokenBudget({ calls, scopedRun }) {
 					children: topStages.map(([stage, data]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: stage }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
 						data.tokens.toLocaleString(),
 						" tok · ",
-						data.count,
-						" appel",
-						data.count > 1 ? "s" : ""
+						data.count
 					] })] }, stage))
 				})
 			]
 		})]
 	});
 }
-function PanelConfigDrawer({ config, onClose, onChange }) {
+function PanelConfigDrawer({ config, onClose, onChange, t }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "panel-config-drawer",
 		children: [
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "panel-config-header",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Configurer le panel" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: t.panelConfigTitle }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 					type: "button",
 					className: "ghost small",
 					onClick: onClose,
-					children: "Fermer"
+					children: t.close
 				})]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
@@ -14071,14 +14139,14 @@ function PanelConfigDrawer({ config, onClose, onChange }) {
 					className: "panel-config-category",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 						className: "eyebrow",
-						children: cat.label
+						children: t[cat.labelKey]
 					}), PANEL_WIDGET_REGISTRY.filter((w) => w.category === cat.id).map((w) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
 						className: "panel-config-toggle",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
 							type: "checkbox",
 							checked: config[w.id] ?? w.defaultOn,
 							onChange: (e) => onChange(w.id, e.target.checked)
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: w.label })]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t[w.labelKey] })]
 					}, w.id))]
 				}, cat.id))
 			}),
@@ -14088,10 +14156,9 @@ function PanelConfigDrawer({ config, onClose, onChange }) {
 					type: "button",
 					className: "ghost small",
 					onClick: () => {
-						const reset = Object.fromEntries(PANEL_WIDGET_REGISTRY.map((w) => [w.id, w.defaultOn]));
-						PANEL_WIDGET_REGISTRY.forEach((w) => onChange(w.id, w.defaultOn, reset));
+						PANEL_WIDGET_REGISTRY.forEach((w) => onChange(w.id, w.defaultOn));
 					},
-					children: "Réinitialiser"
+					children: t.panelConfigReset
 				})
 			})
 		]
@@ -14152,19 +14219,26 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 				scopedPendingApprovals,
 				t
 			}, widgetId);
-			case "semantic_verify": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WSemanticVerify, { scopedRun }, widgetId);
+			case "semantic_verify": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WSemanticVerify, {
+				scopedRun,
+				t
+			}, widgetId);
 			case "token_budget": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WTokenBudget, {
 				calls,
-				scopedRun
+				t
 			}, widgetId);
 			case "approval_queue":
 				if (scopedPendingApprovals.length === 0) return null;
 				return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 					className: "activity-section",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { children: ["Approbations ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-						className: "mini-badge warn",
-						children: scopedPendingApprovals.length
-					})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { children: [
+						t.panelApprovals,
+						" ",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "mini-badge warn",
+							children: scopedPendingApprovals.length
+						})
+					] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 						className: "compact-run-list",
 						children: scopedPendingApprovals.slice(0, 5).map((a) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 							className: "activity-card",
@@ -14402,8 +14476,8 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 							type: "button",
 							className: "ghost small",
 							onClick: () => setConfigOpen((v) => !v),
-							title: "Configurer le panel",
-							"aria-label": "Configurer le panel",
+							title: t.panelConfigTitle,
+							"aria-label": t.panelConfigTitle,
 							children: "⚙"
 						}),
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
@@ -14420,7 +14494,8 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 			configOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PanelConfigDrawer, {
 				config: panelConfig,
 				onClose: () => setConfigOpen(false),
-				onChange: handleWidgetToggle
+				onChange: handleWidgetToggle,
+				t
 			}),
 			PANEL_WIDGET_REGISTRY.filter((w) => panelConfig[w.id]).map((w) => renderWidget(w.id))
 		]
@@ -14443,1029 +14518,2038 @@ function EmptyConversation({ t }) {
 		]
 	});
 }
-var SUGGESTION_POOL = [
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur Hacker News et résume les 3 fils de discussion les plus commentés aujourd'hui"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Trouve les dernières news sur l'IA générative publiées aujourd'hui sur TechCrunch et The Verge"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur Reddit r/MachineLearning et résume les 3 posts les plus commentés de la semaine"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Recherche les 5 articles les plus partagés sur l'IA cette semaine sur Medium"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur Twitter/X et trouve les 5 tweets les plus viraux sur 'agent IA' des dernières 24h"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Trouve les annonces produits tech majeures de cette semaine sur The Verge et Wired"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Recherche les 3 meilleurs podcasts sur l'entrepreneuriat tech sortis ce mois-ci"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur Substack et trouve les newsletters tech les plus populaires avec leurs thèmes principaux"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Trouve les tendances Google Trends pour 'intelligence artificielle' en France ce mois"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur VentureBeat et collecte les 5 articles les plus lus sur les LLM cette semaine"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Recherche les conférences tech en Europe prévues pour les 3 prochains mois avec leurs dates"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur Techmeme et liste les sujets tech les plus couverts aujourd'hui"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Trouve les 5 newsletters les plus recommandées sur le no-code et l'automatisation"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur le site de l'UE et trouve les dernières décisions réglementaires sur l'IA publiées ce mois"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Recherche les études de marché publiées sur l'IA en entreprise en 2025"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur Axios et liste les principales news tech des dernières 48 heures"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Trouve les 3 rapports les plus cités sur l'impact de l'IA sur l'emploi publiés en 2025"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur le blog d'Anthropic et résume les 3 derniers articles publiés"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Recherche les événements IA à venir en Île-de-France sur Eventbrite et Meetup"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur MIT Technology Review et liste les articles les plus lus du mois"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Trouve les 5 threads LinkedIn les plus engagés sur la transformation digitale cette semaine"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur Numerama et collecte les 5 articles sur l'IA publiés cette semaine"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Recherche les keynotes et annonces majeures lors du dernier Google I/O"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Va sur FrenchWeb et liste les startups françaises qui ont levé des fonds ce mois-ci"
-	},
-	{
-		icon: "🔍",
-		cat: "Veille",
-		text: "Trouve les 10 influenceurs LinkedIn les plus actifs sur le sujet de l'IA en France"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur Upwork et trouve 5 missions freelance en IA publiées cette semaine avec leurs budgets"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur LinkedIn et récupère les offres 'Product Manager IA' à Paris publiées ce mois-ci"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Trouve les 5 freelances les mieux notés en développement React sur Malt avec leurs tarifs"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur Glassdoor et trouve les salaires moyens pour un développeur senior React en France"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Recherche les offres de stage en data science à Paris sur Indeed débutant en septembre"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur Welcome to the Jungle et liste les startups qui recrutent en remote en France"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Trouve les 10 entreprises tech françaises avec les meilleures notes Glassdoor"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur Freelance.com et récupère les missions en développement Python publiées cette semaine"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Recherche les offres CDI en 'Machine Learning Engineer' en France sur Apec et Indeed"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur AngelList Talent et trouve les startups early-stage qui recrutent des CTO"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Trouve les meilleurs bootcamps de reconversion en développement web en France avec leurs prix"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur Toptal et explique le processus de sélection et les profils les plus demandés"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Recherche les salaires moyens pour un designer UX/UI senior en Île-de-France"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur Malt et compare les tarifs journaliers moyens des consultants IA en France"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Trouve les offres de CDI en 'AI Engineer' publiées cette semaine sur LinkedIn en France"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur RemoteOK et liste les jobs tech remote avec salaire supérieur à 80k€/an"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Recherche les entreprises françaises qui sponsorisent des visas pour profils tech étrangers"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur 99designs et trouve les concours de design logo actifs avec leurs récompenses"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Trouve sur LinkedIn les recruteurs les plus actifs en IA en France avec leurs contacts"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Va sur Fiverr et collecte les 5 services en prompt engineering les mieux notés"
-	},
-	{
-		icon: "💼",
-		cat: "Emploi",
-		text: "Recherche les programmes d'alternance en data science chez les grandes entreprises françaises"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Recherche le prix actuel du Bitcoin, Ethereum et Solana sur CoinGecko avec leur variation 7 jours"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur Polymarket et liste les 5 marchés avec le plus gros volume d'échange en ce moment"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Trouve les taux de change actuels EUR/USD, EUR/GBP et EUR/JPY"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur CoinMarketCap et identifie les 5 cryptos avec la plus forte hausse sur 24h"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Recherche les meilleures offres de livrets d'épargne en France actuellement sur comparaison"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur TradingView et capture les indicateurs clés du CAC 40 aujourd'hui"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Trouve les dernières décisions de la BCE sur les taux d'intérêt publiées ce mois"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur Boursorama et récupère les 5 actions françaises les plus échangées aujourd'hui"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Recherche le classement des meilleurs ETF monde disponibles en France avec leurs frais"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur Defillama et liste les 5 protocoles DeFi avec le plus grand TVL actuellement"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Trouve les nouvelles réglementations crypto en Europe annoncées en 2025"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur CoinGecko et compare les frais des 5 principales plateformes d'échange crypto"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Recherche les prédictions de prix pour l'Ethereum d'ici fin 2025 sur des sites spécialisés"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur Numbeo et compare le coût de la vie à Paris, Berlin, Amsterdam et Barcelone"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Trouve les meilleurs simulateurs de calcul d'impôts pour indépendants en France"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur Binance et capture les paires crypto/USDT avec le plus gros volume sur 24h"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur GitHub Trending et liste les 5 repos les plus populaires cette semaine avec leur description"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Product Hunt et récupère les 5 produits les mieux notés lancés cette semaine"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Trouve les dernières mises à jour de l'API OpenAI dans leur changelog des 30 derniers jours"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Stack Overflow et trouve les questions 'React Server Components' les plus vues ce mois"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Recherche les benchmarks des derniers GPU RTX 4000 sur Tom's Hardware"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Dev.to et liste les articles les plus aimés sur TypeScript publiés cette semaine"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Trouve les 10 meilleures extensions VS Code pour le développement Python en 2025"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Vercel et collecte les nouvelles fonctionnalités annoncées dans leurs release notes du mois"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Recherche les dernières mises à jour du framework Next.js et résume les changements majeurs"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur npm et liste les packages JavaScript les plus téléchargés cette semaine"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Trouve les 5 meilleures alternatives open source à des outils SaaS populaires sortis en 2025"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Can I Use et vérifie le support navigateur des Container Queries CSS"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Recherche les nouvelles fonctionnalités de Python 3.13 annoncées dans le changelog officiel"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Hugging Face et liste les modèles open source les plus téléchargés cette semaine"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Trouve les dernières annonces de Cloudflare dans leur blog tech publiées ce mois"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Caniuse.com et vérifie la compatibilité de l'API Web Bluetooth"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Recherche les prix des plans Supabase, PlanetScale et Neon pour un projet early-stage"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur MDN et récupère la documentation sur les Web Workers"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Trouve les 5 frameworks CSS alternatifs à Tailwind les plus populaires sur GitHub"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Ray.so et montre comment générer de belles captures de code"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Recherche les comparaisons de performance entre Bun, Deno et Node.js publiées en 2025"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Recherche sur Amazon les écouteurs sans fil avec le meilleur rapport qualité-prix sous 100 €"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Trouve les tarifs de tous les plans de Notion, Linear et Jira et crée un tableau comparatif"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Recherche les prix des abonnements Claude, ChatGPT Plus et Gemini Advanced"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Va sur FNAC et trouve les 5 laptops les mieux notés sous 1000 € actuellement"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Compare les offres fibre optique à Paris des 4 principaux opérateurs avec leurs prix"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Trouve les prix des écrans 4K 27 pouces sur Amazon, Darty et LDLC et compare-les"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Va sur Cdiscount et liste les promotions en cours sur les smartphones Android haut de gamme"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Recherche les meilleures offres de domaines .fr sur OVH, Gandi et Namecheap"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Trouve les tarifs des principaux hébergeurs cloud (AWS, GCP, Azure) pour un VPS 2 vCPU"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Va sur LeBonCoin et liste les MacBook Pro M3 disponibles à Paris sous 1500 €"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Compare les prix des plans Slack, Teams et Discord Nitro pour une équipe de 10 personnes"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Trouve sur Back Market les iPhone 14 reconditionnés garantis au meilleur prix"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Va sur Backmarket.fr et compare les garanties des différents niveaux de reconditionnement"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Recherche les meilleurs prix pour une Tesla Model 3 occasion en France"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Compare les offres Adobe Creative Cloud vs Affinity Suite pour un freelance"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Va sur Booking.com et trouve un hôtel 4 étoiles à Lyon pour ce weekend sous 150 €/nuit"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Récupère les notes et avis des 3 meilleurs restaurants végétariens à Paris sur Google Maps"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Va sur Skyscanner et trouve les vols Paris-Barcelone les moins chers pour les 2 prochains mois"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Trouve les meilleurs quartiers pour habiter à Lisbonne selon les expats sur Expatica"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Va sur Airbnb et liste les logements uniques disponibles à Bordeaux ce weekend sous 100 €/nuit"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Recherche les conditions d'entrée et de visa pour un ressortissant français au Japon en 2025"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Va sur TripAdvisor et trouve les 5 activités les mieux notées à Amsterdam"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Trouve les vols directs Paris-New York les moins chers sur Kayak pour juillet"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Va sur Google Maps et liste les coworkings bien notés ouverts le weekend à Paris 11ème"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Recherche les meilleures assurances voyage pour un trip de 3 mois en Asie du Sud-Est"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Va sur Hostelworld et trouve les hostels les mieux notés à Tokyo sous 40 €/nuit"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Trouve les restaurants étoilés Michelin à Paris qui ont une table disponible ce mois"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Va sur Rome2Rio et compare les options train/avion/bus Paris-Londres avec prix et durée"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Recherche les meilleurs spots de surf en France accessibles en train depuis Paris"
-	},
-	{
-		icon: "✈️",
-		cat: "Voyage",
-		text: "Va sur Booking.com et trouve des appartements avec cuisine à Rome pour 7 nuits en août"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur Coursera et liste les cours certifiants en IA générative avec leur prix et durée"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Trouve les dernières publications académiques sur les LLM multimodaux sur arXiv cette semaine"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur Udemy et collecte les cours Python les mieux notés avec plus de 50 000 étudiants"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Recherche les 10 podcasts tech francophones les mieux notés sur Spotify et Apple Podcasts"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur Khan Academy et liste les modules disponibles sur les statistiques et probabilités"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Trouve les 5 meilleurs livres sur le product management publiés en 2024-2025"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur Google Scholar et trouve les papiers les plus cités sur les Transformers depuis 2023"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Recherche les MOOC gratuits sur le machine learning disponibles en français"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur YouTube et trouve les 5 chaînes les plus populaires sur la finance personnelle en France"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Trouve les certifications AWS les plus demandées sur les offres d'emploi LinkedIn"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur O'Reilly et liste les livres techniques les plus lus sur le cloud engineering"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Recherche les meilleures ressources pour apprendre Rust en 2025 selon la communauté"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur edX et compare les programmes de master en ligne en data science"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Trouve les 5 chaînes YouTube les plus populaires sur l'entrepreneuriat tech en français"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur fast.ai et résume les sujets couverts dans leur cours de deep learning gratuit"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Trouve les 5 dernières levées de fonds de startups françaises dans la deeptech sur Crunchbase"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur Y Combinator et liste les startups de la dernière batch qui travaillent sur des agents IA"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur IndieHackers et récupère les 3 success stories les plus récentes avec leurs revenus"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Trouve les 10 startups SaaS les plus valorisées en France en 2025 sur Crunchbase"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur ProductHunt et identifie les tendances de produits qui émergent ce trimestre"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Recherche les VCs les plus actifs en early-stage IA en France avec leurs portfolios"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur Dealroom et liste les licornes européennes de la tech fondées depuis 2020"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Trouve les accélérateurs et incubateurs IA ouvrant des candidatures en France ce trimestre"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur Beauhurst et collecte les données de levée de fonds UK dans l'IA ce mois"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Recherche les programmes Station F disponibles pour les startups IA en 2025"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur SaaStr et liste les articles sur la croissance SaaS B2B les plus partagés du mois"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Trouve les acquisitions tech majeures annoncées ce mois avec leurs montants"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur Tracxn et compare les principales startups d'agents IA avec leurs financements"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Recherche les 5 fondateurs français de startups tech les plus suivis sur LinkedIn"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur Faire et liste les tendances de produits lifestyle les plus commandés ce mois"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Dribbble et collecte les 5 designs UI les plus likés de cette semaine"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Figma Community et liste les 5 templates UI kit les plus téléchargés cette semaine"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Trouve les plugins Figma les mieux notés pour l'accessibilité WCAG"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Behance et collecte les 5 projets de branding les plus vus ce mois"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Trouve les 5 outils de génération d'images IA les mieux notés en 2025 avec leurs tarifs"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Awwwards et liste les sites web nominés cette semaine avec leurs catégories"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Recherche les palettes de couleurs tendance pour 2025 selon les sites de design"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Coolors.co et capture les palettes les plus populaires du moment"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Trouve les 5 librairies d'icônes gratuites les plus populaires auprès des designers"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Unsplash et identifie les catégories de photos les plus téléchargées cette semaine"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Recherche les 5 meilleurs outils de prototypage alternatifs à Figma pour 2025"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Lottie Files et liste les animations gratuites les plus téléchargées du moment"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Compare les fonctionnalités et prix de Notion, Obsidian et Roam Research"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Recherche les benchmarks LLM les plus récents sur LMSYS Chatbot Arena et compare les modèles"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur G2 et collecte les avis utilisateurs sur les 5 meilleurs outils de gestion de projet"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Trouve les études comparatives sur la productivité remote vs présentiel publiées en 2025"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur Statista et récupère les statistiques d'adoption de l'IA en entreprise en Europe"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Compare les performances de GPT-4o, Claude 3.7 et Gemini 2.0 sur les benchmarks publics"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur SimilarWeb et analyse le trafic mensuel des 5 principales plateformes IA"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Recherche les études NPS sur les outils de développement les plus utilisés en 2025"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur Gartner et trouve les derniers rapports sur le marché des agents IA autonomes"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Compare les APIs de speech-to-text (Whisper, Deepgram, AssemblyAI) en prix et précision"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur SEMrush et analyse les tendances de recherche autour de 'IA générative' en France"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Trouve les études d'usage sur ChatGPT vs Claude vs Gemini publiées en 2025"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur AppFollow et compare les notes et avis des apps de productivité IA sur l'App Store"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Recherche le classement des pays européens par adoption de l'IA dans les PME"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur Investing.com et capture les indicateurs macro-économiques clés de la zone euro"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Trouve les meilleurs PEA disponibles en France avec leurs frais de courtage et d'inactivité"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Va sur Morningstar et compare les performances des 5 meilleurs fonds actions mondiales sur 3 ans"
-	},
-	{
-		icon: "💰",
-		cat: "Finance",
-		text: "Recherche les avis sur les néobanques françaises (Qonto, Shine, Revolut Business) pour freelances"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Va sur Idealo et compare les prix d'un Sony WH-1000XM5 chez les e-commerçants français"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Trouve les meilleures offres de forfaits mobiles sans engagement sous 15 €/mois en France"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Va sur Rakuten et identifie les produits high-tech avec la meilleure décote ce mois"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Compare les tarifs des outils de monitoring (Datadog, New Relic, Sentry) pour une startup"
-	},
-	{
-		icon: "🛒",
-		cat: "Shopping",
-		text: "Trouve les prix des licences JetBrains IntelliJ, VS Code et WebStorm pour une équipe de 5"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur Capterra et collecte les logiciels CRM les mieux notés pour les PME françaises"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Trouve les 5 outils de facturation les plus utilisés par les freelances français avec leurs prix"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur Trustpilot et compare les avis sur les banques en ligne pour entrepreneurs"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Recherche les statistiques de croissance du marché de l'IA en Europe pour 2025-2030"
-	},
-	{
-		icon: "🚀",
-		cat: "Business",
-		text: "Va sur INPI et explique les étapes de dépôt d'une marque pour une startup française"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Mobbin et collecte les patterns UI de navigation les plus utilisés dans les apps fintech"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Trouve les 5 générateurs de gradient CSS les plus populaires utilisés par les designers"
-	},
-	{
-		icon: "🎨",
-		cat: "Design",
-		text: "Va sur Spline.design et capture les exemples de 3D web les plus impressionnants du mois"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur Changelog.md et liste les changements majeurs de React 19 depuis sa sortie"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Recherche les meilleurs outils d'observabilité open source pour une stack Node.js en 2025"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Va sur TLDR Newsletter et résume les 5 news dev les plus importantes de la semaine"
-	},
-	{
-		icon: "🖥️",
-		cat: "Tech",
-		text: "Trouve les 5 projets Rust les plus actifs sur GitHub en dehors du web"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur LinkedIn Learning et liste les cours les plus suivis sur la data visualisation"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Trouve les 5 chaînes YouTube sur l'investissement en bourse les mieux notées en français"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Va sur Brilliant.org et capture les modules disponibles sur la pensée computationnelle"
-	},
-	{
-		icon: "📚",
-		cat: "Apprendre",
-		text: "Recherche les meilleures ressources communautaires pour apprendre le prompt engineering"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur Similarweb et compare le trafic mensuel de Malt, Upwork et Fiverr en France"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Trouve les benchmarks publics les plus récents sur les modèles de code (Copilot, Cursor, Codeium)"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur Builtwith.com et analyse les technologies utilisées par les 100 premières startups Y Combinator"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Recherche les études sur le taux de rétention utilisateur des apps d'IA grand public en 2025"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Va sur Ahrefs et analyse les mots-clés les plus recherchés autour de 'agent IA' en France"
-	},
-	{
-		icon: "📊",
-		cat: "Analyse",
-		text: "Compare les modèles économiques de Midjourney, DALL·E et Stable Diffusion pour les créateurs"
-	}
-];
-function pickSuggestions(exclude = []) {
+var SUGGESTION_POOLS = {
+	fr: [
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur Hacker News et résume les 3 fils de discussion les plus commentés aujourd'hui"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Trouve les dernières news sur l'IA générative publiées aujourd'hui sur TechCrunch et The Verge"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur Reddit r/MachineLearning et résume les 3 posts les plus commentés de la semaine"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Recherche les 5 articles les plus partagés sur l'IA cette semaine sur Medium"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur Twitter/X et trouve les 5 tweets les plus viraux sur 'agent IA' des dernières 24h"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Trouve les annonces produits tech majeures de cette semaine sur The Verge et Wired"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Recherche les 3 meilleurs podcasts sur l'entrepreneuriat tech sortis ce mois-ci"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur Substack et trouve les newsletters tech les plus populaires avec leurs thèmes principaux"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Trouve les tendances Google Trends pour 'intelligence artificielle' en France ce mois"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur VentureBeat et collecte les 5 articles les plus lus sur les LLM cette semaine"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Recherche les conférences tech en Europe prévues pour les 3 prochains mois avec leurs dates"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur Techmeme et liste les sujets tech les plus couverts aujourd'hui"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Trouve les 5 newsletters les plus recommandées sur le no-code et l'automatisation"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur le site de l'UE et trouve les dernières décisions réglementaires sur l'IA publiées ce mois"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Recherche les études de marché publiées sur l'IA en entreprise en 2025"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur Axios et liste les principales news tech des dernières 48 heures"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Trouve les 3 rapports les plus cités sur l'impact de l'IA sur l'emploi publiés en 2025"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur le blog d'Anthropic et résume les 3 derniers articles publiés"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Recherche les événements IA à venir en Île-de-France sur Eventbrite et Meetup"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur MIT Technology Review et liste les articles les plus lus du mois"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Trouve les 5 threads LinkedIn les plus engagés sur la transformation digitale cette semaine"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur Numerama et collecte les 5 articles sur l'IA publiés cette semaine"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Recherche les keynotes et annonces majeures lors du dernier Google I/O"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Va sur FrenchWeb et liste les startups françaises qui ont levé des fonds ce mois-ci"
+		},
+		{
+			icon: "🔍",
+			cat: "Veille",
+			text: "Trouve les 10 influenceurs LinkedIn les plus actifs sur le sujet de l'IA en France"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur Upwork et trouve 5 missions freelance en IA publiées cette semaine avec leurs budgets"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur LinkedIn et récupère les offres 'Product Manager IA' à Paris publiées ce mois-ci"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Trouve les 5 freelances les mieux notés en développement React sur Malt avec leurs tarifs"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur Glassdoor et trouve les salaires moyens pour un développeur senior React en France"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Recherche les offres de stage en data science à Paris sur Indeed débutant en septembre"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur Welcome to the Jungle et liste les startups qui recrutent en remote en France"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Trouve les 10 entreprises tech françaises avec les meilleures notes Glassdoor"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur Freelance.com et récupère les missions en développement Python publiées cette semaine"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Recherche les offres CDI en 'Machine Learning Engineer' en France sur Apec et Indeed"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur AngelList Talent et trouve les startups early-stage qui recrutent des CTO"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Trouve les meilleurs bootcamps de reconversion en développement web en France avec leurs prix"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur Toptal et explique le processus de sélection et les profils les plus demandés"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Recherche les salaires moyens pour un designer UX/UI senior en Île-de-France"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur Malt et compare les tarifs journaliers moyens des consultants IA en France"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Trouve les offres de CDI en 'AI Engineer' publiées cette semaine sur LinkedIn en France"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur RemoteOK et liste les jobs tech remote avec salaire supérieur à 80k€/an"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Recherche les entreprises françaises qui sponsorisent des visas pour profils tech étrangers"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur 99designs et trouve les concours de design logo actifs avec leurs récompenses"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Trouve sur LinkedIn les recruteurs les plus actifs en IA en France avec leurs contacts"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Va sur Fiverr et collecte les 5 services en prompt engineering les mieux notés"
+		},
+		{
+			icon: "💼",
+			cat: "Emploi",
+			text: "Recherche les programmes d'alternance en data science chez les grandes entreprises françaises"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Recherche le prix actuel du Bitcoin, Ethereum et Solana sur CoinGecko avec leur variation 7 jours"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur Polymarket et liste les 5 marchés avec le plus gros volume d'échange en ce moment"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Trouve les taux de change actuels EUR/USD, EUR/GBP et EUR/JPY"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur CoinMarketCap et identifie les 5 cryptos avec la plus forte hausse sur 24h"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Recherche les meilleures offres de livrets d'épargne en France actuellement sur comparaison"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur TradingView et capture les indicateurs clés du CAC 40 aujourd'hui"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Trouve les dernières décisions de la BCE sur les taux d'intérêt publiées ce mois"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur Boursorama et récupère les 5 actions françaises les plus échangées aujourd'hui"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Recherche le classement des meilleurs ETF monde disponibles en France avec leurs frais"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur Defillama et liste les 5 protocoles DeFi avec le plus grand TVL actuellement"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Trouve les nouvelles réglementations crypto en Europe annoncées en 2025"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur CoinGecko et compare les frais des 5 principales plateformes d'échange crypto"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Recherche les prédictions de prix pour l'Ethereum d'ici fin 2025 sur des sites spécialisés"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur Numbeo et compare le coût de la vie à Paris, Berlin, Amsterdam et Barcelone"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Trouve les meilleurs simulateurs de calcul d'impôts pour indépendants en France"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur Binance et capture les paires crypto/USDT avec le plus gros volume sur 24h"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur GitHub Trending et liste les 5 repos les plus populaires cette semaine avec leur description"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Product Hunt et récupère les 5 produits les mieux notés lancés cette semaine"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Trouve les dernières mises à jour de l'API OpenAI dans leur changelog des 30 derniers jours"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Stack Overflow et trouve les questions 'React Server Components' les plus vues ce mois"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Recherche les benchmarks des derniers GPU RTX 4000 sur Tom's Hardware"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Dev.to et liste les articles les plus aimés sur TypeScript publiés cette semaine"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Trouve les 10 meilleures extensions VS Code pour le développement Python en 2025"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Vercel et collecte les nouvelles fonctionnalités annoncées dans leurs release notes du mois"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Recherche les dernières mises à jour du framework Next.js et résume les changements majeurs"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur npm et liste les packages JavaScript les plus téléchargés cette semaine"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Trouve les 5 meilleures alternatives open source à des outils SaaS populaires sortis en 2025"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Can I Use et vérifie le support navigateur des Container Queries CSS"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Recherche les nouvelles fonctionnalités de Python 3.13 annoncées dans le changelog officiel"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Hugging Face et liste les modèles open source les plus téléchargés cette semaine"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Trouve les dernières annonces de Cloudflare dans leur blog tech publiées ce mois"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Caniuse.com et vérifie la compatibilité de l'API Web Bluetooth"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Recherche les prix des plans Supabase, PlanetScale et Neon pour un projet early-stage"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur MDN et récupère la documentation sur les Web Workers"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Trouve les 5 frameworks CSS alternatifs à Tailwind les plus populaires sur GitHub"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Ray.so et montre comment générer de belles captures de code"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Recherche les comparaisons de performance entre Bun, Deno et Node.js publiées en 2025"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Recherche sur Amazon les écouteurs sans fil avec le meilleur rapport qualité-prix sous 100 €"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Trouve les tarifs de tous les plans de Notion, Linear et Jira et crée un tableau comparatif"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Recherche les prix des abonnements Claude, ChatGPT Plus et Gemini Advanced"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Va sur FNAC et trouve les 5 laptops les mieux notés sous 1000 € actuellement"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Compare les offres fibre optique à Paris des 4 principaux opérateurs avec leurs prix"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Trouve les prix des écrans 4K 27 pouces sur Amazon, Darty et LDLC et compare-les"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Va sur Cdiscount et liste les promotions en cours sur les smartphones Android haut de gamme"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Recherche les meilleures offres de domaines .fr sur OVH, Gandi et Namecheap"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Trouve les tarifs des principaux hébergeurs cloud (AWS, GCP, Azure) pour un VPS 2 vCPU"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Va sur LeBonCoin et liste les MacBook Pro M3 disponibles à Paris sous 1500 €"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Compare les prix des plans Slack, Teams et Discord Nitro pour une équipe de 10 personnes"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Trouve sur Back Market les iPhone 14 reconditionnés garantis au meilleur prix"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Va sur Backmarket.fr et compare les garanties des différents niveaux de reconditionnement"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Recherche les meilleurs prix pour une Tesla Model 3 occasion en France"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Compare les offres Adobe Creative Cloud vs Affinity Suite pour un freelance"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Va sur Booking.com et trouve un hôtel 4 étoiles à Lyon pour ce weekend sous 150 €/nuit"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Récupère les notes et avis des 3 meilleurs restaurants végétariens à Paris sur Google Maps"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Va sur Skyscanner et trouve les vols Paris-Barcelone les moins chers pour les 2 prochains mois"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Trouve les meilleurs quartiers pour habiter à Lisbonne selon les expats sur Expatica"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Va sur Airbnb et liste les logements uniques disponibles à Bordeaux ce weekend sous 100 €/nuit"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Recherche les conditions d'entrée et de visa pour un ressortissant français au Japon en 2025"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Va sur TripAdvisor et trouve les 5 activités les mieux notées à Amsterdam"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Trouve les vols directs Paris-New York les moins chers sur Kayak pour juillet"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Va sur Google Maps et liste les coworkings bien notés ouverts le weekend à Paris 11ème"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Recherche les meilleures assurances voyage pour un trip de 3 mois en Asie du Sud-Est"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Va sur Hostelworld et trouve les hostels les mieux notés à Tokyo sous 40 €/nuit"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Trouve les restaurants étoilés Michelin à Paris qui ont une table disponible ce mois"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Va sur Rome2Rio et compare les options train/avion/bus Paris-Londres avec prix et durée"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Recherche les meilleurs spots de surf en France accessibles en train depuis Paris"
+		},
+		{
+			icon: "✈️",
+			cat: "Voyage",
+			text: "Va sur Booking.com et trouve des appartements avec cuisine à Rome pour 7 nuits en août"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur Coursera et liste les cours certifiants en IA générative avec leur prix et durée"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Trouve les dernières publications académiques sur les LLM multimodaux sur arXiv cette semaine"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur Udemy et collecte les cours Python les mieux notés avec plus de 50 000 étudiants"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Recherche les 10 podcasts tech francophones les mieux notés sur Spotify et Apple Podcasts"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur Khan Academy et liste les modules disponibles sur les statistiques et probabilités"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Trouve les 5 meilleurs livres sur le product management publiés en 2024-2025"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur Google Scholar et trouve les papiers les plus cités sur les Transformers depuis 2023"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Recherche les MOOC gratuits sur le machine learning disponibles en français"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur YouTube et trouve les 5 chaînes les plus populaires sur la finance personnelle en France"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Trouve les certifications AWS les plus demandées sur les offres d'emploi LinkedIn"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur O'Reilly et liste les livres techniques les plus lus sur le cloud engineering"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Recherche les meilleures ressources pour apprendre Rust en 2025 selon la communauté"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur edX et compare les programmes de master en ligne en data science"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Trouve les 5 chaînes YouTube les plus populaires sur l'entrepreneuriat tech en français"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur fast.ai et résume les sujets couverts dans leur cours de deep learning gratuit"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Trouve les 5 dernières levées de fonds de startups françaises dans la deeptech sur Crunchbase"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur Y Combinator et liste les startups de la dernière batch qui travaillent sur des agents IA"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur IndieHackers et récupère les 3 success stories les plus récentes avec leurs revenus"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Trouve les 10 startups SaaS les plus valorisées en France en 2025 sur Crunchbase"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur ProductHunt et identifie les tendances de produits qui émergent ce trimestre"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Recherche les VCs les plus actifs en early-stage IA en France avec leurs portfolios"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur Dealroom et liste les licornes européennes de la tech fondées depuis 2020"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Trouve les accélérateurs et incubateurs IA ouvrant des candidatures en France ce trimestre"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur Beauhurst et collecte les données de levée de fonds UK dans l'IA ce mois"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Recherche les programmes Station F disponibles pour les startups IA en 2025"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur SaaStr et liste les articles sur la croissance SaaS B2B les plus partagés du mois"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Trouve les acquisitions tech majeures annoncées ce mois avec leurs montants"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur Tracxn et compare les principales startups d'agents IA avec leurs financements"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Recherche les 5 fondateurs français de startups tech les plus suivis sur LinkedIn"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur Faire et liste les tendances de produits lifestyle les plus commandés ce mois"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Dribbble et collecte les 5 designs UI les plus likés de cette semaine"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Figma Community et liste les 5 templates UI kit les plus téléchargés cette semaine"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Trouve les plugins Figma les mieux notés pour l'accessibilité WCAG"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Behance et collecte les 5 projets de branding les plus vus ce mois"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Trouve les 5 outils de génération d'images IA les mieux notés en 2025 avec leurs tarifs"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Awwwards et liste les sites web nominés cette semaine avec leurs catégories"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Recherche les palettes de couleurs tendance pour 2025 selon les sites de design"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Coolors.co et capture les palettes les plus populaires du moment"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Trouve les 5 librairies d'icônes gratuites les plus populaires auprès des designers"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Unsplash et identifie les catégories de photos les plus téléchargées cette semaine"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Recherche les 5 meilleurs outils de prototypage alternatifs à Figma pour 2025"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Lottie Files et liste les animations gratuites les plus téléchargées du moment"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Compare les fonctionnalités et prix de Notion, Obsidian et Roam Research"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Recherche les benchmarks LLM les plus récents sur LMSYS Chatbot Arena et compare les modèles"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur G2 et collecte les avis utilisateurs sur les 5 meilleurs outils de gestion de projet"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Trouve les études comparatives sur la productivité remote vs présentiel publiées en 2025"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur Statista et récupère les statistiques d'adoption de l'IA en entreprise en Europe"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Compare les performances de GPT-4o, Claude 3.7 et Gemini 2.0 sur les benchmarks publics"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur SimilarWeb et analyse le trafic mensuel des 5 principales plateformes IA"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Recherche les études NPS sur les outils de développement les plus utilisés en 2025"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur Gartner et trouve les derniers rapports sur le marché des agents IA autonomes"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Compare les APIs de speech-to-text (Whisper, Deepgram, AssemblyAI) en prix et précision"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur SEMrush et analyse les tendances de recherche autour de 'IA générative' en France"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Trouve les études d'usage sur ChatGPT vs Claude vs Gemini publiées en 2025"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur AppFollow et compare les notes et avis des apps de productivité IA sur l'App Store"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Recherche le classement des pays européens par adoption de l'IA dans les PME"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur Investing.com et capture les indicateurs macro-économiques clés de la zone euro"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Trouve les meilleurs PEA disponibles en France avec leurs frais de courtage et d'inactivité"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Va sur Morningstar et compare les performances des 5 meilleurs fonds actions mondiales sur 3 ans"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Recherche les avis sur les néobanques françaises (Qonto, Shine, Revolut Business) pour freelances"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Va sur Idealo et compare les prix d'un Sony WH-1000XM5 chez les e-commerçants français"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Trouve les meilleures offres de forfaits mobiles sans engagement sous 15 €/mois en France"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Va sur Rakuten et identifie les produits high-tech avec la meilleure décote ce mois"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Compare les tarifs des outils de monitoring (Datadog, New Relic, Sentry) pour une startup"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Trouve les prix des licences JetBrains IntelliJ, VS Code et WebStorm pour une équipe de 5"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur Capterra et collecte les logiciels CRM les mieux notés pour les PME françaises"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Trouve les 5 outils de facturation les plus utilisés par les freelances français avec leurs prix"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur Trustpilot et compare les avis sur les banques en ligne pour entrepreneurs"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Recherche les statistiques de croissance du marché de l'IA en Europe pour 2025-2030"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Va sur INPI et explique les étapes de dépôt d'une marque pour une startup française"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Mobbin et collecte les patterns UI de navigation les plus utilisés dans les apps fintech"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Trouve les 5 générateurs de gradient CSS les plus populaires utilisés par les designers"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Va sur Spline.design et capture les exemples de 3D web les plus impressionnants du mois"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur Changelog.md et liste les changements majeurs de React 19 depuis sa sortie"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Recherche les meilleurs outils d'observabilité open source pour une stack Node.js en 2025"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Va sur TLDR Newsletter et résume les 5 news dev les plus importantes de la semaine"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Trouve les 5 projets Rust les plus actifs sur GitHub en dehors du web"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur LinkedIn Learning et liste les cours les plus suivis sur la data visualisation"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Trouve les 5 chaînes YouTube sur l'investissement en bourse les mieux notées en français"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Va sur Brilliant.org et capture les modules disponibles sur la pensée computationnelle"
+		},
+		{
+			icon: "📚",
+			cat: "Apprendre",
+			text: "Recherche les meilleures ressources communautaires pour apprendre le prompt engineering"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur Similarweb et compare le trafic mensuel de Malt, Upwork et Fiverr en France"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Trouve les benchmarks publics les plus récents sur les modèles de code (Copilot, Cursor, Codeium)"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur Builtwith.com et analyse les technologies utilisées par les 100 premières startups Y Combinator"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Recherche les études sur le taux de rétention utilisateur des apps d'IA grand public en 2025"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Va sur Ahrefs et analyse les mots-clés les plus recherchés autour de 'agent IA' en France"
+		},
+		{
+			icon: "📊",
+			cat: "Analyse",
+			text: "Compare les modèles économiques de Midjourney, DALL·E et Stable Diffusion pour les créateurs"
+		}
+	],
+	en: [
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to Hacker News and summarize the 3 most commented threads today"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the latest generative AI news published today on TechCrunch and The Verge"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to Reddit r/MachineLearning and summarize the 3 most upvoted posts this week"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the 5 most shared AI articles this week on Medium"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to Twitter/X and find the 5 most viral tweets about 'AI agent' in the last 24 hours"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the major tech product announcements this week on The Verge and Wired"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the 3 best tech entrepreneurship podcasts released this month"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to Substack and find the most popular tech newsletters with their main topics"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find Google Trends for 'artificial intelligence' in the US this month"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to VentureBeat and collect the 5 most read articles about LLMs this week"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find upcoming tech conferences in Europe for the next 3 months with dates"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to Techmeme and list the most covered tech topics today"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the 5 most recommended newsletters on no-code and automation"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to the EU website and find the latest AI regulatory decisions published this month"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find published market research on AI in enterprise in 2025"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to Axios and list the main tech news from the last 48 hours"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the 3 most cited reports on AI's impact on jobs published in 2025"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to Anthropic's blog and summarize the 3 latest articles"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find upcoming AI events in San Francisco or New York on Eventbrite and Meetup"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to MIT Technology Review and list the most read articles this month"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the 5 most engaged LinkedIn threads on digital transformation this week"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to Ars Technica and collect the 5 AI articles published this week"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the key announcements from the latest Google I/O keynote"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Go to TechCrunch and list the startups that raised funding this month"
+		},
+		{
+			icon: "🔍",
+			cat: "Research",
+			text: "Find the 10 most active LinkedIn influencers on AI globally"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to Upwork and find 5 AI freelance missions posted this week with their budgets"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to LinkedIn and get 'AI Product Manager' job offers in London or New York this month"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find the 5 top-rated React developers on Toptal with their rates"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to Glassdoor and find average salaries for a senior React developer in the US"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find data science internship offers in New York on Indeed starting in September"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to RemoteOK and list remote tech jobs with a salary above $80k/year"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find the 10 best-rated tech companies to work for in the US on Glassdoor"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to Freelancer.com and get Python development missions posted this week"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find senior 'Machine Learning Engineer' job offers in the US on LinkedIn and Indeed"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to AngelList Talent and find early-stage startups hiring CTOs"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find the best coding bootcamps in the US with prices and reviews"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to Toptal and explain the selection process and most in-demand profiles"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find average salaries for a senior UX/UI designer in San Francisco"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find AI Engineer job offers posted this week on LinkedIn in the US"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to RemoteOK and list the highest-paying remote tech jobs this month"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find companies sponsoring H1-B visas for tech profiles on Glassdoor"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to 99designs and find active logo design contests with their prizes"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find the most active AI recruiters on LinkedIn globally"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to Fiverr and collect the 5 best-rated prompt engineering services"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Find data science apprenticeship programs at major US companies"
+		},
+		{
+			icon: "💼",
+			cat: "Jobs",
+			text: "Go to Hacker News 'Who is Hiring?' and list the most interesting AI roles this month"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the current price of Bitcoin, Ethereum and Solana on CoinGecko with their 7-day change"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to Polymarket and list the 5 markets with the highest trading volume right now"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the current exchange rates EUR/USD, GBP/USD and JPY/USD"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to CoinMarketCap and identify the 5 cryptos with the biggest 24h gain"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the best high-yield savings accounts available in the US right now"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to TradingView and capture the key S&P 500 indicators today"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the latest Federal Reserve decisions on interest rates published this month"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to Yahoo Finance and get the 5 most traded US stocks today"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the best-performing global ETFs available in the US with their fees"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to Defillama and list the 5 DeFi protocols with the largest TVL right now"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the new crypto regulations in the US announced in 2025"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to CoinGecko and compare the fees of the 5 main crypto exchanges"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find Ethereum price predictions for end of 2025 on specialized sites"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to Numbeo and compare cost of living in New York, London, Paris and Berlin"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the best tax calculators for US freelancers and contractors"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to Binance and capture the crypto/USDT pairs with the highest 24h volume"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the best investment apps for beginners compared by fees and features"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to Investing.com and capture the key macro-economic indicators for the US"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Find the best broker platforms for stock trading in Europe for non-professionals"
+		},
+		{
+			icon: "💰",
+			cat: "Finance",
+			text: "Go to Morningstar and compare the 3-year performance of the top 5 global equity funds"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to GitHub Trending and list the 5 most popular repos this week with their descriptions"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to Product Hunt and get the 5 top-rated products launched this week"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the latest OpenAI API updates in their changelog for the past 30 days"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to Stack Overflow and find the 'React Server Components' questions most viewed this month"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find benchmarks for the latest Nvidia RTX 4000 GPUs on Tom's Hardware"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to Dev.to and list the most liked TypeScript articles published this week"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the 10 best VS Code extensions for Python development in 2025"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to Vercel and collect the new features announced in their release notes this month"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the latest Next.js framework updates and summarize the major changes"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to npm and list the most downloaded JavaScript packages this week"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the 5 best open-source alternatives to popular SaaS tools released in 2025"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find browser support for CSS Container Queries on Can I Use"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the new features in Python 3.13 from the official changelog"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to Hugging Face and list the most downloaded open-source models this week"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the latest Cloudflare announcements from their tech blog this month"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find prices for Supabase, PlanetScale and Neon plans for an early-stage project"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the 5 most popular CSS framework alternatives to Tailwind on GitHub"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find performance comparisons between Bun, Deno and Node.js published in 2025"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to TLDR Newsletter and summarize the 5 most important dev news of the week"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the 5 most active Rust projects on GitHub outside web development"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the changelog for React 19 and list the major changes since release"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the best open-source observability tools for a Node.js stack in 2025"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the top 5 AI coding tools compared by accuracy and price in 2025"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Go to MDN and get the documentation on Web Workers and summarize the key APIs"
+		},
+		{
+			icon: "🖥️",
+			cat: "Tech",
+			text: "Find the most popular developer podcasts this month on Changelog.fm"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find wireless headphones with the best value under $100 on Amazon"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find prices for all plans of Notion, Linear and Jira and create a comparison table"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find the prices of Claude, ChatGPT Plus and Gemini Advanced subscriptions"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find the 5 best-rated laptops under $1000 on Amazon or Best Buy"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Compare fiber internet deals in major US cities from the 4 main providers"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find 4K 27-inch monitor prices on Amazon, B&H and Newegg and compare them"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Go to eBay and list current deals on high-end Android smartphones"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find the best .com domain deals on GoDaddy, Namecheap and Cloudflare Registrar"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find pricing of main cloud providers (AWS, GCP, Azure) for a 2 vCPU VPS"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Go to Swappa and list available MacBook Pro M3 units under $1,500"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Compare prices for Slack, Teams and Discord Nitro for a team of 10"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find the best refurbished iPhone 14 options with warranty on Back Market"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Compare Adobe Creative Cloud vs Affinity Suite pricing for a freelancer"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find the best mechanical keyboard deals under $150 on Amazon"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Compare Datadog, New Relic and Sentry monitoring plans for a startup"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find the best standing desk options under $500 with user reviews"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Go to Wirecutter and get the top-rated home office chair recommendations"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find JetBrains IntelliJ vs VS Code vs WebStorm pricing for a team of 5"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Find the best no-contract mobile plans under $15/month in the US"
+		},
+		{
+			icon: "🛒",
+			cat: "Shopping",
+			text: "Go to Idealo and compare Sony WH-1000XM5 prices across online retailers"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Go to Booking.com and find a 4-star hotel in Rome for this weekend under €150/night"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Get ratings and reviews of the 3 best vegetarian restaurants in London on Google Maps"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Go to Skyscanner and find the cheapest London-Barcelona flights for the next 2 months"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Find the best neighborhoods to live in Lisbon according to expats on Expatica"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Go to Airbnb and list unique places available in Amsterdam this weekend under €100/night"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Find entry and visa requirements for US citizens traveling to Japan in 2025"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Go to TripAdvisor and find the 5 best-rated activities in Tokyo"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Find the cheapest direct NYC-Paris flights on Kayak for July"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Go to Google Maps and list highly-rated coworking spaces open on weekends in NYC"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Find the best travel insurance for a 3-month trip through Southeast Asia"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Go to Hostelworld and find the best-rated hostels in Bali under $30/night"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Find Michelin-starred restaurants in New York with table availability this month"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Go to Rome2Rio and compare train/flight/bus options London to Edinburgh with prices"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Find the best surf spots in Europe accessible by train from major cities"
+		},
+		{
+			icon: "✈️",
+			cat: "Travel",
+			text: "Go to Booking.com and find apartments with a kitchen in Barcelona for 7 nights in August"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to Coursera and list all AI certification courses with their price and duration"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find the latest academic papers on multimodal LLMs on arXiv this week"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to Udemy and collect the highest-rated Python courses with over 50,000 students"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find the 10 best-rated English tech podcasts on Spotify and Apple Podcasts"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to Khan Academy and list available modules on statistics and probability"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find the 5 best books on product management published in 2024-2025"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to Google Scholar and find the most cited Transformer papers since 2023"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find free machine learning MOOCs available in English in 2025"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to YouTube and find the 5 most popular channels on personal finance in English"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find the AWS certifications most in demand on LinkedIn job listings"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to O'Reilly and list the most read technical books on cloud engineering"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find the best resources to learn Rust in 2025 according to the community"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to edX and compare online master's programs in data science"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find the 5 most popular YouTube channels on tech entrepreneurship in English"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to fast.ai and summarize the topics covered in their free deep learning course"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to LinkedIn Learning and list the most followed data visualization courses"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find the 5 best YouTube channels on stock market investing in English"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Go to Brilliant.org and capture the available modules on computational thinking"
+		},
+		{
+			icon: "📚",
+			cat: "Learn",
+			text: "Find the best community resources for learning prompt engineering in 2025"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the 5 latest AI startup funding rounds globally on Crunchbase this week"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to Y Combinator and list the last batch startups working on AI agents"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to IndieHackers and get the 3 most recent success stories with their revenues"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the 10 most valued SaaS startups globally in 2025 on Crunchbase"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to Product Hunt and identify product trends emerging this quarter"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the most active early-stage AI investors in the US with their portfolios"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to Dealroom and list European tech unicorns founded since 2020"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find accelerators and incubators focused on AI accepting applications this quarter"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to SaaStr and list the most shared B2B SaaS growth articles this month"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the major tech acquisitions announced this month with their deal amounts"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to Tracxn and compare the leading AI agent startups with their funding"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the 5 most followed US tech founders on LinkedIn"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to Capterra and collect the best-rated CRM software for small businesses"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the 5 most popular invoicing tools for US freelancers with their pricing"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to Trustpilot and compare reviews of online banking for entrepreneurs"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find market size statistics for the AI agent market in 2025-2030"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Go to USPTO and explain the steps to file a trademark for a US startup"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the most active startup programs at major US universities in 2025"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the latest UK or US tech funding data published this month on Beauhurst or Crunchbase"
+		},
+		{
+			icon: "🚀",
+			cat: "Business",
+			text: "Find the top 5 business plan generators powered by AI and compare their output quality"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Dribbble and collect the 5 most liked UI designs this week"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Figma Community and list the 5 most downloaded UI kit templates this week"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Find the best-rated Figma plugins for WCAG accessibility compliance"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Behance and collect the 5 most viewed branding projects this month"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Find the 5 best AI image generation tools rated in 2025 with their pricing"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Awwwards and list the nominated websites this week with their categories"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Find the color palette trends for 2025 according to major design sites"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Coolors.co and capture the most popular palettes right now"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Find the 5 most popular free icon libraries among designers"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Unsplash and identify the most downloaded photo categories this week"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Find the 5 best prototyping tools as alternatives to Figma for 2025"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Lottie Files and list the most downloaded free animations right now"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Mobbin and collect the most common UI navigation patterns in fintech apps"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Find the 5 most popular CSS gradient generators used by designers"
+		},
+		{
+			icon: "🎨",
+			cat: "Design",
+			text: "Go to Spline.design and capture the most impressive 3D web examples this month"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Compare the features and pricing of Notion, Obsidian and Roam Research"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find the most recent LLM benchmarks on LMSYS Chatbot Arena and compare models"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Go to G2 and collect user reviews of the 5 best project management tools"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find comparative studies on remote vs in-office productivity published in 2025"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Go to Statista and get AI adoption statistics in enterprise in North America"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Compare GPT-4o, Claude 3.7 and Gemini 2.0 performance on public benchmarks"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Go to SimilarWeb and analyze the monthly traffic of the 5 leading AI platforms"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find NPS studies on the most used developer tools in 2025"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Go to Gartner and find the latest reports on the autonomous AI agent market"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Compare speech-to-text APIs (Whisper, Deepgram, AssemblyAI) on price and accuracy"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find search trends around 'generative AI' in the US on SEMrush"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find usage studies on ChatGPT vs Claude vs Gemini published in 2025"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Go to AppFollow and compare ratings of AI productivity apps on the App Store"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find a ranking of countries by AI adoption in SMEs"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Go to Similarweb and compare monthly traffic of Upwork, Toptal and Fiverr globally"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find the latest public benchmarks on coding models (Copilot, Cursor, Codeium)"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Go to Builtwith.com and analyze the tech stack of the top 100 Y Combinator startups"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find studies on user retention rates of consumer AI apps in 2025"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Compare the business models of Midjourney, DALL·E and Stable Diffusion for creators"
+		},
+		{
+			icon: "📊",
+			cat: "Analysis",
+			text: "Find the top keywords searched around 'AI agent' in the US on SEMrush or Ahrefs"
+		}
+	]
+};
+function pickSuggestions(locale = "fr", exclude = []) {
+	const pool = SUGGESTION_POOLS[locale] ?? SUGGESTION_POOLS.fr;
 	const excludeTexts = new Set(exclude.map((s) => s.text));
-	const available = SUGGESTION_POOL.filter((s) => !excludeTexts.has(s.text));
+	const available = pool.filter((s) => !excludeTexts.has(s.text));
 	const picked = [];
-	const pool = [...available];
-	while (picked.length < 3 && pool.length > 0) {
-		const i = Math.floor(Math.random() * pool.length);
-		picked.push(pool.splice(i, 1)[0]);
+	const remaining = [...available];
+	while (picked.length < 3 && remaining.length > 0) {
+		const i = Math.floor(Math.random() * remaining.length);
+		picked.push(remaining.splice(i, 1)[0]);
 	}
 	return picked;
 }
-function PromptSuggestions({ draft, onDraftChange, inputRef, disabled }) {
-	const [suggestions, setSuggestions] = import_react.useState(() => pickSuggestions());
+function PromptSuggestions({ draft, onDraftChange, inputRef, disabled, locale, t }) {
+	const [suggestions, setSuggestions] = import_react.useState(() => pickSuggestions(locale));
 	const [refreshKey, setRefreshKey] = import_react.useState(0);
+	import_react.useEffect(() => {
+		setSuggestions(pickSuggestions(locale));
+		setRefreshKey((k) => k + 1);
+	}, [locale]);
 	if (draft.objective) return null;
 	const handlePick = (text) => {
 		onDraftChange({ objective: text });
 		setTimeout(() => inputRef?.current?.focus(), 0);
 	};
 	const handleRefresh = () => {
-		setSuggestions((prev) => pickSuggestions(prev));
+		setSuggestions((prev) => pickSuggestions(locale, prev));
 		setRefreshKey((k) => k + 1);
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -15506,12 +16590,12 @@ function PromptSuggestions({ draft, onDraftChange, inputRef, disabled }) {
 				type: "button",
 				className: "psc-refresh",
 				onClick: handleRefresh,
-				title: "Nouvelles idées",
-				"aria-label": "Nouvelles idées",
+				title: t.suggestionRefresh,
+				"aria-label": t.suggestionRefresh,
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 					className: "psc-refresh-icon",
 					children: "↻"
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Autres idées" })]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.suggestionRefresh })]
 			})
 		})]
 	}, refreshKey);

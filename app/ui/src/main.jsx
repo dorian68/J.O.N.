@@ -1610,6 +1610,12 @@ function App() {
             ) : null}
           </div>
 
+          <PromptSuggestions
+            draft={draft}
+            onDraftChange={updateDraft}
+            inputRef={composerInputRef}
+            disabled={busy.loading || busy.reviewing || busy.starting || !project}
+          />
           <Composer
             draft={draft}
             busy={busy}
@@ -3528,6 +3534,101 @@ function EmptyConversation({ t }) {
       <p className="eyebrow">{t.jonDesktop}</p>
       <h1>{t.emptyTitle}</h1>
       <p>{t.emptySubtitle}</p>
+    </div>
+  );
+}
+
+// ── Prompt suggestion bubbles ────────────────────────────────────────────────
+
+const SUGGESTION_POOL = [
+  "Va sur Upwork et trouve-moi 5 missions freelance en rapport avec l'IA publiées cette semaine",
+  "Recherche les 10 meilleures extensions VS Code pour le développement Python en 2025 et liste-les avec leurs notes",
+  "Va sur LinkedIn et récupère les offres d'emploi 'Product Manager IA' à Paris publiées ce mois-ci",
+  "Trouve les 5 dernières levées de fonds de startups françaises dans la deeptech sur Crunchbase",
+  "Va sur Hacker News et résume les 3 fils de discussion les plus commentés aujourd'hui",
+  "Recherche le prix actuel du Bitcoin, Ethereum et Solana sur CoinGecko et compare leur variation sur 7 jours",
+  "Va sur Polymarket et liste les 5 marchés avec le plus gros volume d'échange en ce moment",
+  "Trouve les dernières publications académiques sur les LLM multimodaux parues sur arXiv cette semaine",
+  "Va sur Product Hunt et récupère les 5 produits les mieux notés lancés cette semaine",
+  "Recherche sur Amazon les écouteurs sans fil avec le meilleur rapport qualité-prix sous 100 €",
+  "Va sur GitHub Trending et liste les 5 repos les plus populaires cette semaine avec leur description",
+  "Trouve les dernières news sur Anthropic Claude publiées aujourd'hui sur TechCrunch",
+  "Récupère les notes et avis des 3 meilleurs restaurants végétariens à Paris sur Google Maps",
+  "Va sur Glassdoor et trouve les salaires moyens pour un développeur senior React en France",
+  "Recherche les conférences tech en Europe prévues pour les 3 prochains mois et liste-les avec les dates",
+  "Va sur Twitter/X et trouve les 5 tweets les plus viraux sur le sujet 'agent IA' des dernières 24h",
+  "Trouve les tarifs de tous les plans de Notion, Linear et Jira et crée un tableau comparatif",
+  "Va sur Reddit r/MachineLearning et résume les 3 posts les plus commentés de la semaine",
+  "Recherche les mises à jour de l'API OpenAI publiées ces 30 derniers jours dans leur changelog",
+  "Va sur Booking.com et trouve un hôtel 4 étoiles à Lyon pour ce weekend sous 150 €/nuit",
+  "Trouve les 5 freelances les mieux notés en développement React sur Malt",
+  "Va sur Dribbble et collecte les 5 designs UI les plus likés de cette semaine",
+  "Recherche les benchmarks de performance des derniers GPU Nvidia RTX 4000 sur Tom's Hardware",
+  "Va sur Coursera et liste tous les cours certifiants en IA générative avec leur prix et durée",
+  "Trouve les 10 podcasts tech francophones les mieux notés sur Spotify",
+  "Va sur IndieHackers et récupère les 3 success stories les plus récentes avec leurs revenus",
+  "Recherche les offres de stage en data science à Paris sur Indeed et filtre celles qui débutent en septembre",
+  "Va sur Figma Community et liste les 5 templates UI kit les plus téléchargés cette semaine",
+  "Trouve les dernières décisions réglementaires sur l'IA en Europe publiées sur le site de l'UE",
+  "Va sur Stack Overflow et trouve les questions sur 'React Server Components' les plus vues ce mois",
+  "Recherche les prix des abonnements Claude, ChatGPT Plus et Gemini Advanced et compare-les",
+  "Va sur Y Combinator et liste les startups de la dernière batch qui travaillent sur des agents IA",
+  "Trouve les plugins Figma les mieux notés pour l'accessibilité WCAG",
+  "Va sur Vercel et collecte les nouvelles fonctionnalités annoncées dans leurs release notes du mois",
+  "Recherche les 5 meilleures alternatives open source à Notion avec leurs fonctionnalités clés",
+  "Va sur Dev.to et liste les articles les plus aimés sur TypeScript publiés cette semaine",
+  "Trouve les taux de change actuels EUR/USD, EUR/GBP et EUR/JPY",
+  "Va sur Behance et collecte les 5 projets de branding les plus vus ce mois-ci",
+  "Recherche les dernières mises à jour du framework Next.js et résume les changements majeurs",
+  "Va sur Numbeo et compare le coût de la vie à Paris, Berlin et Amsterdam",
+];
+
+function pickSuggestions(exclude = []) {
+  const pool = SUGGESTION_POOL.filter((s) => !exclude.includes(s));
+  const picked = [];
+  const available = [...pool];
+  while (picked.length < 3 && available.length > 0) {
+    const i = Math.floor(Math.random() * available.length);
+    picked.push(available.splice(i, 1)[0]);
+  }
+  return picked;
+}
+
+function PromptSuggestions({ draft, onDraftChange, inputRef, disabled }) {
+  const [suggestions, setSuggestions] = React.useState(() => pickSuggestions());
+  const visible = !draft.objective;
+
+  if (!visible) return null;
+
+  const handlePick = (text) => {
+    onDraftChange({ objective: text });
+    inputRef?.current?.focus();
+  };
+
+  const handleRefresh = () => setSuggestions((prev) => pickSuggestions(prev));
+
+  return (
+    <div className="prompt-suggestions">
+      {suggestions.map((s, i) => (
+        <button
+          key={i}
+          type="button"
+          className="prompt-suggestion-chip"
+          disabled={disabled}
+          onClick={() => handlePick(s)}
+        >
+          {s}
+        </button>
+      ))}
+      <button
+        type="button"
+        className="prompt-suggestion-refresh"
+        onClick={handleRefresh}
+        title="Nouvelles suggestions"
+        aria-label="Nouvelles suggestions"
+      >
+        ↻
+      </button>
     </div>
   );
 }

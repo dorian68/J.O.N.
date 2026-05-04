@@ -21,7 +21,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 	enumerable: true
 }) : target, mod));
 //#endregion
-//#region node_modules/react/cjs/react.production.js
+//#region ../node_modules/react/cjs/react.production.js
 /**
 * @license React
 * react.production.js
@@ -381,12 +381,12 @@ var require_react_production = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.version = "19.2.5";
 }));
 //#endregion
-//#region node_modules/react/index.js
+//#region ../node_modules/react/index.js
 var require_react = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_react_production();
 }));
 //#endregion
-//#region node_modules/scheduler/cjs/scheduler.production.js
+//#region ../node_modules/scheduler/cjs/scheduler.production.js
 /**
 * @license React
 * scheduler.production.js
@@ -627,12 +627,12 @@ var require_scheduler_production = /* @__PURE__ */ __commonJSMin(((exports) => {
 	};
 }));
 //#endregion
-//#region node_modules/scheduler/index.js
+//#region ../node_modules/scheduler/index.js
 var require_scheduler = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_scheduler_production();
 }));
 //#endregion
-//#region node_modules/react-dom/cjs/react-dom.production.js
+//#region ../node_modules/react-dom/cjs/react-dom.production.js
 /**
 * @license React
 * react-dom.production.js
@@ -773,7 +773,7 @@ var require_react_dom_production = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.version = "19.2.5";
 }));
 //#endregion
-//#region node_modules/react-dom/index.js
+//#region ../node_modules/react-dom/index.js
 var require_react_dom = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	function checkDCE() {
 		if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === "undefined" || typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE !== "function") return;
@@ -787,7 +787,7 @@ var require_react_dom = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_react_dom_production();
 }));
 //#endregion
-//#region node_modules/react-dom/cjs/react-dom-client.production.js
+//#region ../node_modules/react-dom/cjs/react-dom-client.production.js
 /**
 * @license React
 * react-dom-client.production.js
@@ -9867,7 +9867,7 @@ var require_react_dom_client_production = /* @__PURE__ */ __commonJSMin(((export
 	};
 }));
 //#endregion
-//#region node_modules/react-dom/client.js
+//#region ../node_modules/react-dom/client.js
 var require_client = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	function checkDCE() {
 		if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === "undefined" || typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE !== "function") return;
@@ -9881,7 +9881,7 @@ var require_client = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_react_dom_client_production();
 }));
 //#endregion
-//#region ui/src/i18n.js
+//#region src/i18n.js
 var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
 var import_client = require_client();
 var SUPPORTED_LOCALES = Object.freeze(["fr", "en"]);
@@ -10512,7 +10512,7 @@ function formatTime(value, locale = "fr") {
 	}).format(date);
 }
 //#endregion
-//#region node_modules/react/cjs/react-jsx-runtime.production.js
+//#region ../node_modules/react/cjs/react-jsx-runtime.production.js
 /**
 * @license React
 * react-jsx-runtime.production.js
@@ -10609,7 +10609,7 @@ var __vitePreload = function preload(baseModule, deps, importerUrl) {
 	});
 };
 //#endregion
-//#region ui/src/main.jsx
+//#region src/main.jsx
 var EMPTY_DRAFT = Object.freeze({
 	objective: "",
 	deliverable: "",
@@ -13717,6 +13717,380 @@ function TerminalSidebar({ projectId, conversationId, workspace, onTerminalInput
 		]
 	});
 }
+var PANEL_CONFIG_KEY = "jon.panel.widgets.v1";
+var PANEL_WIDGET_REGISTRY = [
+	{
+		id: "mission_state",
+		label: "Mission & Progression",
+		category: "mission",
+		defaultOn: true
+	},
+	{
+		id: "jon_needs",
+		label: "Ce que JON attend",
+		category: "mission",
+		defaultOn: true
+	},
+	{
+		id: "semantic_verify",
+		label: "Vérification sémantique",
+		category: "mission",
+		defaultOn: true
+	},
+	{
+		id: "token_budget",
+		label: "Budget tokens & DOM",
+		category: "telemetry",
+		defaultOn: true
+	},
+	{
+		id: "browser_state",
+		label: "État du navigateur",
+		category: "surfaces",
+		defaultOn: true
+	},
+	{
+		id: "desktop_state",
+		label: "État du desktop",
+		category: "surfaces",
+		defaultOn: false
+	},
+	{
+		id: "approval_queue",
+		label: "Approbations en attente",
+		category: "mission",
+		defaultOn: true
+	},
+	{
+		id: "run_narrative",
+		label: "Trace de la mission",
+		category: "trace",
+		defaultOn: true
+	},
+	{
+		id: "llm_stages",
+		label: "Appels LLM",
+		category: "telemetry",
+		defaultOn: true
+	},
+	{
+		id: "evidence",
+		label: "Preuves & captures",
+		category: "trace",
+		defaultOn: true
+	},
+	{
+		id: "artifacts",
+		label: "Artefacts",
+		category: "trace",
+		defaultOn: false
+	},
+	{
+		id: "terminal_alerts",
+		label: "Alertes terminal",
+		category: "surfaces",
+		defaultOn: false
+	},
+	{
+		id: "terminal_transcript",
+		label: "Transcript terminal",
+		category: "surfaces",
+		defaultOn: false
+	},
+	{
+		id: "run_history",
+		label: "Historique des missions",
+		category: "trace",
+		defaultOn: false
+	}
+];
+var PANEL_CATEGORIES = [
+	{
+		id: "mission",
+		label: "Mission"
+	},
+	{
+		id: "surfaces",
+		label: "Surfaces"
+	},
+	{
+		id: "telemetry",
+		label: "Télémétrie"
+	},
+	{
+		id: "trace",
+		label: "Trace"
+	}
+];
+function loadPanelConfig() {
+	try {
+		const stored = JSON.parse(localStorage.getItem(PANEL_CONFIG_KEY) ?? "null");
+		if (stored && typeof stored === "object") return stored;
+	} catch {}
+	return Object.fromEntries(PANEL_WIDGET_REGISTRY.map((w) => [w.id, w.defaultOn]));
+}
+function savePanelConfig(config) {
+	try {
+		localStorage.setItem(PANEL_CONFIG_KEY, JSON.stringify(config));
+	} catch {}
+}
+function WMissionState({ scopedRun, t, locale }) {
+	const sv = scopedRun?.metadata?.semanticVerification ?? null;
+	const steps = (scopedRun?.metadata?.missionProgress ?? null)?.steps ?? null;
+	const verdict = sv?.verificationVerdict ?? null;
+	const verdictTone = {
+		pass: "ok",
+		partial: "warn",
+		fail: "danger",
+		degraded: "warn"
+	}[verdict] ?? "neutral";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "activity-section",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Mission & Progression" }), scopedRun ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "widget-mission-state",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "widget-objective",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "widget-label",
+						children: "Objectif"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: scopedRun.metadata?.missionSpec?.objective ?? scopedRun.mission ?? "—" })]
+				}),
+				steps && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "widget-progress-row",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "widget-progress-bar-track",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: `widget-progress-bar-fill ${steps.total > 0 && steps.completed === steps.total ? "done" : ""}`,
+							style: { width: steps.total > 0 ? `${Math.round(steps.completed / steps.total * 100)}%` : "0%" }
+						})
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "widget-progress-label",
+						children: [
+							steps.completed ?? 0,
+							"/",
+							steps.total ?? "?",
+							" étapes",
+							steps.consecutiveFailures > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+								className: "mini-badge danger",
+								children: [
+									" ",
+									steps.consecutiveFailures,
+									" échecs consécutifs"
+								]
+							}) : null
+						]
+					})]
+				}),
+				steps?.dynamicReplans > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "widget-hint",
+					children: [
+						"↺ ",
+						steps.dynamicReplans,
+						" replan",
+						steps.dynamicReplans > 1 ? "s" : ""
+					]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "widget-status-row",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `mini-badge ${verdictTone}`,
+						children: verdict ?? scopedRun.status
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+						t.updated,
+						": ",
+						formatDate(scopedRun.updatedAt ?? scopedRun.createdAt, locale)
+					] })]
+				})
+			]
+		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "muted",
+			children: t.noRunSelected
+		})]
+	});
+}
+function WJonNeeds({ scopedRun, scopedPendingApprovals, t }) {
+	const sv = scopedRun?.metadata?.semanticVerification ?? null;
+	const needsApproval = scopedPendingApprovals.length > 0;
+	const verificationFailed = sv && !sv.verifiedByOutcomes;
+	const nextAction = sv?.nextBestAction ?? null;
+	const failureReason = sv?.failureReason ?? null;
+	if (!scopedRun) return null;
+	if (!needsApproval && !verificationFailed && !nextAction) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "activity-section",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Ce que JON attend" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "widget-jon-needs",
+			children: [
+				needsApproval && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "card warning widget-need-card",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "⏳ Approbation requise" }), scopedPendingApprovals.slice(0, 2).map((a) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+						a.actionLabel ?? a.category,
+						" ",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: `mini-badge ${a.riskLevel === "high" ? "danger" : "warn"}`,
+							children: a.riskLevel
+						})
+					] }, a.id))]
+				}),
+				verificationFailed && failureReason && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "card warning widget-need-card",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "✗ Objectif non vérifié" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: failureReason })]
+				}),
+				nextAction && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "card widget-need-card",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "→ Prochaine action" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: nextAction })]
+				})
+			]
+		})]
+	});
+}
+function WSemanticVerify({ scopedRun }) {
+	const sv = scopedRun?.metadata?.semanticVerification ?? null;
+	if (!scopedRun) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "activity-section",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Vérification sémantique" }), sv ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "widget-semantic",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "widget-verdict-row",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `mini-badge ${{
+							pass: "ok",
+							partial: "warn",
+							fail: "danger",
+							degraded: "warn"
+						}[sv.verificationVerdict] ?? "neutral"}`,
+						children: {
+							pass: "✓ Vérifié",
+							partial: "~ Partiel",
+							fail: "✗ Échec",
+							degraded: "⚠ Dégradé"
+						}[sv.verificationVerdict] ?? sv.verificationVerdict
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "mini-badge neutral",
+						children: ["confiance: ", sv.confidence ?? "?"]
+					})]
+				}),
+				sv.satisfiedOutcomes?.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+					className: "widget-outcome-list ok",
+					children: sv.satisfiedOutcomes.slice(0, 4).map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: ["✓ ", o] }, i))
+				}),
+				sv.unsatisfiedOutcomes?.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+					className: "widget-outcome-list fail",
+					children: sv.unsatisfiedOutcomes.slice(0, 4).map((o, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: ["✗ ", o] }, i))
+				})
+			]
+		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "muted",
+			children: "Pas encore vérifié"
+		})]
+	});
+}
+function WTokenBudget({ calls, scopedRun }) {
+	const totalTokens = calls.reduce((acc, c) => acc + (c.tokenUsage?.totalTokens ?? 0), 0);
+	const totalCost = calls.reduce((acc, c) => acc + (c.estimatedCost ?? 0), 0);
+	const domInputTokens = [...calls].reverse().find((c) => c.callType === "browser_plan" || c.callType === "browser_replan")?.tokenUsage?.inputTokens ?? null;
+	const perStage = {};
+	for (const c of calls) {
+		const stage = c.callType ?? "unknown";
+		if (!perStage[stage]) perStage[stage] = {
+			count: 0,
+			tokens: 0
+		};
+		perStage[stage].count++;
+		perStage[stage].tokens += c.tokenUsage?.totalTokens ?? 0;
+	}
+	const topStages = Object.entries(perStage).sort((a, b) => b[1].tokens - a[1].tokens).slice(0, 5);
+	const usagePct = Math.min(100, Math.round(totalTokens / 5e4 * 100));
+	const budgetTone = usagePct > 85 ? "danger" : usagePct > 60 ? "warn" : "ok";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "activity-section",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Budget tokens & DOM" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "widget-token-budget",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "widget-progress-bar-track",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: `widget-progress-bar-fill ${budgetTone}`,
+						style: { width: `${usagePct}%` }
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "inspector-grid",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["Run total", /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", {
+							className: `mini-badge ${budgetTone}`,
+							children: [totalTokens.toLocaleString(), " tok"]
+						})] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["Coût", /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: ["$", totalCost.toFixed(4)] })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["Appels LLM", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: calls.length })] }),
+						domInputTokens && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["DOM estimé", /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", {
+							className: "mini-badge warn",
+							children: [domInputTokens.toLocaleString(), " tok"]
+						})] })
+					]
+				}),
+				topStages.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+					className: "activity-timeline compact",
+					children: topStages.map(([stage, data]) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: stage }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+						data.tokens.toLocaleString(),
+						" tok · ",
+						data.count,
+						" appel",
+						data.count > 1 ? "s" : ""
+					] })] }, stage))
+				})
+			]
+		})]
+	});
+}
+function PanelConfigDrawer({ config, onClose, onChange }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "panel-config-drawer",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "panel-config-header",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Configurer le panel" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: onClose,
+					children: "Fermer"
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "panel-config-body",
+				children: PANEL_CATEGORIES.map((cat) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "panel-config-category",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "eyebrow",
+						children: cat.label
+					}), PANEL_WIDGET_REGISTRY.filter((w) => w.category === cat.id).map((w) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+						className: "panel-config-toggle",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							type: "checkbox",
+							checked: config[w.id] ?? w.defaultOn,
+							onChange: (e) => onChange(w.id, e.target.checked)
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: w.label })]
+					}, w.id))]
+				}, cat.id))
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "panel-config-footer",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: () => {
+						const reset = Object.fromEntries(PANEL_WIDGET_REGISTRY.map((w) => [w.id, w.defaultOn]));
+						PANEL_WIDGET_REGISTRY.forEach((w) => onChange(w.id, w.defaultOn, reset));
+					},
+					children: "Réinitialiser"
+				})
+			})
+		]
+	});
+}
 function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, onOpenTerminals, pendingApprovals, liveStatus, locale, t }) {
 	const linkedRunIds = new Set([
 		...Array.isArray(conversation?.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : [],
@@ -13738,10 +14112,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 	const calls = scopedRunDetail?.llmCalls ?? [];
 	const browserState = browserStateFromEvidence(evidence);
 	const browserActionTypes = (browserState?.recentActions ?? []).map((action) => action.action).filter(Boolean).slice(-6);
-	workspace?.missionBrief;
-	workspace?.terminals;
 	const workspaceDecisions = workspace?.decisions ?? [];
-	workspace?.alerts;
 	const workspaceTerminalEvents = workspace?.terminalEvents ?? [];
 	const traceItems = runTraceItems({
 		scopedRun,
@@ -13753,6 +14124,235 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 		t
 	});
 	const capabilitySummary = runCapabilitySummary(scopedRun, scopedRunDetail);
+	const [panelConfig, setPanelConfig] = import_react.useState(loadPanelConfig);
+	const [configOpen, setConfigOpen] = import_react.useState(false);
+	const handleWidgetToggle = (id, checked) => {
+		const next = {
+			...panelConfig,
+			[id]: checked
+		};
+		setPanelConfig(next);
+		savePanelConfig(next);
+	};
+	const renderWidget = (widgetId) => {
+		switch (widgetId) {
+			case "mission_state": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WMissionState, {
+				scopedRun,
+				t,
+				locale
+			}, widgetId);
+			case "jon_needs": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WJonNeeds, {
+				scopedRun,
+				scopedPendingApprovals,
+				t
+			}, widgetId);
+			case "semantic_verify": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WSemanticVerify, { scopedRun }, widgetId);
+			case "token_budget": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(WTokenBudget, {
+				calls,
+				scopedRun
+			}, widgetId);
+			case "approval_queue":
+				if (scopedPendingApprovals.length === 0) return null;
+				return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					className: "activity-section",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", { children: ["Approbations ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "mini-badge warn",
+						children: scopedPendingApprovals.length
+					})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "compact-run-list",
+						children: scopedPendingApprovals.slice(0, 5).map((a) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "activity-card",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: a.actionLabel ?? a.category }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: `mini-badge ${a.riskLevel === "high" ? "danger" : "warn"}`,
+								children: a.riskLevel
+							})]
+						}, a.id))
+					})]
+				}, widgetId);
+			case "run_narrative": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runNarrative }),
+					traceItems.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noRecentActions
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
+						className: "run-trace-list",
+						children: traceItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+							className: item.tone ?? "",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: item.label }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.detail }),
+								item.timestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(item.timestamp, locale) }) : null
+							] })]
+						}, item.id))
+					}),
+					scopedEvents.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "activity-timeline compact",
+						style: { marginTop: "0.5rem" },
+						children: scopedEvents.slice(0, 6).map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: eventLabel(event) }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+							event.type,
+							" · ",
+							formatDate(event.createdAt, locale)
+						] })] }, technicalEventKey(event)))
+					})
+				]
+			}, widgetId);
+			case "browser_state": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.browserState }), browserState ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "inspector-grid",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.pageTitle, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.title || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.activeUrl, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.url || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.navigationSteps, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.navigationHistory?.length ?? 0 })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.blockers, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.blocker?.blocked ? browserState.blocker.reason || t.failed : t.notAvailable })] })
+					]
+				}), browserActionTypes.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+					className: "activity-timeline compact",
+					children: browserActionTypes.map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: action }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.lastBrowserActions })] }, `${action}-${index}`))
+				})] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "muted",
+					children: t.noBrowserState
+				})]
+			}, widgetId);
+			case "desktop_state": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.decisionTrace }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "inspector-grid",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.workspaceBrowserMode, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: workspace?.browserStrategy?.preferredMode === "workspace_browser_mode" ? t.done : t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.frame, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.frame || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.capability, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.capability || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.skill, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.skill || t.notAvailable })] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.policy, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.policy || t.notAvailable })] })
+					]
+				})]
+			}, widgetId);
+			case "llm_stages": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.generation }),
+					calls.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "muted",
+						children: ["0 ", t.llmCalls]
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "activity-timeline compact",
+						children: calls.slice(-8).reverse().map((call) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: call.callType }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+							call.resultStatus,
+							" · ",
+							call.tokenUsage?.totalTokens ?? 0,
+							" ",
+							t.tokens
+						] })] }, call.id))
+					})
+				]
+			}, widgetId);
+			case "evidence": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.evidence }),
+					evidence.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noEvidence
+					}) : null,
+					evidence.slice(0, 8).map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+						className: "activity-link",
+						href: item.hasScreenshot && scopedRun ? `/api/runs/${scopedRun.id}/evidence/${item.id}/screenshot` : "#",
+						target: "_blank",
+						rel: "noreferrer",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: item.kind ?? "evidence" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.description ?? item.path ?? item.id })]
+					}, item.id))
+				]
+			}, widgetId);
+			case "artifacts": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.artifacts }),
+					artifacts.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noArtifacts
+					}) : null,
+					artifacts.slice(0, 8).map((artifact, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+						className: "activity-link",
+						href: artifact.href ?? artifact.url ?? "#",
+						target: "_blank",
+						rel: "noreferrer",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: artifact.title ?? artifact.name ?? artifact.path ?? `Artifact ${index + 1}` }), artifact.description ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: artifact.description }) : null]
+					}, artifact.id ?? artifact.path ?? index))
+				]
+			}, widgetId);
+			case "terminal_alerts": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalAlerts }),
+					workspace?.alerts?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
+						className: "run-trace-list",
+						children: workspace.alerts.map((alert) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+							className: alert.requiresApproval ? "warn" : "neutral",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: alert.action }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: alert.reason }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(alert.createdAt, locale) })
+							] })]
+						}, alert.id))
+					}) : null,
+					workspaceDecisions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "activity-timeline compact",
+						children: workspaceDecisions.slice(-4).reverse().map((decision) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: decision.action }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+							decision.reason,
+							" · ",
+							formatDate(decision.createdAt, locale)
+						] })] }, decision.id))
+					}),
+					!workspace?.alerts?.length && !workspaceDecisions.length && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noTerminalDecisions
+					})
+				]
+			}, widgetId);
+			case "terminal_transcript": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalTranscript }),
+					workspaceTerminalEvents.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noTerminalTranscript
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "activity-timeline compact",
+						children: workspaceTerminalEvents.slice(-6).reverse().map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [event.eventType, event.stream ? ` · ${event.stream}` : ""] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: event.content ? event.content.slice(0, 180) : formatDate(event.createdAt, locale) })] }, event.id))
+					})
+				]
+			}, widgetId);
+			case "run_history": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "activity-section",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runHistory }),
+					visibleRuns.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted",
+						children: t.noRuns
+					}) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "compact-run-list",
+						children: visibleRuns.slice(0, 8).map((candidate) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							className: `compact-run-item ${candidate.id === selectedRunId ? "selected" : ""}`,
+							onClick: () => onOpenRun(candidate.id),
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: candidate.metadata?.missionSpec?.objective ?? candidate.mission ?? t.selectedMission }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+								candidate.status,
+								" · ",
+								formatDate(candidate.updatedAt ?? candidate.createdAt, locale)
+							] })]
+						}, candidate.id))
+					})
+				]
+			}, widgetId);
+			default: return null;
+		}
+	};
 	if (!open) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
 		className: "activity-panel collapsed",
 		"aria-label": t.runInspector,
@@ -13795,6 +14395,14 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 							type: "button",
 							className: "ghost small",
+							onClick: () => setConfigOpen((v) => !v),
+							title: "Configurer le panel",
+							"aria-label": "Configurer le panel",
+							children: "⚙"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ghost small",
 							onClick: onToggle,
 							"aria-label": t.collapseInspector,
 							title: t.collapseInspector,
@@ -13803,231 +14411,12 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 					]
 				})]
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.currentRun }), scopedRun ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "activity-card",
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: scopedRun.metadata?.missionSpec?.objective ?? scopedRun.mission ?? t.selectedMission }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
-							t.status,
-							": ",
-							scopedRun.status
-						] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
-							t.updated,
-							": ",
-							formatDate(scopedRun.updatedAt ?? scopedRun.createdAt, locale)
-						] }),
-						scopedPendingApprovals.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-							className: "mini-badge warn",
-							children: t.confirmationNeeded
-						}) : null
-					]
-				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-					className: "muted",
-					children: t.noRunSelected
-				})]
+			configOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PanelConfigDrawer, {
+				config: panelConfig,
+				onClose: () => setConfigOpen(false),
+				onChange: handleWidgetToggle
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runNarrative }),
-					traceItems.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noRecentActions
-					}) : null,
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
-						className: "run-trace-list",
-						children: traceItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
-							className: item.tone ?? "",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: item.label }),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.detail }),
-								item.timestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(item.timestamp, locale) }) : null
-							] })]
-						}, item.id))
-					})
-				]
-			}),
-			workspace?.alerts?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalAlerts }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
-					className: "run-trace-list",
-					children: workspace.alerts.map((alert) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
-						className: alert.requiresApproval ? "warn" : "neutral",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: alert.action }),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: alert.reason }),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(alert.createdAt, locale) })
-						] })]
-					}, alert.id))
-				})]
-			}) : null,
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.browserState }), browserState ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "inspector-grid",
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.pageTitle, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.title || t.notAvailable })] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.activeUrl, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.url || t.notAvailable })] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.navigationSteps, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.navigationHistory?.length ?? 0 })] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.blockers, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: browserState.blocker?.blocked ? browserState.blocker.reason || t.failed : t.notAvailable })] })
-					]
-				}), browserActionTypes.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
-					className: "activity-timeline compact",
-					children: browserActionTypes.map((action, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: action }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.lastBrowserActions })] }, `${action}-${index}`))
-				}) : null] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-					className: "muted",
-					children: t.noBrowserState
-				})]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.browserStrategy }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "inspector-grid",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.workspaceBrowserMode, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: workspace?.browserStrategy?.preferredMode === "workspace_browser_mode" ? t.done : t.notAvailable })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.systemBrowserMode, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: workspace?.browserStrategy?.supportedModes?.includes("system_browser_mode") ? t.done : t.notAvailable })] })]
-				})]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.decisionTrace }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "inspector-grid",
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.frame, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.frame || t.notAvailable })] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.capability, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.capability || t.notAvailable })] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.skill, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.skill || t.notAvailable })] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.policy, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: capabilitySummary.policy || t.notAvailable })] })
-					]
-				})]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.artifacts }),
-					artifacts.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noArtifacts
-					}) : null,
-					artifacts.slice(0, 8).map((artifact, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
-						className: "activity-link",
-						href: artifact.href ?? artifact.url ?? "#",
-						target: "_blank",
-						rel: "noreferrer",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: artifact.title ?? artifact.name ?? artifact.path ?? `Artifact ${index + 1}` }), artifact.description ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: artifact.description }) : null]
-					}, artifact.id ?? artifact.path ?? index))
-				]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.evidence }),
-					evidence.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noEvidence
-					}) : null,
-					evidence.slice(0, 8).map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
-						className: "activity-link",
-						href: item.hasScreenshot && scopedRun ? `/api/runs/${scopedRun.id}/evidence/${item.id}/screenshot` : "#",
-						target: "_blank",
-						rel: "noreferrer",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: item.kind ?? "evidence" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.description ?? item.path ?? item.id })]
-					}, item.id))
-				]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.recentActions }),
-					scopedEvents.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noRecentActions
-					}) : null,
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
-						className: "activity-timeline",
-						children: scopedEvents.slice(0, 10).map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: eventLabel(event) }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
-							event.type,
-							" · ",
-							formatDate(event.createdAt, locale)
-						] })] }, technicalEventKey(event)))
-					})
-				]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.generation }),
-					calls.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
-						className: "muted",
-						children: ["0 ", t.llmCalls]
-					}) : null,
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
-						className: "activity-timeline compact",
-						children: calls.slice(-6).reverse().map((call) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: call.callType }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
-							call.resultStatus,
-							" · ",
-							call.tokenUsage?.totalTokens ?? 0,
-							" ",
-							t.tokens
-						] })] }, call.id))
-					})
-				]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalDecisions }),
-					workspaceDecisions.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noTerminalDecisions
-					}) : null,
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
-						className: "activity-timeline compact",
-						children: workspaceDecisions.slice(-6).reverse().map((decision) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: decision.action }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
-							decision.reason,
-							" · ",
-							formatDate(decision.createdAt, locale)
-						] })] }, decision.id))
-					})
-				]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.terminalTranscript }),
-					workspaceTerminalEvents.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noTerminalTranscript
-					}) : null,
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
-						className: "activity-timeline compact",
-						children: workspaceTerminalEvents.slice(-6).reverse().map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [event.eventType, event.stream ? ` · ${event.stream}` : ""] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: event.content ? event.content.slice(0, 180) : formatDate(event.createdAt, locale) })] }, event.id))
-					})
-				]
-			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
-				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runHistory }),
-					visibleRuns.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noRuns
-					}) : null,
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-						className: "compact-run-list",
-						children: visibleRuns.slice(0, 8).map((candidate) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
-							type: "button",
-							className: `compact-run-item ${candidate.id === selectedRunId ? "selected" : ""}`,
-							onClick: () => onOpenRun(candidate.id),
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: candidate.metadata?.missionSpec?.objective ?? candidate.mission ?? t.selectedMission }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
-								candidate.status,
-								" · ",
-								formatDate(candidate.updatedAt ?? candidate.createdAt, locale)
-							] })]
-						}, candidate.id))
-					})
-				]
-			})
+			PANEL_WIDGET_REGISTRY.filter((w) => panelConfig[w.id]).map((w) => renderWidget(w.id))
 		]
 	});
 }

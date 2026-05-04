@@ -2976,6 +2976,243 @@ function TerminalSidebar({
   );
 }
 
+// ── Panel widget registry ────────────────────────────────────────────────────
+
+const PANEL_CONFIG_KEY = "jon.panel.widgets.v1";
+
+const PANEL_WIDGET_REGISTRY = [
+  { id: "mission_state",       label: "Mission & Progression",     category: "mission",   defaultOn: true  },
+  { id: "jon_needs",           label: "Ce que JON attend",         category: "mission",   defaultOn: true  },
+  { id: "semantic_verify",     label: "Vérification sémantique",   category: "mission",   defaultOn: true  },
+  { id: "token_budget",        label: "Budget tokens & DOM",       category: "telemetry", defaultOn: true  },
+  { id: "browser_state",       label: "État du navigateur",        category: "surfaces",  defaultOn: true  },
+  { id: "desktop_state",       label: "État du desktop",           category: "surfaces",  defaultOn: false },
+  { id: "approval_queue",      label: "Approbations en attente",   category: "mission",   defaultOn: true  },
+  { id: "run_narrative",       label: "Trace de la mission",       category: "trace",     defaultOn: true  },
+  { id: "llm_stages",         label: "Appels LLM",                category: "telemetry", defaultOn: true  },
+  { id: "evidence",            label: "Preuves & captures",        category: "trace",     defaultOn: true  },
+  { id: "artifacts",           label: "Artefacts",                 category: "trace",     defaultOn: false },
+  { id: "terminal_alerts",     label: "Alertes terminal",          category: "surfaces",  defaultOn: false },
+  { id: "terminal_transcript", label: "Transcript terminal",       category: "surfaces",  defaultOn: false },
+  { id: "run_history",         label: "Historique des missions",   category: "trace",     defaultOn: false },
+];
+
+const PANEL_CATEGORIES = [
+  { id: "mission",   label: "Mission" },
+  { id: "surfaces",  label: "Surfaces" },
+  { id: "telemetry", label: "Télémétrie" },
+  { id: "trace",     label: "Trace" },
+];
+
+function loadPanelConfig() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PANEL_CONFIG_KEY) ?? "null");
+    if (stored && typeof stored === "object") return stored;
+  } catch { /* ignore */ }
+  return Object.fromEntries(PANEL_WIDGET_REGISTRY.map((w) => [w.id, w.defaultOn]));
+}
+
+function savePanelConfig(config) {
+  try { localStorage.setItem(PANEL_CONFIG_KEY, JSON.stringify(config)); } catch { /* ignore */ }
+}
+
+// ── Individual widget renderers ──────────────────────────────────────────────
+
+function WMissionState({ scopedRun, t, locale }) {
+  const sv = scopedRun?.metadata?.semanticVerification ?? null;
+  const mp = scopedRun?.metadata?.missionProgress ?? null;
+  const steps = mp?.steps ?? null;
+  const verdict = sv?.verificationVerdict ?? null;
+  const verdictTone = { pass: "ok", partial: "warn", fail: "danger", degraded: "warn" }[verdict] ?? "neutral";
+
+  return (
+    <section className="activity-section">
+      <h3>Mission &amp; Progression</h3>
+      {scopedRun ? (
+        <div className="widget-mission-state">
+          <div className="widget-objective">
+            <span className="widget-label">Objectif</span>
+            <strong>{scopedRun.metadata?.missionSpec?.objective ?? scopedRun.mission ?? "—"}</strong>
+          </div>
+          {steps && (
+            <div className="widget-progress-row">
+              <div className="widget-progress-bar-track">
+                <div
+                  className={`widget-progress-bar-fill ${steps.total > 0 && steps.completed === steps.total ? "done" : ""}`}
+                  style={{ width: steps.total > 0 ? `${Math.round((steps.completed / steps.total) * 100)}%` : "0%" }}
+                />
+              </div>
+              <span className="widget-progress-label">
+                {steps.completed ?? 0}/{steps.total ?? "?"} étapes
+                {steps.consecutiveFailures > 0 ? <span className="mini-badge danger"> {steps.consecutiveFailures} échecs consécutifs</span> : null}
+              </span>
+            </div>
+          )}
+          {steps?.dynamicReplans > 0 && <p className="widget-hint">↺ {steps.dynamicReplans} replan{steps.dynamicReplans > 1 ? "s" : ""}</p>}
+          <div className="widget-status-row">
+            <span className={`mini-badge ${verdictTone}`}>{verdict ?? scopedRun.status}</span>
+            <small>{t.updated}: {formatDate(scopedRun.updatedAt ?? scopedRun.createdAt, locale)}</small>
+          </div>
+        </div>
+      ) : <p className="muted">{t.noRunSelected}</p>}
+    </section>
+  );
+}
+
+function WJonNeeds({ scopedRun, scopedPendingApprovals, t }) {
+  const sv = scopedRun?.metadata?.semanticVerification ?? null;
+  const needsApproval = scopedPendingApprovals.length > 0;
+  const verificationFailed = sv && !sv.verifiedByOutcomes;
+  const nextAction = sv?.nextBestAction ?? null;
+  const failureReason = sv?.failureReason ?? null;
+
+  if (!scopedRun) return null;
+  if (!needsApproval && !verificationFailed && !nextAction) return null;
+
+  return (
+    <section className="activity-section">
+      <h3>Ce que JON attend</h3>
+      <div className="widget-jon-needs">
+        {needsApproval && (
+          <div className="card warning widget-need-card">
+            <strong>⏳ Approbation requise</strong>
+            {scopedPendingApprovals.slice(0, 2).map((a) => (
+              <span key={a.id}>{a.actionLabel ?? a.category} <span className={`mini-badge ${a.riskLevel === "high" ? "danger" : "warn"}`}>{a.riskLevel}</span></span>
+            ))}
+          </div>
+        )}
+        {verificationFailed && failureReason && (
+          <div className="card warning widget-need-card">
+            <strong>✗ Objectif non vérifié</strong>
+            <span>{failureReason}</span>
+          </div>
+        )}
+        {nextAction && (
+          <div className="card widget-need-card">
+            <strong>→ Prochaine action</strong>
+            <span>{nextAction}</span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function WSemanticVerify({ scopedRun }) {
+  const sv = scopedRun?.metadata?.semanticVerification ?? null;
+  if (!scopedRun) return null;
+
+  const verdictLabel = { pass: "✓ Vérifié", partial: "~ Partiel", fail: "✗ Échec", degraded: "⚠ Dégradé" };
+  const verdictTone = { pass: "ok", partial: "warn", fail: "danger", degraded: "warn" };
+
+  return (
+    <section className="activity-section">
+      <h3>Vérification sémantique</h3>
+      {sv ? (
+        <div className="widget-semantic">
+          <div className="widget-verdict-row">
+            <span className={`mini-badge ${verdictTone[sv.verificationVerdict] ?? "neutral"}`}>
+              {verdictLabel[sv.verificationVerdict] ?? sv.verificationVerdict}
+            </span>
+            <span className="mini-badge neutral">confiance: {sv.confidence ?? "?"}</span>
+          </div>
+          {sv.satisfiedOutcomes?.length > 0 && (
+            <ul className="widget-outcome-list ok">
+              {sv.satisfiedOutcomes.slice(0, 4).map((o, i) => <li key={i}>✓ {o}</li>)}
+            </ul>
+          )}
+          {sv.unsatisfiedOutcomes?.length > 0 && (
+            <ul className="widget-outcome-list fail">
+              {sv.unsatisfiedOutcomes.slice(0, 4).map((o, i) => <li key={i}>✗ {o}</li>)}
+            </ul>
+          )}
+        </div>
+      ) : <p className="muted">Pas encore vérifié</p>}
+    </section>
+  );
+}
+
+function WTokenBudget({ calls, scopedRun }) {
+  const totalTokens = calls.reduce((acc, c) => acc + (c.tokenUsage?.totalTokens ?? 0), 0);
+  const totalCost = calls.reduce((acc, c) => acc + (c.estimatedCost ?? 0), 0);
+  const browserPlanCall = [...calls].reverse().find((c) => c.callType === "browser_plan" || c.callType === "browser_replan");
+  const domInputTokens = browserPlanCall?.tokenUsage?.inputTokens ?? null;
+  const perStage = {};
+  for (const c of calls) {
+    const stage = c.callType ?? "unknown";
+    if (!perStage[stage]) perStage[stage] = { count: 0, tokens: 0 };
+    perStage[stage].count++;
+    perStage[stage].tokens += c.tokenUsage?.totalTokens ?? 0;
+  }
+  const topStages = Object.entries(perStage).sort((a, b) => b[1].tokens - a[1].tokens).slice(0, 5);
+  const budgetTokens = 50_000;
+  const usagePct = Math.min(100, Math.round((totalTokens / budgetTokens) * 100));
+  const budgetTone = usagePct > 85 ? "danger" : usagePct > 60 ? "warn" : "ok";
+
+  return (
+    <section className="activity-section">
+      <h3>Budget tokens &amp; DOM</h3>
+      <div className="widget-token-budget">
+        <div className="widget-progress-bar-track">
+          <div className={`widget-progress-bar-fill ${budgetTone}`} style={{ width: `${usagePct}%` }} />
+        </div>
+        <div className="inspector-grid">
+          <span>Run total<strong className={`mini-badge ${budgetTone}`}>{totalTokens.toLocaleString()} tok</strong></span>
+          <span>Coût<strong>${(totalCost).toFixed(4)}</strong></span>
+          <span>Appels LLM<strong>{calls.length}</strong></span>
+          {domInputTokens && <span>DOM estimé<strong className="mini-badge warn">{domInputTokens.toLocaleString()} tok</strong></span>}
+        </div>
+        {topStages.length > 0 && (
+          <ul className="activity-timeline compact">
+            {topStages.map(([stage, data]) => (
+              <li key={stage}>
+                <span>{stage}</span>
+                <small>{data.tokens.toLocaleString()} tok · {data.count} appel{data.count > 1 ? "s" : ""}</small>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ── Panel configure drawer ───────────────────────────────────────────────────
+
+function PanelConfigDrawer({ config, onClose, onChange }) {
+  return (
+    <div className="panel-config-drawer">
+      <div className="panel-config-header">
+        <strong>Configurer le panel</strong>
+        <button type="button" className="ghost small" onClick={onClose}>Fermer</button>
+      </div>
+      <div className="panel-config-body">
+        {PANEL_CATEGORIES.map((cat) => (
+          <div key={cat.id} className="panel-config-category">
+            <p className="eyebrow">{cat.label}</p>
+            {PANEL_WIDGET_REGISTRY.filter((w) => w.category === cat.id).map((w) => (
+              <label key={w.id} className="panel-config-toggle">
+                <input
+                  type="checkbox"
+                  checked={config[w.id] ?? w.defaultOn}
+                  onChange={(e) => onChange(w.id, e.target.checked)}
+                />
+                <span>{w.label}</span>
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="panel-config-footer">
+        <button type="button" className="ghost small" onClick={() => {
+          const reset = Object.fromEntries(PANEL_WIDGET_REGISTRY.map((w) => [w.id, w.defaultOn]));
+          PANEL_WIDGET_REGISTRY.forEach((w) => onChange(w.id, w.defaultOn, reset));
+        }}>Réinitialiser</button>
+      </div>
+    </div>
+  );
+}
+
 function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, onOpenTerminals, pendingApprovals, liveStatus, locale, t }) {
   const linkedRunIds = new Set([
     ...(Array.isArray(conversation?.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : []),
@@ -2984,9 +3221,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
   ].filter(Boolean));
   const hasConversationScope = Boolean(conversationId) || linkedRunIds.size > 0;
   const matchesConversation = (candidate) => {
-    if (!candidate) {
-      return false;
-    }
+    if (!candidate) return false;
     return linkedRunIds.has(candidate.id)
       || candidate.metadata?.conversationId === conversationId
       || candidate.metadata?.conversation?.id === conversationId;
@@ -3007,21 +3242,245 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
     .map((action) => action.action)
     .filter(Boolean)
     .slice(-6);
-  const workspaceMission = workspace?.missionBrief ?? null;
-  const workspaceTerminals = workspace?.terminals ?? [];
   const workspaceDecisions = workspace?.decisions ?? [];
-  const workspaceAlerts = workspace?.alerts ?? [];
   const workspaceTerminalEvents = workspace?.terminalEvents ?? [];
-  const traceItems = runTraceItems({
-    scopedRun,
-    events: scopedEvents,
-    approvals: scopedPendingApprovals,
-    artifacts,
-    evidence,
-    calls,
-    t
-  });
+  const traceItems = runTraceItems({ scopedRun, events: scopedEvents, approvals: scopedPendingApprovals, artifacts, evidence, calls, t });
   const capabilitySummary = runCapabilitySummary(scopedRun, scopedRunDetail);
+
+  const [panelConfig, setPanelConfig] = React.useState(loadPanelConfig);
+  const [configOpen, setConfigOpen] = React.useState(false);
+
+  const handleWidgetToggle = (id, checked) => {
+    const next = { ...panelConfig, [id]: checked };
+    setPanelConfig(next);
+    savePanelConfig(next);
+  };
+
+  const renderWidget = (widgetId) => {
+    switch (widgetId) {
+      case "mission_state":
+        return <WMissionState key={widgetId} scopedRun={scopedRun} t={t} locale={locale} />;
+
+      case "jon_needs":
+        return <WJonNeeds key={widgetId} scopedRun={scopedRun} scopedPendingApprovals={scopedPendingApprovals} t={t} />;
+
+      case "semantic_verify":
+        return <WSemanticVerify key={widgetId} scopedRun={scopedRun} />;
+
+      case "token_budget":
+        return <WTokenBudget key={widgetId} calls={calls} scopedRun={scopedRun} />;
+
+      case "approval_queue":
+        if (scopedPendingApprovals.length === 0) return null;
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>Approbations <span className="mini-badge warn">{scopedPendingApprovals.length}</span></h3>
+            <div className="compact-run-list">
+              {scopedPendingApprovals.slice(0, 5).map((a) => (
+                <div key={a.id} className="activity-card">
+                  <strong>{a.actionLabel ?? a.category}</strong>
+                  <span className={`mini-badge ${a.riskLevel === "high" ? "danger" : "warn"}`}>{a.riskLevel}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+
+      case "run_narrative":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.runNarrative}</h3>
+            {traceItems.length === 0 ? <p className="muted">{t.noRecentActions}</p> : null}
+            <ol className="run-trace-list">
+              {traceItems.map((item) => (
+                <li key={item.id} className={item.tone ?? ""}>
+                  <i aria-hidden="true" />
+                  <div>
+                    <strong>{item.label}</strong>
+                    <span>{item.detail}</span>
+                    {item.timestamp ? <small>{formatDate(item.timestamp, locale)}</small> : null}
+                  </div>
+                </li>
+              ))}
+            </ol>
+            {scopedEvents.length > 0 && (
+              <ul className="activity-timeline compact" style={{ marginTop: "0.5rem" }}>
+                {scopedEvents.slice(0, 6).map((event) => (
+                  <li key={technicalEventKey(event)}>
+                    <span>{eventLabel(event)}</span>
+                    <small>{event.type} · {formatDate(event.createdAt, locale)}</small>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+
+      case "browser_state":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.browserState}</h3>
+            {browserState ? (
+              <>
+                <div className="inspector-grid">
+                  <span>{t.pageTitle}<strong>{browserState.title || t.notAvailable}</strong></span>
+                  <span>{t.activeUrl}<strong>{browserState.url || t.notAvailable}</strong></span>
+                  <span>{t.navigationSteps}<strong>{browserState.navigationHistory?.length ?? 0}</strong></span>
+                  <span>{t.blockers}<strong>{browserState.blocker?.blocked ? browserState.blocker.reason || t.failed : t.notAvailable}</strong></span>
+                </div>
+                {browserActionTypes.length > 0 && (
+                  <ul className="activity-timeline compact">
+                    {browserActionTypes.map((action, index) => (
+                      <li key={`${action}-${index}`}>
+                        <span>{action}</span>
+                        <small>{t.lastBrowserActions}</small>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : <p className="muted">{t.noBrowserState}</p>}
+          </section>
+        );
+
+      case "desktop_state":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.decisionTrace}</h3>
+            <div className="inspector-grid">
+              <span>{t.workspaceBrowserMode}<strong>{workspace?.browserStrategy?.preferredMode === "workspace_browser_mode" ? t.done : t.notAvailable}</strong></span>
+              <span>{t.frame}<strong>{capabilitySummary.frame || t.notAvailable}</strong></span>
+              <span>{t.capability}<strong>{capabilitySummary.capability || t.notAvailable}</strong></span>
+              <span>{t.skill}<strong>{capabilitySummary.skill || t.notAvailable}</strong></span>
+              <span>{t.policy}<strong>{capabilitySummary.policy || t.notAvailable}</strong></span>
+            </div>
+          </section>
+        );
+
+      case "llm_stages":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.generation}</h3>
+            {calls.length === 0 ? <p className="muted">0 {t.llmCalls}</p> : null}
+            <ul className="activity-timeline compact">
+              {calls.slice(-8).reverse().map((call) => (
+                <li key={call.id}>
+                  <span>{call.callType}</span>
+                  <small>{call.resultStatus} · {call.tokenUsage?.totalTokens ?? 0} {t.tokens}</small>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+
+      case "evidence":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.evidence}</h3>
+            {evidence.length === 0 ? <p className="muted">{t.noEvidence}</p> : null}
+            {evidence.slice(0, 8).map((item) => (
+              <a
+                key={item.id}
+                className="activity-link"
+                href={item.hasScreenshot && scopedRun ? `/api/runs/${scopedRun.id}/evidence/${item.id}/screenshot` : "#"}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <strong>{item.kind ?? "evidence"}</strong>
+                <span>{item.description ?? item.path ?? item.id}</span>
+              </a>
+            ))}
+          </section>
+        );
+
+      case "artifacts":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.artifacts}</h3>
+            {artifacts.length === 0 ? <p className="muted">{t.noArtifacts}</p> : null}
+            {artifacts.slice(0, 8).map((artifact, index) => (
+              <a className="activity-link" key={artifact.id ?? artifact.path ?? index} href={artifact.href ?? artifact.url ?? "#"} target="_blank" rel="noreferrer">
+                <strong>{artifact.title ?? artifact.name ?? artifact.path ?? `Artifact ${index + 1}`}</strong>
+                {artifact.description ? <span>{artifact.description}</span> : null}
+              </a>
+            ))}
+          </section>
+        );
+
+      case "terminal_alerts":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.terminalAlerts}</h3>
+            {workspace?.alerts?.length > 0 ? (
+              <ol className="run-trace-list">
+                {workspace.alerts.map((alert) => (
+                  <li key={alert.id} className={alert.requiresApproval ? "warn" : "neutral"}>
+                    <i aria-hidden="true" />
+                    <div>
+                      <strong>{alert.action}</strong>
+                      <span>{alert.reason}</span>
+                      <small>{formatDate(alert.createdAt, locale)}</small>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+            {workspaceDecisions.length > 0 && (
+              <ul className="activity-timeline compact">
+                {workspaceDecisions.slice(-4).reverse().map((decision) => (
+                  <li key={decision.id}>
+                    <span>{decision.action}</span>
+                    <small>{decision.reason} · {formatDate(decision.createdAt, locale)}</small>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {(!workspace?.alerts?.length && !workspaceDecisions.length) && <p className="muted">{t.noTerminalDecisions}</p>}
+          </section>
+        );
+
+      case "terminal_transcript":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.terminalTranscript}</h3>
+            {workspaceTerminalEvents.length === 0 ? <p className="muted">{t.noTerminalTranscript}</p> : null}
+            <ul className="activity-timeline compact">
+              {workspaceTerminalEvents.slice(-6).reverse().map((event) => (
+                <li key={event.id}>
+                  <span>{event.eventType}{event.stream ? ` · ${event.stream}` : ""}</span>
+                  <small>{event.content ? event.content.slice(0, 180) : formatDate(event.createdAt, locale)}</small>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+
+      case "run_history":
+        return (
+          <section key={widgetId} className="activity-section">
+            <h3>{t.runHistory}</h3>
+            {visibleRuns.length === 0 ? <p className="muted">{t.noRuns}</p> : null}
+            <div className="compact-run-list">
+              {visibleRuns.slice(0, 8).map((candidate) => (
+                <button
+                  type="button"
+                  key={candidate.id}
+                  className={`compact-run-item ${candidate.id === selectedRunId ? "selected" : ""}`}
+                  onClick={() => onOpenRun(candidate.id)}
+                >
+                  <strong>{candidate.metadata?.missionSpec?.objective ?? candidate.mission ?? t.selectedMission}</strong>
+                  <span>{candidate.status} · {formatDate(candidate.updatedAt ?? candidate.createdAt, locale)}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   if (!open) {
     return (
       <aside className="activity-panel collapsed" aria-label={t.runInspector} data-testid="run-inspector">
@@ -3033,6 +3492,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
       </aside>
     );
   }
+
   return (
     <aside className="activity-panel open" aria-label={t.runInspector} data-testid="run-inspector">
       <div className="side-panel-header">
@@ -3043,196 +3503,20 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
         <div className="side-panel-actions">
           <span className={`mini-badge ${liveStatus === "live" ? "ok" : "warn"}`}>{liveStatus === "live" ? t.live : t.degraded}</span>
           <button type="button" className="ghost small" onClick={onOpenTerminals}>{t.terminalSurfaces}</button>
+          <button type="button" className="ghost small" onClick={() => setConfigOpen((v) => !v)} title="Configurer le panel" aria-label="Configurer le panel">⚙</button>
           <button type="button" className="ghost small" onClick={onToggle} aria-label={t.collapseInspector} title={t.collapseInspector}>{t.collapse}</button>
         </div>
       </div>
 
-      <section className="activity-section">
-        <h3>{t.currentRun}</h3>
-        {scopedRun ? (
-          <div className="activity-card">
-            <strong>{scopedRun.metadata?.missionSpec?.objective ?? scopedRun.mission ?? t.selectedMission}</strong>
-            <span>{t.status}: {scopedRun.status}</span>
-            <small>{t.updated}: {formatDate(scopedRun.updatedAt ?? scopedRun.createdAt, locale)}</small>
-            {scopedPendingApprovals.length > 0 ? <span className="mini-badge warn">{t.confirmationNeeded}</span> : null}
-          </div>
-        ) : <p className="muted">{t.noRunSelected}</p>}
-      </section>
+      {configOpen && (
+        <PanelConfigDrawer
+          config={panelConfig}
+          onClose={() => setConfigOpen(false)}
+          onChange={handleWidgetToggle}
+        />
+      )}
 
-      <section className="activity-section">
-        <h3>{t.runNarrative}</h3>
-        {traceItems.length === 0 ? <p className="muted">{t.noRecentActions}</p> : null}
-        <ol className="run-trace-list">
-          {traceItems.map((item) => (
-            <li key={item.id} className={item.tone ?? ""}>
-              <i aria-hidden="true" />
-              <div>
-                <strong>{item.label}</strong>
-                <span>{item.detail}</span>
-                {item.timestamp ? <small>{formatDate(item.timestamp, locale)}</small> : null}
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {workspace?.alerts?.length > 0 ? (
-        <section className="activity-section">
-          <h3>{t.terminalAlerts}</h3>
-          <ol className="run-trace-list">
-            {workspace.alerts.map((alert) => (
-              <li key={alert.id} className={alert.requiresApproval ? "warn" : "neutral"}>
-                <i aria-hidden="true" />
-                <div>
-                  <strong>{alert.action}</strong>
-                  <span>{alert.reason}</span>
-                  <small>{formatDate(alert.createdAt, locale)}</small>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
-
-      <section className="activity-section">
-        <h3>{t.browserState}</h3>
-        {browserState ? (
-          <>
-            <div className="inspector-grid">
-              <span>{t.pageTitle}<strong>{browserState.title || t.notAvailable}</strong></span>
-              <span>{t.activeUrl}<strong>{browserState.url || t.notAvailable}</strong></span>
-              <span>{t.navigationSteps}<strong>{browserState.navigationHistory?.length ?? 0}</strong></span>
-              <span>{t.blockers}<strong>{browserState.blocker?.blocked ? browserState.blocker.reason || t.failed : t.notAvailable}</strong></span>
-            </div>
-            {browserActionTypes.length > 0 ? (
-              <ul className="activity-timeline compact">
-                {browserActionTypes.map((action, index) => (
-                  <li key={`${action}-${index}`}>
-                    <span>{action}</span>
-                    <small>{t.lastBrowserActions}</small>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </>
-        ) : <p className="muted">{t.noBrowserState}</p>}
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.browserStrategy}</h3>
-        <div className="inspector-grid">
-          <span>{t.workspaceBrowserMode}<strong>{workspace?.browserStrategy?.preferredMode === "workspace_browser_mode" ? t.done : t.notAvailable}</strong></span>
-          <span>{t.systemBrowserMode}<strong>{workspace?.browserStrategy?.supportedModes?.includes("system_browser_mode") ? t.done : t.notAvailable}</strong></span>
-        </div>
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.decisionTrace}</h3>
-        <div className="inspector-grid">
-          <span>{t.frame}<strong>{capabilitySummary.frame || t.notAvailable}</strong></span>
-          <span>{t.capability}<strong>{capabilitySummary.capability || t.notAvailable}</strong></span>
-          <span>{t.skill}<strong>{capabilitySummary.skill || t.notAvailable}</strong></span>
-          <span>{t.policy}<strong>{capabilitySummary.policy || t.notAvailable}</strong></span>
-        </div>
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.artifacts}</h3>
-        {artifacts.length === 0 ? <p className="muted">{t.noArtifacts}</p> : null}
-        {artifacts.slice(0, 8).map((artifact, index) => (
-          <a className="activity-link" key={artifact.id ?? artifact.path ?? index} href={artifact.href ?? artifact.url ?? "#"} target="_blank" rel="noreferrer">
-            <strong>{artifact.title ?? artifact.name ?? artifact.path ?? `Artifact ${index + 1}`}</strong>
-            {artifact.description ? <span>{artifact.description}</span> : null}
-          </a>
-        ))}
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.evidence}</h3>
-        {evidence.length === 0 ? <p className="muted">{t.noEvidence}</p> : null}
-        {evidence.slice(0, 8).map((item) => (
-          <a
-            key={item.id}
-            className="activity-link"
-            href={item.hasScreenshot && scopedRun ? `/api/runs/${scopedRun.id}/evidence/${item.id}/screenshot` : "#"}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <strong>{item.kind ?? "evidence"}</strong>
-            <span>{item.description ?? item.path ?? item.id}</span>
-          </a>
-        ))}
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.recentActions}</h3>
-        {scopedEvents.length === 0 ? <p className="muted">{t.noRecentActions}</p> : null}
-        <ul className="activity-timeline">
-          {scopedEvents.slice(0, 10).map((event) => (
-            <li key={technicalEventKey(event)}>
-              <span>{eventLabel(event)}</span>
-              <small>{event.type} · {formatDate(event.createdAt, locale)}</small>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.generation}</h3>
-        {calls.length === 0 ? <p className="muted">0 {t.llmCalls}</p> : null}
-        <ul className="activity-timeline compact">
-          {calls.slice(-6).reverse().map((call) => (
-            <li key={call.id}>
-              <span>{call.callType}</span>
-              <small>{call.resultStatus} · {call.tokenUsage?.totalTokens ?? 0} {t.tokens}</small>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.terminalDecisions}</h3>
-        {workspaceDecisions.length === 0 ? <p className="muted">{t.noTerminalDecisions}</p> : null}
-        <ul className="activity-timeline compact">
-          {workspaceDecisions.slice(-6).reverse().map((decision) => (
-            <li key={decision.id}>
-              <span>{decision.action}</span>
-              <small>{decision.reason} · {formatDate(decision.createdAt, locale)}</small>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.terminalTranscript}</h3>
-        {workspaceTerminalEvents.length === 0 ? <p className="muted">{t.noTerminalTranscript}</p> : null}
-        <ul className="activity-timeline compact">
-          {workspaceTerminalEvents.slice(-6).reverse().map((event) => (
-            <li key={event.id}>
-              <span>{event.eventType}{event.stream ? ` · ${event.stream}` : ""}</span>
-              <small>{event.content ? event.content.slice(0, 180) : formatDate(event.createdAt, locale)}</small>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="activity-section">
-        <h3>{t.runHistory}</h3>
-        {visibleRuns.length === 0 ? <p className="muted">{t.noRuns}</p> : null}
-        <div className="compact-run-list">
-          {visibleRuns.slice(0, 8).map((candidate) => (
-            <button
-              type="button"
-              key={candidate.id}
-              className={`compact-run-item ${candidate.id === selectedRunId ? "selected" : ""}`}
-              onClick={() => onOpenRun(candidate.id)}
-            >
-              <strong>{candidate.metadata?.missionSpec?.objective ?? candidate.mission ?? t.selectedMission}</strong>
-              <span>{candidate.status} · {formatDate(candidate.updatedAt ?? candidate.createdAt, locale)}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+      {PANEL_WIDGET_REGISTRY.filter((w) => panelConfig[w.id]).map((w) => renderWidget(w.id))}
     </aside>
   );
 }

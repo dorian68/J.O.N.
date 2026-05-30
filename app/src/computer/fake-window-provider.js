@@ -93,6 +93,44 @@ export class FakeWindowProvider {
     }));
   }
 
+  listExternalTerminals() {
+    return (this.externalTerminals ?? []).map((term) => ({ ...term }));
+  }
+
+  readExternalTerminalBuffer(processId, windowHandle = null) {
+    const term = (this.externalTerminals ?? []).find((t) =>
+      (processId && String(t.processId) === String(processId)) ||
+      (windowHandle && String(t.windowHandle) === String(windowHandle))
+    );
+    if (!term) {
+      return { success: false, reason: "unknown process", lines: [] };
+    }
+    return {
+      success: true,
+      method: "fake_provider",
+      width: 80,
+      height: 24,
+      lines: term.fakeBuffer ?? ["fake terminal output"],
+      text: (term.fakeBuffer ?? ["fake terminal output"]).join("\n")
+    };
+  }
+
+  sendExternalTerminalInput(processId, text, windowHandle = null) {
+    const term = (this.externalTerminals ?? []).find((t) =>
+      (processId && String(t.processId) === String(processId)) ||
+      (windowHandle && String(t.windowHandle) === String(windowHandle))
+    );
+    if (!term) {
+      return { success: false, reason: "unknown process" };
+    }
+    term.fakeBuffer = [...(term.fakeBuffer ?? []), `> ${text}`];
+    return { success: true, method: "fake_provider", sentLength: String(text ?? "").length };
+  }
+
+  setExternalTerminals(terminals) {
+    this.externalTerminals = terminals ?? [];
+  }
+
   detectActiveWindow() {
     const active = this.windows.find((windowState) => windowState.active && windowState.visible) ?? null;
     return active ? {
@@ -103,6 +141,10 @@ export class FakeWindowProvider {
       executablePath: active.executablePath,
       bounds: active.bounds
     } : null;
+  }
+
+  getWindowIcon(windowId) {
+    return { iconBase64: null, handle: String(windowId ?? ""), reason: "fake_provider" };
   }
 
   focusWindow(windowId) {

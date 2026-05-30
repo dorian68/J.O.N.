@@ -677,6 +677,31 @@ switch ($Action) {
   "accessibilityTree" {
     Get-AccessibilityTree -WindowHandle $Handle -Depth $MaxDepth -NodeLimit $MaxNodes | ConvertTo-Json -Depth 8
   }
+  "getWindowIcon" {
+    if (-not $Handle) { throw "Handle is required for getWindowIcon" }
+    $window = Get-WindowByHandle $Handle
+    $execPath = if ($window -ne $null) { $window.executablePath } else { $null }
+    if (-not $execPath -or -not (Test-Path $execPath -ErrorAction SilentlyContinue)) {
+      @{ iconBase64 = $null; handle = $Handle; reason = "no_executable_path" } | ConvertTo-Json -Depth 3
+      break
+    }
+    try {
+      Add-Type -Assembly System.Drawing -ErrorAction Stop
+      $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($execPath)
+      if (-not $icon) {
+        @{ iconBase64 = $null; handle = $Handle; reason = "no_icon" } | ConvertTo-Json -Depth 3
+        break
+      }
+      $bmp = $icon.ToBitmap()
+      $ms = New-Object System.IO.MemoryStream
+      $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+      $b64 = [Convert]::ToBase64String($ms.ToArray())
+      $ms.Dispose(); $bmp.Dispose(); $icon.Dispose()
+      @{ iconBase64 = $b64; handle = $Handle; executablePath = $execPath } | ConvertTo-Json -Depth 3
+    } catch {
+      @{ iconBase64 = $null; handle = $Handle; reason = "error"; error = $_.Exception.Message } | ConvertTo-Json -Depth 3
+    }
+  }
   default {
     throw "Unsupported action: $Action"
   }

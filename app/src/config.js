@@ -9,7 +9,9 @@ const repoRoot = path.resolve(appRoot, "..");
 
 export const APP_ROOT = appRoot;
 export const REPO_ROOT = repoRoot;
-export const DATA_ROOT = path.join(appRoot, ".runtime-data");
+export const DATA_ROOT = process.env.COWORK_DATA_ROOT
+  ? path.resolve(process.env.COWORK_DATA_ROOT)
+  : path.join(appRoot, ".runtime-data");
 export const DB_PATH = path.join(DATA_ROOT, "cowork-prototype.sqlite");
 export const RUNS_ROOT = path.join(DATA_ROOT, "runs");
 export const LOGS_ROOT = path.join(DATA_ROOT, "logs");
@@ -24,6 +26,7 @@ export const DEFAULT_SERVER_PORT = 41731;
 export const DEFAULT_OPERATOR_PORT = 41732;
 export const DEFAULT_BROWSER_CHANNEL = process.env.COWORK_BROWSER_CHANNEL || "bundled";
 export const DEFAULT_HEADLESS = process.env.COWORK_HEADLESS !== "0";
+export const DEFAULT_BROWSER_STEALTH = process.env.COWORK_BROWSER_STEALTH !== "0";
 export const DEFAULT_TIMEOUT_MS = 10_000;
 export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
 export const DEFAULT_LLM_PROVIDER_MODE = process.env.COWORK_LLM_PROVIDER_MODE || "openai_compatible";
@@ -116,7 +119,10 @@ export const LLM_CALL_TYPE = Object.freeze({
   EVALUATION_SUPPORT: "evaluation_support",
   AMBIGUITY_NOTE: "ambiguity_note",
   WINDOW_DESCRIPTION: "window_description",
-  WORKSPACE_TERMINAL_REASONING: "workspace_terminal_reasoning"
+  WORKSPACE_TERMINAL_REASONING: "workspace_terminal_reasoning",
+  WORKSPACE_STAGE_VERIFICATION: "workspace_stage_verification",
+  RECOVERY_ALTERNATIVE_GENERATION: "recovery_alternative_generation",
+  RECOVERY_ESCALATION_MESSAGE: "recovery_escalation_message"
 });
 
 export const LLM_RESULT_STATUS = Object.freeze({
@@ -137,7 +143,9 @@ export const REASONING_STAGE = Object.freeze({
   EVALUATION_SUPPORT: "evaluation_support",
   AMBIGUITY_NOTE: "ambiguity_note",
   WINDOW_DESCRIPTION: "window_description",
-  WORKSPACE_TERMINAL_REASONING: "workspace_terminal_reasoning"
+  WORKSPACE_TERMINAL_REASONING: "workspace_terminal_reasoning",
+  RECOVERY_ALTERNATIVE_GENERATION: "recovery_alternative_generation",
+  RECOVERY_ESCALATION_MESSAGE: "recovery_escalation_message"
 });
 
 export const BENCHMARK_REVIEW_CLASSIFICATION = Object.freeze({

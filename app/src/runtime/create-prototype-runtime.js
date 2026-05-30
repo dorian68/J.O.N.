@@ -15,6 +15,7 @@ export async function createPrototypeRuntime({
   browserOptions,
   computerProvider,
   llmGateway,
+  env = process.env,
   reasoningEngine,
   approvalResolver,
   policyHooks,
@@ -23,7 +24,7 @@ export async function createPrototypeRuntime({
 } = {}) {
   const database = new PrototypeDatabase(dbPath);
   await database.open();
-  const resolvedLlmGateway = llmGateway ?? await createDefaultLlmGateway();
+  const resolvedLlmGateway = llmGateway ?? await createDefaultLlmGateway({ env });
   const resolvedReasoningEngine = reasoningEngine ?? createDefaultContextualReasoningEngine();
 
   const defaultPolicyHooks = {

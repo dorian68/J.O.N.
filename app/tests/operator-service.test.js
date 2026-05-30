@@ -168,6 +168,10 @@ export async function run() {
     assert.equal(dashboard.missionEntry.modes.some((mode) => mode.id === "research"), true);
     assert.equal(typeof dashboard.llmDashboard?.estimatedCost, "number");
     assert.equal(Array.isArray(dashboard.llmDashboard?.stageBreakdown), true);
+    const mobileInlineLlm = await service.resolveLlmInlineText("default", "Écris /llm{un mot de test}", "type_text");
+    assert.equal(mobileInlineLlm.projectId, project.id);
+    assert.equal(mobileInlineLlm.hadInlineLlm, true);
+    assert.ok(!mobileInlineLlm.text.includes("/llm{"));
 
     const launch = await service.startScenario(project.id, "computer");
 
@@ -354,6 +358,13 @@ export async function run() {
     assert.equal(browserManifest.content.payload.verification.validated, true);
     assert.equal(browserMissionDetail.run.metadata?.verificationSummary?.overallStatus, "pass");
 
+    const ebayPreview = await service.previewMission(project.id, {
+      objective: "Go to eBay and list current deals on high-end Android smartphones"
+    });
+    assert.equal(ebayPreview.preflight.understanding.chosenExecutionFrame, "research");
+    assert.equal(ebayPreview.preflight.understanding.requiresClarification, false);
+    assert.equal(ebayPreview.preflight.understanding.coverageStatus, "full");
+
     const upworkPreview = await service.previewMission(project.id, {
       objective: "Ouvrir Upwork et lister 5 postes autour de Excel.",
       deliverable: "Liste de 5 postes Excel sur Upwork",
@@ -361,7 +372,11 @@ export async function run() {
         website: "Upwork",
         searchQuery: "Excel",
         resultCount: 5,
-        application: "Google Chrome"
+        application: "Google Chrome",
+        computerAction: {
+          type: "launch_browser_search",
+          boundedLaunchOnly: true
+        }
       }
     });
     assert.equal(upworkPreview.missionDraft.parameters.browserLaunch.browserId, "chrome");
@@ -383,7 +398,11 @@ export async function run() {
           website: "Upwork",
           searchQuery: "Excel",
           resultCount: 5,
-          application: "Google Chrome"
+          application: "Google Chrome",
+          computerAction: {
+            type: "launch_browser_search",
+            boundedLaunchOnly: true
+          }
         }
       },
       preflight: upworkPreview.preflight
@@ -444,6 +463,10 @@ export async function run() {
       parameters: {
         browserLaunch: {
           browserId: "edge"
+        },
+        computerAction: {
+          type: "launch_browser_search",
+          boundedLaunchOnly: true
         }
       }
     });
@@ -459,11 +482,15 @@ export async function run() {
       missionSpec: {
         objective: "Open Edge, search for release readiness, then capture a screenshot of the visible result.",
         parameters: {
-          browserLaunch: {
-            browserId: "edge"
-          }
+        browserLaunch: {
+          browserId: "edge"
+        },
+        computerAction: {
+          type: "launch_browser_search",
+          boundedLaunchOnly: true
         }
-      },
+      }
+    },
       preflight: browserSearchPreview.preflight,
       orchestration: {
         autoContinue: true,

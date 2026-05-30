@@ -194,6 +194,14 @@ export async function run() {
 
   {
     const t = makeTracker();
+    t.complete({ verifiedByOutcomes: false, failureReason: "missing screenshot" });
+    assert.equal(t.finalStatus, "failed");
+    assert.equal(t.verifiedByOutcomes, false);
+    assert.equal(t.stoppedReason, "missing screenshot");
+  }
+
+  {
+    const t = makeTracker();
     t.fail("Too many consecutive failures");
     assert.equal(t.finalStatus, "failed");
     assert.equal(t.stoppedReason, "Too many consecutive failures");

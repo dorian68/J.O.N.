@@ -4,9 +4,11 @@ import {
   BROWSER_REPLAN_TRIGGERS,
   buildDeterministicBrowserPlan,
   buildDeterministicBrowserReplan,
+  generateBrowserPlan,
   selectReplanTriggerChange,
   validateBrowserPlanOutput
 } from "../src/browser/browser-planner.js";
+import { classifyBrowserBlockerSignal } from "../src/browser/browser-blockers.js";
 import { rankCandidates } from "../src/browser/dom-strategy.js";
 
 export async function run() {
@@ -54,6 +56,27 @@ export async function run() {
     }, { allowlistedHosts: ["127.0.0.1"] }),
     /not allowlisted/
   );
+
+  const upworkAliasPlan = validateBrowserPlanOutput({
+    missionSummary: "Open Upwork directly",
+    startUrl: "https://www.upwork.com/freelancers/~me",
+    allowlistedHosts: ["upwork"],
+    steps: [
+      { id: "open", action: "open_session" },
+      { id: "go", action: "navigate", target: { url: "https://www.upwork.com/freelancers/~me" } }
+    ]
+  }, { allowlistedHosts: ["upwork"] });
+  assert.equal(upworkAliasPlan.allowlistedHosts.includes("upwork.com"), true);
+  assert.equal(upworkAliasPlan.allowlistedHosts.includes("www.upwork.com"), true);
+
+  const googleSorryBlocker = classifyBrowserBlockerSignal({
+    url: "https://www.google.com/sorry/index?continue=https://www.google.com/search%3Fq%3Dupwork",
+    title: "https://www.google.com/search?q=upwork",
+    bodyText: "Nos systèmes ont détecté un trafic exceptionnel sur votre réseau informatique. Cette page permet de vérifier que c'est bien vous qui envoyez des requêtes, et non un robot."
+  });
+  assert.equal(googleSorryBlocker.blocked, true);
+  assert.equal(googleSorryBlocker.type, "captcha_or_automation_block");
+  assert.equal(googleSorryBlocker.requiresUserAction, true);
 
   assert.throws(
     () => validateBrowserPlanOutput({
@@ -180,4 +203,46 @@ export async function run() {
   assert.equal(ranked.best.index, 0);
   assert.equal(ranked.ambiguous, false);
   assert.equal(ranked.best.reasons.includes("exact_name"), true);
+
+  const malformedStrictGateway = {
+    getStatus: () => ({ deterministicFallback: false }),
+    generateStructured: async () => {
+      throw Object.assign(new Error("Unsupported browser verification expectation type: ."), {
+        category: "malformed_output"
+      });
+    }
+  };
+  const recoveredPlan = await generateBrowserPlan({
+    llmGateway: malformedStrictGateway,
+    runId: "run_browser_plan_recovery",
+    input: {
+      mission: "Accéder au site RemoteOK et lister les offres d'emploi tech à distance.",
+      startUrl: "https://www.google.com/search?q=site%3Aremoteok.io%20jobs",
+      allowlistedHosts: ["google.com", "www.google.com", "remoteok.io"]
+    }
+  });
+  assert.equal(recoveredPlan.generationMode, "deterministic_fallback");
+  assert.equal(recoveredPlan.fallbackReason, "malformed_output");
+  assert.equal(recoveredPlan.output.steps.some((step) => step.action === "capture_evidence"), true);
+
+  const providerStrictGateway = {
+    getStatus: () => ({ deterministicFallback: false }),
+    generateStructured: async () => {
+      throw Object.assign(new Error("Provider unavailable"), {
+        category: "provider_unavailable"
+      });
+    }
+  };
+  await assert.rejects(
+    () => generateBrowserPlan({
+      llmGateway: providerStrictGateway,
+      runId: "run_browser_plan_no_provider_fallback",
+      input: {
+        mission: "Open a page",
+        startUrl: "https://example.com/",
+        allowlistedHosts: ["example.com"]
+      }
+    }),
+    /Provider unavailable/
+  );
 }

@@ -151,3 +151,11 @@ Severity vocabulary:
 - no production packaging or release posture
 - no production-grade security hardening
 - no production-grade real-provider operational proof
+## 2026-05-07 Remaining Deviations
+
+- JON is closer to a real cowork agent, but not production-ready.
+- Tool lifecycle is not yet universal across every runtime path.
+- Acceptance missions 1 and 2 now have local real-surface execution proof in this environment, but the remaining acceptance missions still need the same level of proof.
+- SurfaceRouter is deterministic and conservative; it does not yet learn from previous routing mistakes.
+- Mobile companion is usable as a V1 cockpit, but not yet a complete run inspection and proof review surface.
+- Terminal mission execution remains incomplete for true end-to-end monitoring, safe injection, and final verification.

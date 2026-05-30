@@ -6,6 +6,7 @@ import {
   describeBrowserMode,
   BrowserSessionTracker
 } from "../src/browser/browser-mode.js";
+import { WorkspaceBrowserProvider } from "../src/browser/workspace-browser-provider.js";
 
 export async function run() {
   // Constants are frozen and correct
@@ -114,4 +115,28 @@ export async function run() {
   // Custom sessionId preserved
   const custom = tracker.open({ projectId: "proj_3", sessionId: "my_custom_id" });
   assert.equal(custom.id, "my_custom_id");
+
+  // WorkspaceBrowserProvider can expose the persistent JON controller to the
+  // browser autonomy runtime without opening a second session.
+  const provider = new WorkspaceBrowserProvider();
+  const fakeController = {
+    userDataDir: "persistent-profile",
+    activeTargetId: "target_1",
+    isOpen: () => true
+  };
+  const jonSession = provider.tracker.open({
+    projectId: "proj_browser",
+    runId: "run_first",
+    mode: BROWSER_MODE.WORKSPACE
+  });
+  provider.jonSessionId = jonSession.id;
+  provider.jonController = fakeController;
+  provider.controllers.set(jonSession.id, fakeController);
+  provider.targetIndex.set(jonSession.id, "target_1");
+  provider.tracker.activate(jonSession.id);
+  const handle = provider.getAutomationHandle(jonSession.id);
+  assert.equal(handle.session.id, jonSession.id);
+  assert.equal(handle.controller, fakeController);
+  assert.equal(handle.targetId, "target_1");
+  assert.equal(handle.persistent, true);
 }

@@ -51,6 +51,42 @@ function stripScreenshotPayload(value) {
   ));
 }
 
+function compactStepForEvent(step = {}, index = 0) {
+  return {
+    id: step.id ?? `browser_step_${index + 1}`,
+    action: step.action ?? "unknown",
+    label: step.label ?? step.action ?? "Browser step",
+    riskLevel: step.riskLevel ?? null,
+    requiresApproval: Boolean(step.requiresApproval),
+    target: compactResult(step.target ?? {}),
+    selector: compactResult(step.selector ?? null),
+    value: typeof step.value === "string" && step.value
+      ? `${step.value.slice(0, 80)}${step.value.length > 80 ? "..." : ""}`
+      : step.value ?? null,
+    expectation: compactResult(step.expectation ?? null),
+    evidenceLabel: step.evidenceLabel ?? null,
+    stopOnFailure: step.stopOnFailure !== false
+  };
+}
+
+function statusToStepEvent(status = "") {
+  if (status === "blocked") return "browser.step_blocked";
+  if (status === "fail" || status === "failed") return "browser.step_failed";
+  if (status === "partial" || status === "ambiguous") return "browser.step_failed";
+  return "browser.step_succeeded";
+}
+
+function outputSummaryForStepResult(result = {}, fallback = "") {
+  if (result?.navigation?.url) return `URL: ${result.navigation.url}`;
+  if (result?.browserState?.url) return `State: ${result.browserState.title ?? result.browserState.url}`;
+  if (result?.domSummary) return `DOM: ${result.domSummary.interactiveElementCount ?? 0} interactive element(s), ${result.domSummary.bodyTextLength ?? 0} text chars`;
+  if (result?.blocker) return result.blocker.blocked ? `Blocked: ${result.blocker.reason ?? "browser blocker"}` : "No blocker detected";
+  if (result?.evidence?.id) return `Evidence captured: ${result.evidence.id}`;
+  if (result?.verification) return result.verification.validated ? "Outcome check passed" : "Outcome check failed";
+  if (result?.extracted) return "Content extracted";
+  return fallback;
+}
+
 export class BrowserOperator {
   constructor({
     browserController,
@@ -107,7 +143,23 @@ export class BrowserOperator {
 
     // Mutable step queue — replanning splices new steps in place of remaining ones.
     const executionSteps = [...plan.steps];
+    await this.#emitEvent("browser.plan_generated", {
+      runId: this.runId,
+      generationMode: execution.generationMode,
+      fallbackReason: execution.fallbackReason,
+      stepCount: executionSteps.length,
+      steps: executionSteps.map((step, index) => compactStepForEvent(step, index))
+    });
+    for (const [index, step] of executionSteps.entries()) {
+      await this.#emitEvent("browser.step_planned", {
+        runId: this.runId,
+        step: compactStepForEvent(step, index),
+        index,
+        total: executionSteps.length
+      });
+    }
     const maxReplans = Number.isFinite(Number(input.maxBrowserReplans)) ? Number(input.maxBrowserReplans) : 2;
+    const maxSteps = Number.isFinite(Number(input.maxBrowserSteps)) ? Number(input.maxBrowserSteps) : 60;
     let replanCount = 0;
 
     let targetId = null;
@@ -115,8 +167,34 @@ export class BrowserOperator {
     let stepIdx = 0;
     try {
       while (stepIdx < executionSteps.length) {
+        if (stepIdx >= maxSteps) {
+          execution.status = "failed";
+          execution.errors.push({
+            id: "max_steps_exceeded",
+            action: "guard",
+            label: `Run aborted: exceeded maxSteps limit (${maxSteps})`,
+            status: "fail",
+            startedAt: nowIso(),
+            completedAt: nowIso(),
+            error: `Browser mission exceeded the maximum step limit of ${maxSteps}. Run stopped to prevent infinite execution.`
+          });
+          await this.#emitEvent("browser.run_limit_exceeded", {
+            runId: this.runId,
+            reason: "max_steps_exceeded",
+            maxSteps,
+            stepsExecuted: stepIdx
+          });
+          break;
+        }
         const step = executionSteps[stepIdx];
         const stepStartedAt = nowIso();
+        await this.#emitEvent("browser.step_running", {
+          runId: this.runId,
+          step: compactStepForEvent(step, stepIdx),
+          index: stepIdx,
+          total: executionSteps.length,
+          startedAt: stepStartedAt
+        });
         try {
           if (targetId) {
             browserWatcher = await this.#ensureBrowserWatcher({
@@ -148,11 +226,21 @@ export class BrowserOperator {
                   blocker: preStepBlocker
                 })
               });
+              await this.#emitEvent("browser.step_blocked", {
+                runId: this.runId,
+                step: compactStepForEvent(step, stepIdx),
+                index: stepIdx,
+                status: "blocked",
+                startedAt: stepStartedAt,
+                completedAt: nowIso(),
+                outputSummary: preStepBlocker.reason ?? "Browser watcher detected a blocker before this step.",
+                error: preStepBlocker.reason ?? "blocking_browser_state_changed"
+              });
               break;
             }
           }
 
-          const result = await this.#executeStep({ step, plan, targetId, evidenceDir });
+          const result = await this.#executeStep({ step, plan, targetId, evidenceDir, input });
           if (result?.targetId) {
             targetId = result.targetId;
           }
@@ -179,6 +267,17 @@ export class BrowserOperator {
             startedAt: stepStartedAt,
             completedAt: nowIso(),
             result: compactResult(result)
+          });
+          await this.#emitEvent(statusToStepEvent(result?.status ?? "pass"), {
+            runId: this.runId,
+            step: compactStepForEvent(step, stepIdx),
+            index: stepIdx,
+            status: result?.status ?? "pass",
+            startedAt: stepStartedAt,
+            completedAt: nowIso(),
+            outputSummary: outputSummaryForStepResult(result, `${step.label ?? step.action} completed.`),
+            evidenceId: result?.evidence?.id ?? null,
+            evidenceIds: result?.evidence?.id ? [result.evidence.id] : []
           });
           if (execution.status === "blocked") {
             break;
@@ -244,6 +343,16 @@ export class BrowserOperator {
           };
           execution.stepResults.push(failure);
           execution.errors.push(failure);
+          await this.#emitEvent("browser.step_failed", {
+            runId: this.runId,
+            step: compactStepForEvent(step, stepIdx),
+            index: stepIdx,
+            status: "fail",
+            startedAt: stepStartedAt,
+            completedAt: failure.completedAt,
+            outputSummary: error?.message ?? String(error),
+            error: error?.message ?? String(error)
+          });
           if (step.stopOnFailure) {
             execution.status = "failed";
             break;
@@ -345,6 +454,15 @@ export class BrowserOperator {
     // Splice: remove all steps after current index, append new replan steps.
     executionSteps.splice(stepIdx + 1);
     executionSteps.push(...newSteps);
+    for (const [index, step] of newSteps.entries()) {
+      await this.#emitEvent("browser.step_planned", {
+        runId: this.runId,
+        step: compactStepForEvent(step, stepIdx + 1 + index),
+        index: stepIdx + 1 + index,
+        total: executionSteps.length,
+        replanId
+      });
+    }
 
     execution.adaptations.push({
       id: replanId,
@@ -523,12 +641,12 @@ export class BrowserOperator {
     });
   }
 
-  async #executeStep({ step, plan, targetId, evidenceDir }) {
+  async #executeStep({ step, plan, targetId, evidenceDir, input = {} }) {
     switch (step.action) {
       case "open_session": {
         const session = await this.browser.openBrowserSession({
           allowlistedHosts: plan.allowlistedHosts,
-          headless: true
+          headless: input.headless ?? this.browser.headless ?? true
         });
         return {
           status: "pass",
@@ -737,6 +855,97 @@ export class BrowserOperator {
             reason: step.label || "Manual handoff requested by browser plan."
           }
         };
+
+      // ── Tab management steps ────────────────────────────────────────────────
+      case "open_tab": {
+        const newTargetId = await this.browser.openTab(step.target?.url || "about:blank");
+        this.browser.focusTab(newTargetId);
+        return { status: "pass", targetId: newTargetId, openedUrl: step.target?.url || "about:blank" };
+      }
+      case "close_tab": {
+        const tidToClose = step.targetId || this.#requireTarget(targetId);
+        await this.browser.closeTab(tidToClose);
+        return { status: "pass", closedTargetId: tidToClose };
+      }
+      case "focus_tab": {
+        const tidToFocus = step.targetId;
+        if (!tidToFocus) throw new Error("focus_tab step requires targetId.");
+        this.browser.focusTab(tidToFocus);
+        return { status: "pass", targetId: tidToFocus };
+      }
+      case "navigate_tab": {
+        const navTargetId = step.targetId || this.#requireTarget(targetId);
+        if (step.targetId) this.browser.focusTab(navTargetId);
+        const navResult = await this.browser.navigate(navTargetId, step.target.url);
+        return { status: "pass", targetId: navTargetId, navigation: navResult };
+      }
+      case "observe_tab": {
+        const obsTid = step.targetId || this.#requireTarget(targetId);
+        const [snapshot, screenshotBase64] = await Promise.all([
+          this.browser.captureDomSnapshotForTarget(obsTid),
+          this.browser.captureScreenshotBase64(obsTid).catch(() => null)
+        ]);
+        const blockers = await this.browser.detectBlockers(obsTid).catch(() => ({ blocked: false }));
+        return {
+          status: blockers.blocked ? "blocked" : "pass",
+          targetId: obsTid,
+          observation: {
+            url: snapshot.url,
+            title: snapshot.title,
+            bodyTextLength: snapshot.bodyText?.length ?? 0,
+            interactiveElementCount: snapshot.interactiveElements?.length ?? 0,
+            screenshotBase64
+          },
+          blocker: blockers.blocked ? blockers : null
+        };
+      }
+      case "screenshot_tab": {
+        const ssTid = step.targetId || this.#requireTarget(targetId);
+        const screenshotBase64 = await this.browser.captureScreenshotBase64(ssTid);
+        return { status: "pass", targetId: ssTid, screenshotBase64 };
+      }
+      case "extract_tab_text": {
+        const exTid = step.targetId || this.#requireTarget(targetId);
+        const snapshot = await this.browser.captureDomSnapshotForTarget(exTid);
+        return {
+          status: "pass",
+          targetId: exTid,
+          extracted: {
+            [step.outputKey ?? step.id ?? "text"]: snapshot.bodyText ?? ""
+          },
+          url: snapshot.url,
+          title: snapshot.title
+        };
+      }
+      case "scroll_tab": {
+        const scTid = step.targetId || this.#requireTarget(targetId);
+        const scrollResult = await this.browser.scrollViewport(scTid, { deltaY: step.deltaY ?? 640 });
+        return { status: "pass", targetId: scTid, scroll: scrollResult };
+      }
+      case "press_key": {
+        const pkTid = step.targetId || this.#requireTarget(targetId);
+        if (!step.key) throw new Error("press_key step requires key.");
+        const pressResult = await this.browser.pressKey(pkTid, step.key);
+        await this.browser.waitForPageStable(pkTid, { timeoutMs: 1500, settleMs: 80 }).catch(() => {});
+        return { status: "pass", targetId: pkTid, press: pressResult };
+      }
+      case "evaluate_script": {
+        const evTid = step.targetId || this.#requireTarget(targetId);
+        const evaluation = await this.browser.evaluateScript(evTid, {
+          expression: step.expression ?? step.script,
+          arg: step.arg ?? null
+        });
+        return { status: "pass", targetId: evTid, evaluation };
+      }
+      case "cdp_command": {
+        const cdpTid = step.targetId || this.#requireTarget(targetId);
+        const cdp = await this.browser.dispatchCdpCommand(cdpTid, {
+          method: step.method,
+          params: step.params ?? {}
+        });
+        return { status: "pass", targetId: cdpTid, cdp };
+      }
+
       default:
         throw new Error(`Unsupported browser operator step: ${step.action}`);
     }

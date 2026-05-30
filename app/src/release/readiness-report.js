@@ -140,11 +140,11 @@ export function classifyReadiness({ doctorReport, validationSummary, proofArtifa
 
 export async function buildReadinessReport(options = {}) {
   const proofArtifacts = options.proofArtifacts ?? await collectProofArtifacts();
-  const doctorReport = await buildReleaseDoctorReport({
+  const doctorReport = options.doctorReport ?? await buildReleaseDoctorReport({
     ...options,
     proofArtifacts
   });
-  const validationSummary = await buildRealSurfaceValidationSummary({
+  const validationSummary = options.validationSummary ?? await buildRealSurfaceValidationSummary({
     rootPath: REAL_SURFACE_VALIDATION_ROOT
   });
   const operationalDeep = options.operationalDeep ?? await buildOperationalDeepReadinessReport({

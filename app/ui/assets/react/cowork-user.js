@@ -21,7 +21,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 	enumerable: true
 }) : target, mod));
 //#endregion
-//#region ../node_modules/react/cjs/react.production.js
+//#region node_modules/react/cjs/react.production.js
 /**
 * @license React
 * react.production.js
@@ -381,12 +381,12 @@ var require_react_production = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.version = "19.2.5";
 }));
 //#endregion
-//#region ../node_modules/react/index.js
+//#region node_modules/react/index.js
 var require_react = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_react_production();
 }));
 //#endregion
-//#region ../node_modules/scheduler/cjs/scheduler.production.js
+//#region node_modules/scheduler/cjs/scheduler.production.js
 /**
 * @license React
 * scheduler.production.js
@@ -627,12 +627,12 @@ var require_scheduler_production = /* @__PURE__ */ __commonJSMin(((exports) => {
 	};
 }));
 //#endregion
-//#region ../node_modules/scheduler/index.js
+//#region node_modules/scheduler/index.js
 var require_scheduler = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_scheduler_production();
 }));
 //#endregion
-//#region ../node_modules/react-dom/cjs/react-dom.production.js
+//#region node_modules/react-dom/cjs/react-dom.production.js
 /**
 * @license React
 * react-dom.production.js
@@ -773,7 +773,7 @@ var require_react_dom_production = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.version = "19.2.5";
 }));
 //#endregion
-//#region ../node_modules/react-dom/index.js
+//#region node_modules/react-dom/index.js
 var require_react_dom = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	function checkDCE() {
 		if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === "undefined" || typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE !== "function") return;
@@ -787,7 +787,7 @@ var require_react_dom = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_react_dom_production();
 }));
 //#endregion
-//#region ../node_modules/react-dom/cjs/react-dom-client.production.js
+//#region node_modules/react-dom/cjs/react-dom-client.production.js
 /**
 * @license React
 * react-dom-client.production.js
@@ -9867,7 +9867,7 @@ var require_react_dom_client_production = /* @__PURE__ */ __commonJSMin(((export
 	};
 }));
 //#endregion
-//#region ../node_modules/react-dom/client.js
+//#region node_modules/react-dom/client.js
 var require_client = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	function checkDCE() {
 		if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === "undefined" || typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE !== "function") return;
@@ -9881,7 +9881,7 @@ var require_client = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_react_dom_client_production();
 }));
 //#endregion
-//#region src/i18n.js
+//#region ui/src/i18n.js
 var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
 var import_client = require_client();
 var SUPPORTED_LOCALES = Object.freeze(["fr", "en"]);
@@ -9898,17 +9898,17 @@ var STRINGS = Object.freeze({
 		collapse: "Réduire",
 		collapseConversations: "Réduire les conversations",
 		collapseTerminals: "Réduire les terminaux",
-		collapseInspector: "Réduire l'inspecteur",
+		collapseInspector: "Réduire les coulisses",
 		openConversations: "Ouvrir les conversations",
-		openInspector: "Ouvrir l'inspecteur",
+		openInspector: "Ouvrir les coulisses",
 		conversationsShort: "Conv.",
-		inspectorShort: "Trace",
+		inspectorShort: "JON",
 		adminConsole: "Console admin",
 		activity: "Activité",
-		runContext: "Contexte du run",
-		runInspector: "Inspecteur du run",
-		sessionInspector: "Session",
-		runNarrative: "Fil d’exécution",
+		runContext: "Contexte de mission",
+		runInspector: "Coulisses de JON",
+		sessionInspector: "En direct",
+		runNarrative: "Ce que JON fait",
 		decisionTrace: "Décision",
 		frame: "Cadre",
 		capability: "Capacité",
@@ -9956,14 +9956,16 @@ var STRINGS = Object.freeze({
 		launchNow: "Je peux le faire maintenant. Ton accord lance le run gouverné.",
 		progress: "Progression",
 		result: "Résultat",
-		done: "C’est terminé.",
+		done: "C’est fait.",
 		working: "Je m’en occupe.",
+		doneHeading: "C’est fait.",
+		workingHeading: "Je suis en train d’agir.",
 		waitingApproval: "J’attends ton accord.",
 		failed: "Je n’ai pas réussi à terminer.",
 		approveOnce: "Autoriser une fois",
 		deny: "Refuser",
 		stopRun: "Arrêter le run",
-		approvalFootnote: "Les détails complets restent dans la trace technique et l’historique des approvals.",
+		approvalFootnote: "Les détails complets restent dans les coulisses de JON et l’historique des accords.",
 		technicalDetails: "Détails techniques",
 		timeline: "Timeline",
 		ai: "IA",
@@ -10008,6 +10010,17 @@ var STRINGS = Object.freeze({
 		settingsSaved: "Enregistré",
 		settingsClose: "Fermer",
 		settingsSaving: "Enregistrement…",
+		settingsConnectors: "Connecteurs et MCP",
+		settingsConnectorsHint: "Déclare des serveurs MCP ou outils externes que JON pourra sélectionner pendant une mission agentique.",
+		settingsNoConnectors: "Aucun connecteur configuré.",
+		settingsConnectorConnected: "Connecté",
+		settingsConnectorSetup: "À configurer",
+		settingsConnectorNamePlaceholder: "Nom du connecteur",
+		settingsConnectorCommandPlaceholder: "Commande stdio, ex: npx mon-mcp",
+		settingsConnectorUrlPlaceholder: "URL HTTP/SSE optionnelle",
+		settingsConnectorAdd: "Ajouter MCP",
+		settingsConnectorAdding: "Ajout…",
+		settingsConnectorSaved: "Connecteur ajouté au graphe de capacités.",
 		browserStartSession: "Démarrer le navigateur",
 		browserStarting: "Ouverture…",
 		browserStartError: "Impossible d'ouvrir le navigateur",
@@ -10094,10 +10107,21 @@ var STRINGS = Object.freeze({
 		terminalReplySent: "Envoyé",
 		terminalReplySentConfirm: "Réponse envoyée au terminal.",
 		terminalReplyBlocked: "L'entrée nécessite une approbation explicite.",
+		terminalAskBeforeSending: "Me demander avant",
+		terminalAskBeforeSendingSet: "JON demandera ton accord avant d’envoyer cette réponse.",
 		terminalInjectContext: "Injecter le contexte mission",
 		terminalContextInjected: "Contexte mission injecté dans le terminal.",
 		launchCli: "Lancer un agent CLI",
 		attachTerminal: "Attacher un terminal",
+		detectExternalTerminals: "Détecter les terminaux ouverts",
+		detectExternalTerminalsBtn: "Détecter",
+		externalTerminalAdopt: "Adopter",
+		externalTerminalAdopting: "Adoption…",
+		externalTerminalStop: "Détacher",
+		externalTerminalsFound: "Terminaux détectés sur ce PC",
+		externalTerminalsNone: "Aucun terminal ouvert détecté.",
+		externalTerminalReadOnly: "Lecture seule (ConPTY)",
+		externalTerminalAdopted: "Adopté",
 		openTerminals: "Ouvrir les terminaux",
 		newTerminal: "Nouveau terminal",
 		createTerminal: "Créer un terminal",
@@ -10186,18 +10210,18 @@ var STRINGS = Object.freeze({
 		statusNeedsAttentionLabel: "Attention requise",
 		terminalAuthorizedLabel: "Autoriser JON à interagir avec ce terminal",
 		objective: "Objectif",
-		panelWidgetMissionState: "Mission & Progression",
+		panelWidgetMissionState: "Mission et progression",
 		panelWidgetJonNeeds: "Ce que JON attend",
-		panelWidgetSemanticVerify: "Vérification sémantique",
-		panelWidgetTokenBudget: "Budget tokens & DOM",
-		panelWidgetDesktopState: "État du desktop",
-		panelWidgetApprovalQueue: "Approbations en attente",
-		panelWidgetLlmStages: "Appels LLM",
+		panelWidgetSemanticVerify: "Vérification du résultat",
+		panelWidgetTokenBudget: "Budget IA",
+		panelWidgetDesktopState: "Workspace observé",
+		panelWidgetApprovalQueue: "Accords en attente",
+		panelWidgetLlmStages: "Réponses IA",
 		panelCatMission: "Mission",
 		panelCatSurfaces: "Surfaces",
-		panelCatTelemetry: "Télémétrie",
-		panelCatTrace: "Trace",
-		panelConfigTitle: "Configurer le panel",
+		panelCatTelemetry: "Diagnostics",
+		panelCatTrace: "Coulisses",
+		panelConfigTitle: "Configurer les coulisses",
 		panelConfigReset: "Réinitialiser",
 		panelApprovalRequired: "Approbation requise",
 		panelObjectiveUnverified: "Objectif non vérifié",
@@ -10214,6 +10238,66 @@ var STRINGS = Object.freeze({
 		panelSteps: "étapes",
 		panelReplans: "replan",
 		panelReplansPlural: "replans",
+		executionTools: "Outils utilisés",
+		toolStatusPlanned: "prévu",
+		toolStatusRunning: "en cours",
+		toolStatusSucceeded: "réussi",
+		toolStatusFailed: "échec",
+		toolStatusSkipped: "ignoré",
+		toolStatusBlocked: "bloqué",
+		statusQueued: "En attente",
+		statusRunning: "En cours",
+		statusWaitingUser: "Attend ton accord",
+		statusCompleted: "Terminé",
+		statusFailed: "Bloqué",
+		statusBlocked: "Bloqué",
+		missionProgressGraph: "Avancement de la mission",
+		jonPlan: "Plan de JON",
+		jonTools: "Outils que JON utilise",
+		jonWorkspaceState: "Ce que JON observe",
+		jonVerification: "Vérification finale",
+		planUnderstand: "Comprendre la demande",
+		planAskApproval: "Demander ton accord",
+		planUseBrowser: "Piloter le navigateur",
+		planUseDesktop: "Agir sur le desktop",
+		planUseTerminal: "Surveiller le terminal",
+		planCaptureProof: "Capturer une preuve",
+		planPrepareDeliverable: "Préparer le livrable",
+		planVerifyOutcome: "Vérifier le résultat",
+		planActWorkspace: "Agir sur la bonne surface",
+		planStepActive: "JON travaille sur cette étape maintenant.",
+		planStepPlanned: "Cette étape est prévue après l’étape en cours.",
+		planStepCompleted: "Cette étape est terminée et prise en compte.",
+		planStepBlocked: "Cette étape est bloquée et demande une reprise.",
+		planLinkedTools: "Outils liés à cette étape",
+		activeWindow: "Fenêtre",
+		activeBrowser: "Navigateur",
+		activeTerminal: "Terminal",
+		toolDesktopInspect: "Observer les fenêtres",
+		toolDesktopLaunch: "Ouvrir l’application",
+		toolDesktopFocus: "Mettre la fenêtre au premier plan",
+		toolDesktopType: "Écrire dans l’application",
+		toolCaptureProof: "Capturer une preuve",
+		toolBrowserOpen: "Ouvrir le navigateur",
+		toolBrowserNavigate: "Aller sur la page",
+		toolBrowserSearch: "Lancer la recherche",
+		toolBrowserRead: "Lire la page",
+		toolBrowserWait: "Attendre le chargement",
+		toolBrowserState: "Observer l’état de la page",
+		toolBrowserQuery: "Repérer un élément",
+		toolBrowserClick: "Cliquer dans la page",
+		toolBrowserType: "Écrire dans la page",
+		toolBrowserSelect: "Choisir une option",
+		toolBrowserExtract: "Extraire le contenu",
+		toolBrowserBlockers: "Chercher un blocage",
+		toolTerminalRead: "Lire le terminal",
+		toolTerminalReply: "Répondre au terminal",
+		toolFileRead: "Lire un fichier",
+		toolFileWrite: "Écrire un fichier",
+		toolArtifactCreate: "Créer le livrable",
+		toolApprovalRequest: "Demander ton accord",
+		toolApprovalResolve: "Valider l’accord",
+		toolVerifierCheck: "Vérifier l’objectif",
 		suggestionRefresh: "Autres idées",
 		newConversationTitle: "Nouvelle conversation"
 	},
@@ -10229,17 +10313,17 @@ var STRINGS = Object.freeze({
 		collapse: "Collapse",
 		collapseConversations: "Collapse conversations",
 		collapseTerminals: "Collapse terminals",
-		collapseInspector: "Collapse inspector",
+		collapseInspector: "Collapse behind the scenes",
 		openConversations: "Open conversations",
-		openInspector: "Open inspector",
+		openInspector: "Open behind the scenes",
 		conversationsShort: "Chats",
-		inspectorShort: "Trace",
+		inspectorShort: "JON",
 		adminConsole: "Admin console",
 		activity: "Activity",
-		runContext: "Run context",
-		runInspector: "Run inspector",
-		sessionInspector: "Session",
-		runNarrative: "Execution thread",
+		runContext: "Mission context",
+		runInspector: "Behind JON",
+		sessionInspector: "Live",
+		runNarrative: "What JON is doing",
 		decisionTrace: "Decision",
 		frame: "Frame",
 		capability: "Capability",
@@ -10289,12 +10373,14 @@ var STRINGS = Object.freeze({
 		result: "Result",
 		done: "Done.",
 		working: "I’m on it.",
+		doneHeading: "Done.",
+		workingHeading: "I’m working on it.",
 		waitingApproval: "I’m waiting for your approval.",
 		failed: "I couldn’t finish.",
 		approveOnce: "Approve once",
 		deny: "Deny",
 		stopRun: "Stop run",
-		approvalFootnote: "Full details stay in the technical trace and approval history.",
+		approvalFootnote: "Full details stay behind the scenes and in the approval history.",
 		technicalDetails: "Technical details",
 		timeline: "Timeline",
 		ai: "AI",
@@ -10339,6 +10425,17 @@ var STRINGS = Object.freeze({
 		settingsSaved: "Saved",
 		settingsClose: "Close",
 		settingsSaving: "Saving…",
+		settingsConnectors: "Connectors and MCP",
+		settingsConnectorsHint: "Declare MCP servers or external tools that JON can select during an agentic mission.",
+		settingsNoConnectors: "No configured connector.",
+		settingsConnectorConnected: "Connected",
+		settingsConnectorSetup: "Setup needed",
+		settingsConnectorNamePlaceholder: "Connector name",
+		settingsConnectorCommandPlaceholder: "Stdio command, e.g. npx my-mcp",
+		settingsConnectorUrlPlaceholder: "Optional HTTP/SSE URL",
+		settingsConnectorAdd: "Add MCP",
+		settingsConnectorAdding: "Adding…",
+		settingsConnectorSaved: "Connector added to the capability graph.",
 		browserStartSession: "Start browser",
 		browserStarting: "Opening…",
 		browserStartError: "Failed to open browser",
@@ -10425,10 +10522,21 @@ var STRINGS = Object.freeze({
 		terminalReplySent: "Sent",
 		terminalReplySentConfirm: "Reply sent to terminal.",
 		terminalReplyBlocked: "Input requires explicit approval.",
+		terminalAskBeforeSending: "Ask me first",
+		terminalAskBeforeSendingSet: "JON will ask for your approval before sending this reply.",
 		terminalInjectContext: "Inject mission context",
 		terminalContextInjected: "Mission context injected into terminal.",
 		launchCli: "Launch CLI agent",
 		attachTerminal: "Attach terminal",
+		detectExternalTerminals: "Detect open terminals",
+		detectExternalTerminalsBtn: "Detect",
+		externalTerminalAdopt: "Adopt",
+		externalTerminalAdopting: "Adopting…",
+		externalTerminalStop: "Detach",
+		externalTerminalsFound: "Terminals detected on this PC",
+		externalTerminalsNone: "No open terminal detected.",
+		externalTerminalReadOnly: "Read-only (ConPTY)",
+		externalTerminalAdopted: "Adopted",
 		openTerminals: "Open terminals",
 		newTerminal: "New terminal",
 		createTerminal: "Create terminal",
@@ -10517,18 +10625,18 @@ var STRINGS = Object.freeze({
 		statusNeedsAttentionLabel: "Needs attention",
 		terminalAuthorizedLabel: "Authorize JON to interact with this terminal",
 		objective: "Objective",
-		panelWidgetMissionState: "Mission & Progress",
+		panelWidgetMissionState: "Mission and progress",
 		panelWidgetJonNeeds: "What JON needs",
-		panelWidgetSemanticVerify: "Semantic verification",
-		panelWidgetTokenBudget: "Token budget & DOM",
-		panelWidgetDesktopState: "Desktop state",
+		panelWidgetSemanticVerify: "Result verification",
+		panelWidgetTokenBudget: "AI budget",
+		panelWidgetDesktopState: "Observed workspace",
 		panelWidgetApprovalQueue: "Pending approvals",
-		panelWidgetLlmStages: "LLM calls",
+		panelWidgetLlmStages: "AI replies",
 		panelCatMission: "Mission",
 		panelCatSurfaces: "Surfaces",
-		panelCatTelemetry: "Telemetry",
-		panelCatTrace: "Trace",
-		panelConfigTitle: "Configure panel",
+		panelCatTelemetry: "Diagnostics",
+		panelCatTrace: "Behind the scenes",
+		panelConfigTitle: "Configure behind the scenes",
 		panelConfigReset: "Reset",
 		panelApprovalRequired: "Approval required",
 		panelObjectiveUnverified: "Objective unverified",
@@ -10545,6 +10653,66 @@ var STRINGS = Object.freeze({
 		panelSteps: "steps",
 		panelReplans: "replan",
 		panelReplansPlural: "replans",
+		executionTools: "Tools used",
+		toolStatusPlanned: "planned",
+		toolStatusRunning: "running",
+		toolStatusSucceeded: "succeeded",
+		toolStatusFailed: "failed",
+		toolStatusSkipped: "skipped",
+		toolStatusBlocked: "blocked",
+		statusQueued: "Queued",
+		statusRunning: "Running",
+		statusWaitingUser: "Waiting for you",
+		statusCompleted: "Completed",
+		statusFailed: "Blocked",
+		statusBlocked: "Blocked",
+		missionProgressGraph: "Mission progress",
+		jonPlan: "JON’s plan",
+		jonTools: "Tools JON is using",
+		jonWorkspaceState: "What JON observes",
+		jonVerification: "Final verification",
+		planUnderstand: "Understand the request",
+		planAskApproval: "Ask for your approval",
+		planUseBrowser: "Control the browser",
+		planUseDesktop: "Act on the desktop",
+		planUseTerminal: "Watch the terminal",
+		planCaptureProof: "Capture proof",
+		planPrepareDeliverable: "Prepare the deliverable",
+		planVerifyOutcome: "Verify the result",
+		planActWorkspace: "Act on the right surface",
+		planStepActive: "JON is working on this step now.",
+		planStepPlanned: "This step is planned after the current one.",
+		planStepCompleted: "This step is done and included in the mission state.",
+		planStepBlocked: "This step is blocked and needs recovery.",
+		planLinkedTools: "Tools linked to this step",
+		activeWindow: "Window",
+		activeBrowser: "Browser",
+		activeTerminal: "Terminal",
+		toolDesktopInspect: "Observe windows",
+		toolDesktopLaunch: "Open the app",
+		toolDesktopFocus: "Focus the window",
+		toolDesktopType: "Type in the app",
+		toolCaptureProof: "Capture proof",
+		toolBrowserOpen: "Open the browser",
+		toolBrowserNavigate: "Go to the page",
+		toolBrowserSearch: "Run the search",
+		toolBrowserRead: "Read the page",
+		toolBrowserWait: "Wait for load",
+		toolBrowserState: "Observe page state",
+		toolBrowserQuery: "Find an element",
+		toolBrowserClick: "Click in the page",
+		toolBrowserType: "Type in the page",
+		toolBrowserSelect: "Select an option",
+		toolBrowserExtract: "Extract content",
+		toolBrowserBlockers: "Check blockers",
+		toolTerminalRead: "Read the terminal",
+		toolTerminalReply: "Reply to the terminal",
+		toolFileRead: "Read a file",
+		toolFileWrite: "Write a file",
+		toolArtifactCreate: "Create the deliverable",
+		toolApprovalRequest: "Ask for approval",
+		toolApprovalResolve: "Record approval",
+		toolVerifierCheck: "Verify the objective",
 		suggestionRefresh: "More ideas",
 		newConversationTitle: "New conversation"
 	}
@@ -10574,7 +10742,7 @@ function formatTime(value, locale = "fr") {
 	}).format(date);
 }
 //#endregion
-//#region ../node_modules/react/cjs/react-jsx-runtime.production.js
+//#region node_modules/react/cjs/react-jsx-runtime.production.js
 /**
 * @license React
 * react-jsx-runtime.production.js
@@ -10671,7 +10839,7 @@ var __vitePreload = function preload(baseModule, deps, importerUrl) {
 	});
 };
 //#endregion
-//#region src/main.jsx
+//#region ui/src/main.jsx
 var EMPTY_DRAFT = Object.freeze({
 	objective: "",
 	deliverable: "",
@@ -10697,6 +10865,10 @@ async function api(path, options = {}) {
 		throw new Error(payload?.error?.message ?? `HTTP ${response.status}`);
 	}
 	return response.status === 204 ? null : response.json();
+}
+function runDetailUrl(runId, locale) {
+	const query = locale ? `?locale=${encodeURIComponent(locale)}` : "";
+	return `/api/runs/${encodeURIComponent(runId)}${query}`;
 }
 async function streamApi(path, options = {}, handlers = {}) {
 	const response = await fetch(path, {
@@ -10831,23 +11003,24 @@ function latestRuns(dashboard, selectedProjectId) {
 		return String(rightDate).localeCompare(String(leftDate));
 	});
 }
-function eventLabel(event) {
+function eventLabel(event, t = stringsForLocale("fr")) {
+	const en = t.send === "Send";
 	const type = String(event?.type ?? "");
 	const payload = event?.payload ?? {};
-	if (type === "run.started") return "Action lancée.";
-	if (type === "run.settled" || type === "run.completed") return "Résultat prêt.";
-	if (type === "run.failed") return "Action interrompue.";
-	if (type === "approval.requested") return "Confirmation demandée.";
-	if (type === "approval.resolved" || type === "approval.granted") return "Confirmation reçue.";
-	if (type === "tool.executed") return `Action effectuée${payload.primitive ? ` : ${payload.primitive}` : ""}.`;
-	if (type === "tool.blocked") return `Action bloquée${payload.reason ? ` : ${payload.reason}` : ""}.`;
-	if (type === "tool.recovery_attempted") return "Récupération tentée.";
-	if (type === "evidence.recorded") return "Preuve capturée.";
-	if (type === "run.chain.decided") return "Suite évaluée.";
-	if (type === "run.chain.continued") return "Suite lancée.";
-	if (type === "run.chain.blocked") return "Suite en attente d’une précision.";
-	if (type === "llm.degraded_mode.activated") return "Mode IA dégradé, fallback sûr activé.";
-	return type ? `Événement : ${type}` : "Mise à jour reçue.";
+	if (type === "run.started") return en ? "Action started." : "Action lancée.";
+	if (type === "run.settled" || type === "run.completed") return en ? "Mission reviewed." : "Mission évaluée.";
+	if (type === "run.failed") return en ? "Action interrupted." : "Action interrompue.";
+	if (type === "approval.requested") return en ? "Confirmation requested." : "Confirmation demandée.";
+	if (type === "approval.resolved" || type === "approval.granted") return en ? "Confirmation received." : "Confirmation reçue.";
+	if (type === "tool.executed") return en ? `Tool succeeded${payload.primitive ? `: ${payload.primitive}` : ""}.` : `Action effectuée${payload.primitive ? ` : ${payload.primitive}` : ""}.`;
+	if (type === "tool.blocked") return en ? `Tool blocked${payload.reason ? `: ${payload.reason}` : ""}.` : `Action bloquée${payload.reason ? ` : ${payload.reason}` : ""}.`;
+	if (type === "tool.recovery_attempted") return en ? "Recovery attempted." : "Récupération tentée.";
+	if (type === "evidence.recorded") return en ? "Proof captured." : "Preuve capturée.";
+	if (type === "run.chain.decided") return en ? "Next step evaluated." : "Suite évaluée.";
+	if (type === "run.chain.continued") return en ? "Next step started." : "Suite lancée.";
+	if (type === "run.chain.blocked") return en ? "Next step needs clarification." : "Suite en attente d’une précision.";
+	if (type === "llm.degraded_mode.activated") return en ? "Safe AI fallback enabled." : "Mode IA dégradé, fallback sûr activé.";
+	return type ? en ? `Event: ${type}` : `Événement : ${type}` : en ? "Update received." : "Mise à jour reçue.";
 }
 function statusTone(status) {
 	if ([
@@ -10867,6 +11040,209 @@ function statusTone(status) {
 		"running"
 	].includes(status)) return "warn";
 	return "";
+}
+function jonPulseState(status, { pendingApprovals = [], busy = false } = {}) {
+	if (pendingApprovals.length > 0 || status === "paused" || status === "waiting_for_input") return "waiting_user";
+	if (status === "failed" || status === "blocked" || status === "error") return "blocked";
+	if (status === "completed" || status === "passed") return "completed";
+	if (busy || status === "running" || status === "pending" || status === "queued") return "acting";
+	return "idle";
+}
+function JonPulse({ state = "idle", small = false, label = "JON" }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: `jon-pulse ${state} ${small ? "small" : ""}`,
+		title: label,
+		"aria-label": label,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "jon-pulse-node main" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "jon-pulse-link one" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "jon-pulse-link two" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "jon-pulse-node satellite one" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "jon-pulse-node satellite two" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "sr-only",
+				children: label
+			})
+		]
+	});
+}
+function AssistantAvatar({ state = "idle", visible = true, small = false }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: `react-avatar ${visible ? "" : "react-avatar-empty"}`,
+		"aria-hidden": !visible,
+		children: visible ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(JonPulse, {
+			state,
+			small
+		}) : null
+	});
+}
+function toolCallStatusLabel(status, t) {
+	return {
+		planned: t.toolStatusPlanned,
+		running: t.toolStatusRunning,
+		succeeded: t.toolStatusSucceeded,
+		failed: t.toolStatusFailed,
+		skipped: t.toolStatusSkipped,
+		blocked: t.toolStatusBlocked
+	}[status] ?? status;
+}
+function friendlyRunStatus(status, t) {
+	return {
+		queued: t.statusQueued,
+		pending: t.statusQueued,
+		running: t.statusRunning,
+		paused: t.statusWaitingUser,
+		waiting_for_input: t.statusWaitingUser,
+		completed: t.statusCompleted,
+		failed: t.statusFailed,
+		blocked: t.statusBlocked
+	}[status] ?? status ?? t.status;
+}
+function normalizedToolName(call) {
+	return call?.toolName ?? call?.tool ?? call?.primitive ?? "";
+}
+function humanToolName(call, t) {
+	const tool = normalizedToolName(call);
+	return {
+		"desktop.inspectWindows": t.toolDesktopInspect,
+		"desktop.launchApplication": t.toolDesktopLaunch,
+		"desktop.focusWindow": t.toolDesktopFocus,
+		"desktop.typeText": t.toolDesktopType,
+		"desktop.captureScreenshot": t.toolCaptureProof,
+		"browser.open": t.toolBrowserOpen,
+		"browser.navigate": t.toolBrowserNavigate,
+		"browser.search": t.toolBrowserSearch,
+		"browser.extractDom": t.toolBrowserRead,
+		"browser.waitForLoad": t.toolBrowserWait,
+		"browser.readState": t.toolBrowserState,
+		"browser.queryDom": t.toolBrowserQuery,
+		"browser.click": t.toolBrowserClick,
+		"browser.typeText": t.toolBrowserType,
+		"browser.selectOption": t.toolBrowserSelect,
+		"browser.extractText": t.toolBrowserExtract,
+		"browser.extractStructuredRows": t.toolBrowserExtract,
+		"browser.detectBlockers": t.toolBrowserBlockers,
+		"browser.captureScreenshot": t.toolCaptureProof,
+		"terminal.read": t.toolTerminalRead,
+		"terminal.injectInput": t.toolTerminalReply,
+		"file.read": t.toolFileRead,
+		"file.write": t.toolFileWrite,
+		"artifact.create": t.toolArtifactCreate,
+		"approval.request": t.toolApprovalRequest,
+		"approval.resolve": t.toolApprovalResolve,
+		"verifier.checkOutcome": t.toolVerifierCheck
+	}[tool] ?? call?.label ?? tool;
+}
+function toolStatusTone(status) {
+	if (status === "succeeded" || status === "completed") return "ok";
+	if (status === "failed" || status === "blocked") return "danger";
+	if (status === "running" || status === "planned") return "warn";
+	return "neutral";
+}
+function progressPercent(steps = [], run = null, verification = null) {
+	if (verification?.objectiveSatisfied || run?.status === "completed" && !verification) return 100;
+	const countable = steps.filter((step) => step.status !== "idle");
+	const done = steps.filter((step) => [
+		"done",
+		"completed",
+		"succeeded"
+	].includes(step.status)).length;
+	const active = steps.some((step) => [
+		"active",
+		"running",
+		"planned"
+	].includes(step.status)) ? .45 : 0;
+	const total = Math.max(steps.length || countable.length, 1);
+	const percent = Math.max(0, Math.min(100, Math.round((done + active) / total * 100)));
+	return verification?.objectiveSatisfied === false ? Math.min(percent, 82) : percent;
+}
+function normalizePlanForGraph(plan = [], fallbackSteps = []) {
+	return (plan.length > 0 ? plan : fallbackSteps).slice(0, 6).map((step, index) => ({
+		id: step.id ?? `stage-${index}`,
+		label: step.label,
+		detail: step.reason ?? step.detail ?? "",
+		status: step.status === "completed" || step.status === "succeeded" ? "done" : step.status
+	}));
+}
+function isGenericStepLabel(value) {
+	const text = String(value ?? "").trim();
+	return !text || /^step\s*#?\s*\d+$/i.test(text) || /^étape\s*#?\s*\d+$/i.test(text);
+}
+function inferStepSurface(step = {}, index = 0, toolCalls = []) {
+	const combined = `${`${step.id ?? ""} ${step.label ?? ""} ${step.reason ?? ""} ${step.detail ?? ""}`.toLowerCase()} ${normalizedToolName(toolCalls.find((call) => call.stepId && call.stepId === step.id) ?? null).toLowerCase()}`;
+	if (/approval|accord|confirmation/.test(combined)) return "approval";
+	if (/verify|verif|vérif|outcome|result|résultat/.test(combined)) return "verify";
+	if (/evidence|proof|preuve|screenshot|capture/.test(combined)) return "proof";
+	if (/browser|chrome|edge|url|page|search|google|navigate/.test(combined)) return "browser";
+	if (/desktop|window|notepad|application|app|type|write/.test(combined)) return "desktop";
+	if (/terminal|cli|shell|codex|claude/.test(combined)) return "terminal";
+	if (/artifact|artefact|file|fichier|report|rapport/.test(combined)) return "artifact";
+	if (index === 0) return "understand";
+	return "act";
+}
+function readableStepLabel(step = {}, index = 0, toolCalls = [], t) {
+	if (!isGenericStepLabel(step.label)) return step.label;
+	const surface = inferStepSurface(step, index, toolCalls);
+	return {
+		understand: t.planUnderstand,
+		approval: t.planAskApproval,
+		browser: t.planUseBrowser,
+		desktop: t.planUseDesktop,
+		terminal: t.planUseTerminal,
+		proof: t.planCaptureProof,
+		artifact: t.planPrepareDeliverable,
+		verify: t.planVerifyOutcome,
+		act: t.planActWorkspace
+	}[surface] ?? t.planActWorkspace;
+}
+function readableStepDetail(step = {}, index = 0, toolCalls = [], state = {}, t) {
+	const direct = step.reason ?? step.detail ?? "";
+	if (direct && !/^step\s*#?\s*\d+$/i.test(String(direct).trim())) return direct;
+	const linked = toolCalls.find((call) => call.stepId && call.stepId === step.id) ?? toolCalls.find((call) => inferStepSurface(step, index, [call]) === inferStepSurface(step, index, toolCalls));
+	const toolDetail = linked ? [
+		humanToolName(linked, t),
+		linked.reason,
+		linked.inputSummary,
+		linked.outputSummary
+	].filter(Boolean).join(" · ") : "";
+	if (toolDetail) return toolDetail;
+	if (step.status === "blocked" || step.status === "failed") return state.blockage || t.planStepBlocked;
+	if (step.status === "active" || step.status === "running") return t.planStepActive;
+	if (step.status === "completed" || step.status === "done" || step.status === "succeeded") return t.planStepCompleted;
+	return t.planStepPlanned;
+}
+function buildReadableExecutionSteps(plan = [], fallbackSteps = [], toolCalls = [], state = {}, t) {
+	return (plan.length > 0 ? plan : fallbackSteps).slice(0, 8).map((step, index) => ({
+		...step,
+		id: step.id ?? `stage-${index}`,
+		label: readableStepLabel(step, index, toolCalls, t),
+		detail: readableStepDetail(step, index, toolCalls, state, t),
+		status: step.status === "completed" || step.status === "succeeded" ? "done" : step.status,
+		linkedTools: toolCalls.filter((call) => call.stepId && call.stepId === step.id).slice(0, 3)
+	}));
+}
+var CHAT_PROGRESS_BLOCK_TYPES = new Set([
+	"approvalCard",
+	"terminalPromptCard",
+	"proofCard",
+	"errorRecoveryCard",
+	"nextStepCard"
+]);
+var CHAT_RESULT_BLOCK_TYPES = new Set([
+	"folderList",
+	"table",
+	"browserResultList",
+	"proofCard",
+	"artifactCard",
+	"artifactPreview",
+	"terminalPromptCard",
+	"approvalCard",
+	"errorRecoveryCard",
+	"nextStepCard",
+	"chart"
+]);
+function selectChatBlocks(blocks = [], allowedTypes = CHAT_RESULT_BLOCK_TYPES) {
+	return (Array.isArray(blocks) ? blocks : []).filter((block) => allowedTypes.has(block.type));
 }
 function technicalEventKey(event) {
 	return [
@@ -11231,6 +11607,25 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
 	const [saving, setSaving] = (0, import_react.useState)(false);
 	const [saved, setSaved] = (0, import_react.useState)(false);
 	const [saveError, setSaveError] = (0, import_react.useState)(null);
+	const [connectors, setConnectors] = (0, import_react.useState)(() => agentConfiguration?.connectors?.connectors ?? []);
+	const [connectorName, setConnectorName] = (0, import_react.useState)("");
+	const [connectorCommand, setConnectorCommand] = (0, import_react.useState)("");
+	const [connectorUrl, setConnectorUrl] = (0, import_react.useState)("");
+	const [connectorTools, setConnectorTools] = (0, import_react.useState)("[{\"name\":\"send_email\",\"description\":\"Send an email after explicit approval.\"}]");
+	const [connectorBusy, setConnectorBusy] = (0, import_react.useState)(false);
+	const [connectorError, setConnectorError] = (0, import_react.useState)(null);
+	const [connectorSaved, setConnectorSaved] = (0, import_react.useState)(false);
+	async function refreshConnectors() {
+		try {
+			const payload = await api("/api/connectors");
+			setConnectors(Array.isArray(payload?.connectors) ? payload.connectors : []);
+		} catch {
+			setConnectors([]);
+		}
+	}
+	(0, import_react.useEffect)(() => {
+		refreshConnectors();
+	}, []);
 	function toggleApp(appId) {
 		setTrustedApps((prev) => {
 			const next = new Set(prev);
@@ -11271,6 +11666,39 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
 			setSaveError("Erreur lors de la sauvegarde.");
 		} finally {
 			setSaving(false);
+		}
+	}
+	async function handleAddConnector() {
+		const name = connectorName.trim();
+		if (!name) return;
+		setConnectorBusy(true);
+		setConnectorError(null);
+		setConnectorSaved(false);
+		try {
+			let tools = [];
+			if (connectorTools.trim()) {
+				const parsed = JSON.parse(connectorTools);
+				tools = Array.isArray(parsed) ? parsed : [parsed];
+			}
+			await api("/api/connectors", {
+				method: "POST",
+				body: JSON.stringify({
+					type: "mcp",
+					name,
+					command: connectorCommand.trim(),
+					url: connectorUrl.trim(),
+					tools
+				})
+			});
+			setConnectorName("");
+			setConnectorCommand("");
+			setConnectorUrl("");
+			setConnectorSaved(true);
+			await refreshConnectors();
+		} catch (error) {
+			setConnectorError(error.message ?? "Connector configuration failed.");
+		} finally {
+			setConnectorBusy(false);
 		}
 	}
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
@@ -11396,6 +11824,84 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
 								fontSize: "12px",
 								resize: "vertical"
 							}
+						})
+					]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					className: "settings-connectors-section",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+							style: {
+								fontSize: "13px",
+								marginBottom: "6px"
+							},
+							children: t.settingsConnectors
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							style: {
+								fontSize: "12px",
+								color: "var(--muted)",
+								marginBottom: "10px"
+							},
+							children: t.settingsConnectorsHint
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "settings-connector-list",
+							children: connectors.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "settings-connector-empty",
+								children: t.settingsNoConnectors
+							}) : connectors.map((connector) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "settings-connector-row",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: connector.name }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
+									connector.type ?? connector.category ?? "builtin",
+									" · ",
+									(connector.capabilities ?? []).slice(0, 3).join(", ") || "tool"
+								] })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("em", {
+									className: `settings-connector-status ${connector.status}`,
+									children: connector.status === "connected" ? t.settingsConnectorConnected : t.settingsConnectorSetup
+								})]
+							}, connector.connectorId))
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "settings-connector-form",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									value: connectorName,
+									onChange: (event) => setConnectorName(event.target.value),
+									placeholder: t.settingsConnectorNamePlaceholder
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									value: connectorCommand,
+									onChange: (event) => setConnectorCommand(event.target.value),
+									placeholder: t.settingsConnectorCommandPlaceholder
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									value: connectorUrl,
+									onChange: (event) => setConnectorUrl(event.target.value),
+									placeholder: t.settingsConnectorUrlPlaceholder
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+									value: connectorTools,
+									onChange: (event) => setConnectorTools(event.target.value),
+									rows: 4,
+									placeholder: "[{\"name\":\"tool_name\",\"description\":\"...\"}]"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+									type: "button",
+									className: "primary small",
+									onClick: handleAddConnector,
+									disabled: connectorBusy || !connectorName.trim(),
+									children: connectorBusy ? t.settingsConnectorAdding : t.settingsConnectorAdd
+								}),
+								connectorSaved ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "settings-connector-ok",
+									children: t.settingsConnectorSaved
+								}) : null,
+								connectorError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "settings-connector-error",
+									children: connectorError
+								}) : null
+							]
 						})
 					]
 				}),
@@ -11678,7 +12184,7 @@ function App() {
 				loading: true
 			}));
 			try {
-				setRunDetail(await api(`/api/runs/${conversation.runId}`));
+				setRunDetail(await api(runDetailUrl(conversation.runId, locale)));
 			} catch (error) {
 				setFeedback({
 					tone: "danger",
@@ -11708,7 +12214,7 @@ function App() {
 		});
 		selectedProjectIdRef.current = nextProjectId;
 		selectedRunIdRef.current = nextRunId;
-		if (nextRunId) setRunDetail(await api(`/api/runs/${nextRunId}`));
+		if (nextRunId) setRunDetail(await api(runDetailUrl(nextRunId, locale)));
 		else setRunDetail(null);
 	}
 	(0, import_react.useEffect)(() => {
@@ -11728,6 +12234,21 @@ function App() {
 			mounted = false;
 		};
 	}, []);
+	(0, import_react.useEffect)(() => {
+		if (!selectedRunId) return;
+		let cancelled = false;
+		api(runDetailUrl(selectedRunId, locale)).then((detail) => {
+			if (!cancelled) setRunDetail(detail);
+		}).catch((error) => {
+			if (!cancelled) setFeedback({
+				tone: "danger",
+				text: error.message
+			});
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [locale, selectedRunId]);
 	(0, import_react.useEffect)(() => {
 		const element = transcriptRef.current;
 		if (!element) return;
@@ -11954,7 +12475,7 @@ function App() {
 			loading: true
 		}));
 		try {
-			setRunDetail(await api(`/api/runs/${runId}`));
+			setRunDetail(await api(runDetailUrl(runId, locale)));
 		} catch (error) {
 			setFeedback({
 				tone: "danger",
@@ -12358,14 +12879,29 @@ function App() {
 										run,
 										t
 									}) : null,
-									messages.map((message) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, {
-										message,
-										onStartMission: startMission,
-										onClarificationAnswer: stageClarificationAnswer,
-										onTerminalInput: sendTerminalInput,
-										busy,
-										t
-									}, message.id)),
+									messages.map((message) => {
+										const hasRuntimeAssistantBubble = Boolean(busy.reviewing && !hasStreamingMessage || busy.starting || run && ![
+											"completed",
+											"failed",
+											"stopped",
+											"cancelled"
+										].includes(run.status) || pendingApprovals.length > 0 || runDetail?.review?.outcomeSummary && [
+											"completed",
+											"failed",
+											"stopped",
+											"cancelled"
+										].includes(run?.status));
+										const lastAssistantMessageId = [...messages].reverse().find((candidate) => (candidate.role ?? "assistant") === "assistant")?.id;
+										return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, {
+											message,
+											showIdleLogo: !hasRuntimeAssistantBubble && message.id === lastAssistantMessageId,
+											onStartMission: startMission,
+											onClarificationAnswer: stageClarificationAnswer,
+											onTerminalInput: sendTerminalInput,
+											busy,
+											t
+										}, message.id);
+									}),
 									busy.reviewing && !hasStreamingMessage ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ThinkingMessage, {
 										text: t.thinking,
 										t
@@ -12374,12 +12910,18 @@ function App() {
 										text: t.launching,
 										t
 									}) : null,
-									run ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RunProgressMessage, {
+									run && ![
+										"completed",
+										"failed",
+										"stopped",
+										"cancelled"
+									].includes(run.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RunProgressMessage, {
 										run,
 										runDetail,
 										liveStatus,
 										pendingApprovals,
 										events: activityEvents,
+										onTerminalInput: sendTerminalInput,
 										t
 									}) : null,
 									pendingApprovals.map((approval) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalMessage, {
@@ -12388,21 +12930,27 @@ function App() {
 										onResolve: resolveApproval,
 										t
 									}, approval.id)),
-									runDetail?.review?.outcomeSummary && ["completed", "failed"].includes(run?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OutcomeMessage, {
+									runDetail?.review?.outcomeSummary && [
+										"completed",
+										"failed",
+										"stopped",
+										"cancelled"
+									].includes(run?.status) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(OutcomeMessage, {
 										run,
 										runDetail,
+										onTerminalInput: sendTerminalInput,
 										t
 									}) : null
 								]
 							}),
-							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PromptSuggestions, {
+							!hasConversation ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PromptSuggestions, {
 								draft,
 								onDraftChange: updateDraft,
 								inputRef: composerInputRef,
 								disabled: busy.loading || busy.reviewing || busy.starting || !project,
 								locale,
 								t
-							}),
+							}) : null,
 							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Composer, {
 								draft,
 								busy,
@@ -12689,7 +13237,7 @@ function runTraceItems({ scopedRun, events = [], approvals = [], artifacts = [],
 	for (const event of events.slice(0, 6)) items.push({
 		id: technicalEventKey(event),
 		tone: event.type?.includes("failed") || event.type?.includes("blocked") ? "danger" : event.type?.includes("approval") ? "warn" : "ok",
-		label: eventLabel(event),
+		label: eventLabel(event, t),
 		detail: event.type,
 		timestamp: event.createdAt
 	});
@@ -13269,6 +13817,11 @@ function TerminalSidebar({ projectId, conversationId, workspace, onTerminalInput
 	const [attachBusy, setAttachBusy] = import_react.useState(false);
 	const [missionObjective, setMissionObjective] = import_react.useState("");
 	const [missionBusy, setMissionBusy] = import_react.useState(false);
+	const [showDetect, setShowDetect] = import_react.useState(false);
+	const [detectBusy, setDetectBusy] = import_react.useState(false);
+	const [detectError, setDetectError] = import_react.useState(null);
+	const [detectedTerminals, setDetectedTerminals] = import_react.useState(null);
+	const [adoptingId, setAdoptingId] = import_react.useState(null);
 	const missionBrief = workspace?.missionBrief ?? null;
 	const terminals = workspace?.terminals ?? [];
 	const activeCount = terminals.filter((terminal) => [
@@ -13376,6 +13929,44 @@ function TerminalSidebar({ projectId, conversationId, workspace, onTerminalInput
 			await onRefresh();
 		} catch {} finally {
 			setMissionBusy(false);
+		}
+	}
+	async function handleDetect() {
+		if (!projectId || detectBusy) return;
+		setDetectBusy(true);
+		setDetectError(null);
+		try {
+			setDetectedTerminals((await api(`/api/projects/${projectId}/workspace/external-terminals`))?.terminals ?? []);
+		} catch (err) {
+			setDetectError(err.message);
+		} finally {
+			setDetectBusy(false);
+		}
+	}
+	async function handleAdopt(terminal) {
+		if (!projectId || adoptingId) return;
+		setAdoptingId(terminal.windowHandle ?? terminal.processId);
+		try {
+			const response = await api(`/api/projects/${projectId}/workspace/external-terminals`, {
+				method: "POST",
+				body: JSON.stringify({
+					label: terminal.label || terminal.title || terminal.processName,
+					windowHandle: terminal.windowHandle,
+					processId: terminal.processId,
+					canReadBuffer: terminal.canReadBuffer,
+					processName: terminal.processName,
+					autonomyMode: "assisted",
+					conversationId: conversationId ?? void 0
+				})
+			});
+			setDetectedTerminals(null);
+			setShowDetect(false);
+			await onRefresh();
+			if (response?.terminal?.id) onOpenOverlay?.(response.terminal.id);
+		} catch (err) {
+			setDetectError(err.message);
+		} finally {
+			setAdoptingId(null);
 		}
 	}
 	const launchForm = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -13727,36 +14318,120 @@ function TerminalSidebar({ projectId, conversationId, workspace, onTerminalInput
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "terminal-sidebar-actions",
-				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
-					type: "button",
-					className: `terminal-action-btn ${showLaunch ? "active" : ""}`,
-					onClick: () => {
-						setShowLaunch(!showLaunch);
-						setShowAttach(false);
-						setLaunchError(null);
-					},
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "↗" }),
-						" ",
-						t.launchCli
-					]
-				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
-					type: "button",
-					className: `terminal-action-btn ${showAttach ? "active" : ""}`,
-					onClick: () => {
-						setShowAttach(!showAttach);
-						setShowLaunch(false);
-						setAttachError(null);
-					},
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⊕" }),
-						" ",
-						t.attachTerminal
-					]
-				})]
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						type: "button",
+						className: `terminal-action-btn ${showLaunch ? "active" : ""}`,
+						onClick: () => {
+							setShowLaunch(!showLaunch);
+							setShowAttach(false);
+							setShowDetect(false);
+							setLaunchError(null);
+						},
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "↗" }),
+							" ",
+							t.launchCli
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						type: "button",
+						className: `terminal-action-btn ${showAttach ? "active" : ""}`,
+						onClick: () => {
+							setShowAttach(!showAttach);
+							setShowLaunch(false);
+							setShowDetect(false);
+							setAttachError(null);
+						},
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⊕" }),
+							" ",
+							t.attachTerminal
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						type: "button",
+						className: `terminal-action-btn ${showDetect ? "active" : ""}`,
+						onClick: () => {
+							const next = !showDetect;
+							setShowDetect(next);
+							setShowLaunch(false);
+							setShowAttach(false);
+							if (next && detectedTerminals === null) handleDetect();
+						},
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "⊙" }),
+							" ",
+							t.detectExternalTerminals
+						]
+					})
+				]
 			}),
 			showLaunch ? launchForm : null,
 			showAttach ? attachForm : null,
+			showDetect ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "workspace-form",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "workspace-form-actions",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "small",
+							onClick: handleDetect,
+							disabled: detectBusy,
+							children: detectBusy ? t.sending : t.detectExternalTerminalsBtn
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ghost small",
+							onClick: () => {
+								setShowDetect(false);
+								setDetectedTerminals(null);
+								setDetectError(null);
+							},
+							children: t.hide
+						})]
+					}),
+					detectError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "workspace-form-error",
+						children: detectError
+					}) : null,
+					detectedTerminals !== null ? detectedTerminals.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "muted small-muted",
+						children: t.externalTerminalsNone
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "external-terminal-list",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "workspace-form-hint",
+							children: t.externalTerminalsFound
+						}), detectedTerminals.map((ext) => {
+							const key = ext.windowHandle ?? ext.processId;
+							const alreadyAdopted = ext.alreadyAdopted === true;
+							return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "external-terminal-item",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "external-terminal-info",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+										className: "external-terminal-label",
+										children: ext.label || ext.title || ext.processName
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", {
+										className: "muted",
+										children: [ext.processName, ext.canReadBuffer ? "" : ` · ${t.externalTerminalReadOnly}`]
+									})]
+								}), alreadyAdopted ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "external-terminal-adopted",
+									children: t.externalTerminalAdopted
+								}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+									type: "button",
+									className: "small",
+									disabled: !!adoptingId,
+									onClick: () => handleAdopt(ext),
+									children: adoptingId === key ? t.externalTerminalAdopting : t.externalTerminalAdopt
+								})]
+							}, key);
+						})]
+					}) : null
+				]
+			}) : null,
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "terminal-sidebar-list",
 				"data-testid": "terminal-list",
@@ -13787,7 +14462,7 @@ function TerminalSidebar({ projectId, conversationId, workspace, onTerminalInput
 		]
 	});
 }
-var PANEL_CONFIG_KEY = "jon.panel.widgets.v1";
+var PANEL_CONFIG_KEY = "jon.panel.widgets.v2";
 var PANEL_WIDGET_REGISTRY = [
 	{
 		id: "mission_state",
@@ -13811,7 +14486,7 @@ var PANEL_WIDGET_REGISTRY = [
 		id: "token_budget",
 		labelKey: "panelWidgetTokenBudget",
 		category: "telemetry",
-		defaultOn: true
+		defaultOn: false
 	},
 	{
 		id: "browser_state",
@@ -13841,7 +14516,7 @@ var PANEL_WIDGET_REGISTRY = [
 		id: "llm_stages",
 		labelKey: "panelWidgetLlmStages",
 		category: "telemetry",
-		defaultOn: true
+		defaultOn: false
 	},
 	{
 		id: "evidence",
@@ -13859,7 +14534,7 @@ var PANEL_WIDGET_REGISTRY = [
 		id: "terminal_alerts",
 		labelKey: "terminalAlerts",
 		category: "surfaces",
-		defaultOn: false
+		defaultOn: true
 	},
 	{
 		id: "terminal_transcript",
@@ -14164,6 +14839,231 @@ function PanelConfigDrawer({ config, onClose, onChange, t }) {
 		]
 	});
 }
+function MissionProgressGraph({ steps = [], run = null, verification = null, t }) {
+	const normalized = normalizePlanForGraph([], steps);
+	if (normalized.length === 0) return null;
+	const percent = progressPercent(normalized, run, verification);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mission-progress-graph",
+		"aria-label": t.missionProgressGraph,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mission-progress-graph-top",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.missionProgressGraph }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: [percent, "%"] })]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mission-progress-track",
+				"aria-hidden": "true",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "mission-progress-fill",
+					style: { width: `${percent}%` }
+				}), normalized.map((step) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: `mission-progress-node ${step.status}` }, step.id))]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
+				className: "mission-progress-stages",
+				children: normalized.map((step) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+					className: step.status,
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: step.label }), step.detail ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: step.detail }) : null]
+				}, step.id))
+			})
+		]
+	});
+}
+function ToolTimelineCompact({ toolCalls = [], t }) {
+	if (toolCalls.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		className: "muted",
+		children: t.noRecentActions
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "execution-tool-list",
+		children: toolCalls.slice(-10).reverse().map((call) => {
+			const rawName = normalizedToolName(call);
+			return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+				className: `execution-tool-call ${call.status}`,
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: humanToolName(call, t) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `mini-badge ${toolStatusTone(call.status)}`,
+						children: toolCallStatusLabel(call.status, t)
+					})] }),
+					rawName ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", {
+						className: "tool-technical-name",
+						children: rawName
+					}) : null,
+					call.reason ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: call.reason }) : null,
+					call.inputSummary ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: call.inputSummary }) : null,
+					call.outputSummary ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: call.outputSummary }) : null,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("footer", { children: [call.evidenceId ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+						t.evidence,
+						": ",
+						call.evidenceId
+					] }) : null, call.durationMs != null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [call.durationMs, " ms"] }) : null] })
+				]
+			}, call.id);
+		})
+	});
+}
+function ExecutionPlanDetailList({ steps = [], toolCalls = [], t }) {
+	if (steps.length === 0) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "execution-step-detail-list",
+		children: steps.map((step, index) => {
+			const relatedTools = step.linkedTools?.length > 0 ? step.linkedTools : toolCalls.filter((call) => inferStepSurface(step, index, [call]) === inferStepSurface(step, index, toolCalls)).slice(0, 2);
+			return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+				className: `execution-step-card ${step.status}`,
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "execution-step-number",
+					children: index + 1
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "execution-step-body",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "execution-step-title-row",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: step.label }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: `mini-badge ${step.status === "done" ? "ok" : step.status === "blocked" || step.status === "failed" ? "danger" : step.status === "active" || step.status === "running" ? "warn" : "neutral"}`,
+								children: step.status === "done" ? t.toolStatusSucceeded : step.status === "active" ? t.toolStatusRunning : toolCallStatusLabel(step.status, t)
+							})]
+						}),
+						step.detail ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: step.detail }) : null,
+						relatedTools.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "execution-step-tools",
+							"aria-label": t.planLinkedTools,
+							children: relatedTools.map((call) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: `mini-badge ${toolStatusTone(call.status)}`,
+								children: humanToolName(call, t)
+							}, call.id))
+						}) : null
+					]
+				})]
+			}, step.id);
+		})
+	});
+}
+function ExecutionThreadWidget({ thread, fallbackTraceItems = [], scopedRun, locale, t }) {
+	if (!thread) return fallbackTraceItems.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+		className: "muted",
+		children: t.noRecentActions
+	}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
+		className: "run-trace-list execution-thread-fallback",
+		children: fallbackTraceItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+			className: item.tone ?? "",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: item.label }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.detail }),
+				item.timestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(item.timestamp, locale) }) : null
+			] })]
+		}, item.id))
+	});
+	const plan = Array.isArray(thread.plan) ? thread.plan : [];
+	const toolCalls = Array.isArray(thread.toolCalls) ? thread.toolCalls : [];
+	const state = thread.state ?? {};
+	const verification = thread.verification ?? {};
+	const graphSteps = buildReadableExecutionSteps(plan, buildProgressSteps({
+		run: scopedRun,
+		pendingApprovals: state.pendingApprovals > 0 ? [{}] : [],
+		events: [],
+		outcome: null,
+		t
+	}), toolCalls, state, t);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "execution-thread",
+		"data-testid": "execution-thread",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "execution-thread-mission",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "execution-thread-heading",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(JonPulse, {
+						state: jonPulseState(scopedRun?.status),
+						small: true
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: thread.mission?.objective || scopedRun?.mission || t.selectedMission }), thread.mission?.deliverable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: thread.mission.deliverable }) : null] })]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: `mini-badge ${statusTone(scopedRun?.status)}`,
+					children: friendlyRunStatus(thread.mission?.status ?? scopedRun?.status, t)
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "execution-thread-block",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { children: t.jonPlan }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MissionProgressGraph, {
+						steps: graphSteps,
+						run: scopedRun,
+						verification,
+						t
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExecutionPlanDetailList, {
+						steps: graphSteps,
+						toolCalls,
+						t
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "execution-thread-block",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { children: t.jonTools }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ToolTimelineCompact, {
+					toolCalls,
+					t
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "execution-thread-block",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { children: t.jonWorkspaceState }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "inspector-grid compact",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.activeWindow, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: state.activeWindow || t.notAvailable })] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.activeBrowser, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: state.activeBrowser || t.notAvailable })] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.activeUrl, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: state.activeBrowserUrl || t.notAvailable })] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.activeTerminal, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: state.activeTerminal || t.notAvailable })] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.panelApprovals, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: state.pendingApprovals ?? 0 })] }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [t.evidence, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: state.evidenceCount ?? 0 })] })
+						]
+					}),
+					state.blockage ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "execution-blocker",
+						children: state.blockage
+					}) : null,
+					state.nextAction ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "execution-next",
+						children: [
+							t.panelNextAction,
+							": ",
+							state.nextAction
+						]
+					}) : null
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "execution-thread-block",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", { children: t.jonVerification }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "verification-strip",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: `mini-badge ${verification.objectiveSatisfied ? "ok" : "warn"}`,
+							children: verification.objectiveSatisfied ? t.panelVerdictPass : verification.verdict ?? t.panelNotVerified
+						}), verification.confidence != null ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
+							t.panelConfidence,
+							": ",
+							Math.round(verification.confidence * 100),
+							"%"
+						] }) : null]
+					}),
+					verification.evidenceUsed?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MiniList, {
+						title: t.evidence,
+						items: verification.evidenceUsed
+					}) : null,
+					verification.missingEvidence?.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MiniList, {
+						title: t.panelObjectiveUnverified,
+						items: verification.missingEvidence,
+						tone: "warn"
+					}) : null
+				]
+			})
+		]
+	});
+}
 function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, onOpenTerminals, pendingApprovals, liveStatus, locale, t }) {
 	const linkedRunIds = new Set([
 		...Array.isArray(conversation?.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : [],
@@ -14196,6 +15096,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 		calls,
 		t
 	});
+	const executionThread = scopedRunDetail?.conversationResponse?.executionThread ?? null;
 	const capabilitySummary = runCapabilitySummary(scopedRun, scopedRunDetail);
 	const [panelConfig, setPanelConfig] = import_react.useState(loadPanelConfig);
 	const [configOpen, setConfigOpen] = import_react.useState(false);
@@ -14251,33 +15152,13 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 				}, widgetId);
 			case "run_narrative": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 				className: "activity-section",
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runNarrative }),
-					traceItems.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-						className: "muted",
-						children: t.noRecentActions
-					}) : null,
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
-						className: "run-trace-list",
-						children: traceItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
-							className: item.tone ?? "",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: item.label }),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item.detail }),
-								item.timestamp ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: formatDate(item.timestamp, locale) }) : null
-							] })]
-						}, item.id))
-					}),
-					scopedEvents.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
-						className: "activity-timeline compact",
-						style: { marginTop: "0.5rem" },
-						children: scopedEvents.slice(0, 6).map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: eventLabel(event) }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("small", { children: [
-							event.type,
-							" · ",
-							formatDate(event.createdAt, locale)
-						] })] }, technicalEventKey(event)))
-					})
-				]
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.runNarrative }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ExecutionThreadWidget, {
+					thread: executionThread,
+					fallbackTraceItems: traceItems,
+					scopedRun,
+					locale,
+					t
+				})]
 			}, widgetId);
 			case "browser_state": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 				className: "activity-section",
@@ -16698,34 +17579,34 @@ function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, 
 		]
 	});
 }
-function TerminalEventMessage({ message, t }) {
+function TerminalEventMessage({ message, showAvatar = true, t }) {
 	const ev = message.terminalEvent ?? {};
 	const kindMeta = {
 		terminal_started: {
-			icon: "⌁",
+			state: "acting",
 			labelKey: "terminalStartedTitle",
 			tone: "neutral"
 		},
 		terminal_completion: {
-			icon: "✓",
+			state: "completed",
 			labelKey: "terminalCompletionTitle",
 			tone: "ok"
 		},
 		terminal_auto_action: {
-			icon: "⚡",
+			state: "acting",
 			labelKey: "terminalAutoActionTitle",
 			tone: "neutral"
 		}
 	}[message.kind] ?? {
-		icon: "⌁",
+		state: "idle",
 		labelKey: "terminalAlertTitle",
 		tone: "neutral"
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: `react-message assistant terminal-event-message ${kindMeta.tone}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: kindMeta.icon
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: kindMeta.state,
+			visible: showAvatar
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble terminal-event-bubble",
 			children: [
@@ -16769,13 +17650,13 @@ function TerminalEventMessage({ message, t }) {
 		})]
 	});
 }
-function MissionPausedMessage({ message, t }) {
+function MissionPausedMessage({ message, showAvatar = true, t }) {
 	const pause = message.missionPause ?? {};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: "react-message assistant terminal-event-message warn",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "⏸"
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: "waiting_user",
+			visible: showAvatar
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble terminal-event-bubble",
 			children: [
@@ -16803,29 +17684,35 @@ function MissionPausedMessage({ message, t }) {
 		})]
 	});
 }
-function Message({ message, onStartMission, onClarificationAnswer, onTerminalInput, busy, t }) {
+function Message({ message, showIdleLogo = false, onStartMission, onClarificationAnswer, onTerminalInput, busy, t }) {
 	if (message.kind === "terminal_alert") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TerminalAlertMessage, {
 		message,
+		showAvatar: showIdleLogo || message.streaming,
 		onTerminalInput,
 		t
 	});
 	if (message.kind === "terminal_started" || message.kind === "terminal_completion" || message.kind === "terminal_auto_action") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TerminalEventMessage, {
 		message,
+		showAvatar: showIdleLogo || message.streaming,
 		t
 	});
 	if (message.kind === "mission_paused") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MissionPausedMessage, {
 		message,
+		showAvatar: showIdleLogo,
 		t
 	});
 	if (message.kind === "turn") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TurnMessage, {
 		message,
+		showAvatar: showIdleLogo || message.streaming,
 		onStartMission,
 		onClarificationAnswer,
+		onTerminalInput,
 		busy: busy.starting,
 		t
 	});
 	if (message.kind === "preflight") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PreflightMessage, {
 		message,
+		showAvatar: showIdleLogo || message.streaming,
 		onStartMission,
 		onClarificationAnswer,
 		busy: busy.starting,
@@ -16838,9 +17725,12 @@ function Message({ message, onStartMission, onClarificationAnswer, onTerminalInp
 	});
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: `react-message ${message.role ?? "assistant"} ${message.tone ?? ""}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		children: [message.role === "user" || message.role === "tool" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 			className: "react-avatar",
-			children: message.role === "user" ? t.userAvatar : message.role === "tool" ? t.toolAvatar : "JON"
+			children: message.role === "user" ? t.userAvatar : t.toolAvatar
+		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: message.streaming ? "thinking" : message.tone === "warn" ? "waiting_user" : "idle",
+			visible: showIdleLogo || message.streaming
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble",
 			children: [
@@ -16869,9 +17759,9 @@ function WorkspaceTerminalMessage({ workspace, availableCliAgents = [], onOpenTe
 	const leadingTerminals = terminals.slice(0, 3);
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: "react-message assistant workspace-terminal-message",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "⌁"
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: waitingCount > 0 ? "waiting_user" : activeCount > 0 ? "acting" : "idle",
+			visible: waitingCount > 0 || activeCount > 0
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble workspace-terminal-bubble",
 			"data-testid": "workspace-terminal-bubble",
@@ -16964,7 +17854,7 @@ function WorkspaceTerminalMessage({ workspace, availableCliAgents = [], onOpenTe
 		})]
 	});
 }
-function TerminalAlertMessage({ message, onTerminalInput, t }) {
+function TerminalAlertMessage({ message, showAvatar = true, onTerminalInput, t }) {
 	const alert = message.terminalAlert ?? {};
 	const [replyInput, setReplyInput] = import_react.useState(alert.suggestedInput ?? "");
 	const [replySent, setReplySent] = import_react.useState(false);
@@ -17001,9 +17891,9 @@ function TerminalAlertMessage({ message, onTerminalInput, t }) {
 	const showInjectContext = alert.autonomyMode === "supervised_autonomy" && alert.decisionAction === "auto_inject_context" && alert.missionObjective && !contextInjected;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: `react-message assistant terminal-alert-message ${tone}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "⌁"
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: tone === "warn" ? "waiting_user" : tone === "danger" ? "blocked" : "acting",
+			visible: showAvatar
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble terminal-alert-bubble",
 			children: [
@@ -17099,7 +17989,7 @@ function TerminalAlertMessage({ message, onTerminalInput, t }) {
 		})]
 	});
 }
-function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }) {
+function TurnMessage({ message, showAvatar = true, onStartMission, onClarificationAnswer, onTerminalInput, busy, t }) {
 	const turn = message.turn ?? {};
 	const understanding = normalizePreflight(message.preflight);
 	const choiceRequest = turn.choiceRequest ?? understanding?.choiceRequest ?? null;
@@ -17110,9 +18000,9 @@ function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }
 	const showStatusChip = Boolean(requiresClarification || canStart || turn.action === "refuse");
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: `react-message assistant ${message.tone ?? ""}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "JON"
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: message.streaming ? "thinking" : requiresClarification ? "waiting_user" : canStart ? "thinking" : "idle",
+			visible: showAvatar
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble turn-bubble",
 			children: [
@@ -17120,13 +18010,9 @@ function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }
 					className: "chat-meta",
 					children: message.meta
 				}) : null,
-				message.text ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [message.text, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StreamingCursor, { active: message.streaming })] }) : message.streaming ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "typing-row compact",
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {})
-					]
+				message.text ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: [message.text, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StreamingCursor, { active: message.streaming })] }) : message.streaming ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "sr-only",
+					children: t.thinking
 				}) : null,
 				showStatusChip ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "pill-row",
@@ -17145,7 +18031,12 @@ function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }
 						}) : null
 					]
 				}) : null,
-				!message.streaming ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UiBlocks, { blocks: message.uiBlocks ?? turn.uiBlocks ?? [] }) : null,
+				!message.streaming ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UiBlocks, {
+					blocks: message.uiBlocks ?? turn.uiBlocks ?? [],
+					t,
+					onTerminalInput,
+					projectId: message.projectId
+				}) : null,
 				requiresClarification ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChoiceCard, {
 					choiceRequest,
 					question: clarificationQuestion,
@@ -17213,25 +18104,48 @@ function ActionConfirmCard({ understanding, onStartMission, busy, t }) {
 		})]
 	});
 }
-function UiBlocks({ blocks = [] }) {
+function UiBlocks({ blocks = [], t = stringsForLocale("fr"), onTerminalInput = null, projectId = null }) {
 	const normalized = Array.isArray(blocks) ? blocks : [];
 	if (normalized.length === 0) return null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: "ui-block-stack",
-		children: normalized.map((block, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UiBlock, { block }, block.id ?? `${block.type}-${index}`))
+		children: normalized.map((block, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UiBlock, {
+			block,
+			t,
+			onTerminalInput,
+			projectId
+		}, block.id ?? `${block.type}-${index}`))
 	});
 }
-function UiBlock({ block }) {
+function UiBlock({ block, t, onTerminalInput, projectId }) {
 	switch (block.type) {
 		case "folderList": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FolderListBlock, { block });
 		case "table": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TableBlock, { block });
 		case "metricCards": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MetricCardsBlock, { block });
 		case "chart": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChartBlock, { block });
 		case "reportPreview": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ReportPreviewBlock, { block });
-		case "artifactCard": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArtifactCardBlock, { block });
+		case "artifactCard":
+		case "artifactPreview": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArtifactCardBlock, { block });
 		case "actionPlan": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActionPlanBlock, { block });
 		case "evidenceGallery": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EvidenceGalleryBlock, { block });
 		case "approvalCard": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ApprovalUiBlock, { block });
+		case "resultSummary": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ResultSummaryBlock, {
+			block,
+			t
+		});
+		case "proofCard": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProofCardBlock, {
+			block,
+			t
+		});
+		case "browserResultList": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowserResultListBlock, { block });
+		case "terminalPromptCard": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TerminalPromptCardBlock, {
+			block,
+			t,
+			onTerminalInput,
+			projectId
+		});
+		case "errorRecoveryCard": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorRecoveryCardBlock, { block });
+		case "nextStepCard": return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NextStepCardBlock, { block });
 		default: return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TextUiBlock, { block });
 	}
 }
@@ -17390,42 +18304,157 @@ function ApprovalUiBlock({ block }) {
 		]
 	});
 }
-function ThinkingMessage({ text, meta, t = stringsForLocale("fr") }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
-		className: "react-message assistant active",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "JON"
-		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "react-bubble",
-			children: [
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-					className: "chat-meta",
-					children: meta ?? t.working
-				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "typing-row",
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {})
-					]
-				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: text })
-			]
+function ResultSummaryBlock({ block, t }) {
+	const bullets = Array.isArray(block.bullets) ? block.bullets : [];
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: `ui-block result-summary-block ${block.objectiveSatisfied ? "ok" : "warn"}`,
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "ui-block-header",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: block.title ?? t.result }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: `mini-badge ${block.objectiveSatisfied ? "ok" : "warn"}`,
+					children: block.verdict || block.status || t.status
+				})]
+			}),
+			block.summary ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: block.summary }) : null,
+			bullets.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+				className: "compact-check-list",
+				children: bullets.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: item }, item))
+			}) : null
+		]
+	});
+}
+function ProofCardBlock({ block, t }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "ui-block proof-card-block",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: block.title ?? t.evidence }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: block.label || block.description || block.evidenceId }),
+			block.description ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: block.description }) : null
+		] }), block.href ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+			href: block.href,
+			target: "_blank",
+			rel: "noreferrer",
+			children: t.proofScreenshot
+		}) : null]
+	});
+}
+function BrowserResultListBlock({ block }) {
+	const results = Array.isArray(block.results) ? block.results : [];
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "ui-block browser-result-list-block",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: block.title ?? "Résultats" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "browser-result-list",
+			children: results.map((result, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+				href: result.url || "#",
+				target: "_blank",
+				rel: "noreferrer",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: result.title || result.url }),
+					result.source ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: result.source }) : null,
+					result.snippet ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: result.snippet }) : null
+				]
+			}, `${result.url}-${index}`))
 		})]
 	});
 }
-function PreflightMessage({ message, onStartMission, onClarificationAnswer, busy, t }) {
+function TerminalPromptCardBlock({ block, t, onTerminalInput, projectId }) {
+	const [reply, setReply] = import_react.useState(block.suggestedReply ?? "");
+	const [busy, setBusy] = import_react.useState(false);
+	const [sent, setSent] = import_react.useState(false);
+	const [askFirst, setAskFirst] = import_react.useState(false);
+	const canSend = Boolean(onTerminalInput && projectId && block.terminalId && reply.trim());
+	async function handleSend() {
+		if (!canSend || busy) return;
+		setBusy(true);
+		try {
+			await onTerminalInput(projectId, block.terminalId, reply, { approved: true });
+			setSent(true);
+		} finally {
+			setBusy(false);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "ui-block terminal-prompt-card-block",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "ui-block-header",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: block.title ?? t.terminalAlertTitle }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "mini-badge warn",
+					children: block.requiresApproval ? t.confirmationNeeded : t.terminalWaiting
+				})]
+			}),
+			block.prompt ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: block.prompt }) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "terminal-prompt-actions",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t.terminalSuggestedInput }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					value: reply,
+					onChange: (event) => setReply(event.target.value),
+					placeholder: t.terminalReplyPlaceholder,
+					disabled: busy || sent
+				})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "small",
+					onClick: handleSend,
+					disabled: !canSend || busy || sent,
+					children: sent ? t.terminalReplySent : busy ? t.sending : t.terminalReplySend
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ghost small",
+					onClick: () => setAskFirst(true),
+					disabled: askFirst || sent,
+					children: t.terminalAskBeforeSending
+				})] })]
+			}),
+			askFirst ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: t.terminalAskBeforeSendingSet }) : null
+		]
+	});
+}
+function ErrorRecoveryCardBlock({ block }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "ui-block error-recovery-card-block",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: block.title ?? "Récupération" }),
+			block.blocker ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: block.blocker }) : null,
+			block.recovery ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: block.recovery }) : null
+		]
+	});
+}
+function NextStepCardBlock({ block }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "ui-block next-step-card-block",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: block.title ?? "Prochaine action" }),
+			block.action ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: block.action }) : null,
+			block.reason ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: block.reason }) : null
+		]
+	});
+}
+function ThinkingMessage({ text, meta, t = stringsForLocale("fr") }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+		className: "react-message assistant active",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: "thinking",
+			visible: true
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "react-bubble",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "chat-meta",
+				children: meta ?? t.working
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: text })]
+		})]
+	});
+}
+function PreflightMessage({ message, showAvatar = true, onStartMission, onClarificationAnswer, busy, t }) {
 	const understanding = normalizePreflight(message.preflight);
 	if (!understanding) return null;
 	const requiresClarification = Boolean(understanding.requiresClarification);
 	const choiceRequest = understanding.choiceRequest ?? null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: `react-message assistant ${requiresClarification ? "warn" : "ok"}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "JON"
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: requiresClarification ? "waiting_user" : "thinking",
+			visible: showAvatar
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble preflight-bubble",
 			children: [
@@ -17473,20 +18502,28 @@ function RunReviewIntro({ run, t }) {
 		})]
 	});
 }
-function RunProgressMessage({ run, runDetail, liveStatus, pendingApprovals, events, t }) {
+function RunProgressMessage({ run, runDetail, liveStatus, pendingApprovals, events, onTerminalInput, t }) {
+	const outcome = runDetail?.review?.outcomeSummary ?? null;
+	const response = runDetail?.conversationResponse ?? null;
 	const steps = buildProgressSteps({
 		run,
 		pendingApprovals,
 		events,
-		outcome: runDetail?.review?.outcomeSummary ?? null,
+		outcome,
 		t
 	});
-	const heading = run.status === "running" ? t.working : run.status === "completed" ? t.done : run.status === "paused" ? t.waitingApproval : run.status === "failed" ? t.failed : `${t.status}: ${run.status}`;
+	const heading = run.status === "running" ? t.workingHeading : run.status === "completed" ? t.doneHeading : run.status === "paused" ? t.waitingApproval : run.status === "failed" ? t.failed : `${t.status}: ${run.status}`;
+	const naturalReply = response?.naturalReply || (run.status === "paused" ? t.waitingApproval : run.summary ?? t.working);
+	const workingStatus = response?.currentWorkingStatus || steps.find((step) => step.status === "active")?.detail || t.working;
+	const visibleBlocks = selectChatBlocks(response?.uiBlocks ?? [], CHAT_PROGRESS_BLOCK_TYPES);
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: `react-message assistant progress-message ${statusTone(run.status)}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "JON"
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: jonPulseState(run.status, {
+				pendingApprovals,
+				busy: true
+			}),
+			visible: true
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble progress-bubble",
 			children: [
@@ -17495,23 +18532,38 @@ function RunProgressMessage({ run, runDetail, liveStatus, pendingApprovals, even
 					children: t.progress
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: heading }),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: run.status === "paused" ? t.waitingApproval : run.summary ?? t.working }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: naturalReply }),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 					className: "pill-row",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 						className: `mini-badge ${statusTone(run.status)}`,
-						children: run.status === "paused" ? t.confirmationNeeded : run.status
+						children: run.status === "paused" ? t.confirmationNeeded : friendlyRunStatus(run.status, t)
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 						className: `mini-badge ${liveStatus === "live" ? "ok" : "warn"}`,
 						children: liveStatus === "live" ? t.live : t.degraded
 					})]
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
-					className: "premium-progress-list",
-					children: steps.map((step) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
-						className: step.status,
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { "aria-hidden": "true" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: step.label }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: step.detail })] })]
-					}, step.id))
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "agent-working-status",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(JonPulse, {
+						state: jonPulseState(run.status, {
+							pendingApprovals,
+							busy: true
+						}),
+						small: true
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: workingStatus })]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MissionProgressGraph, {
+					steps,
+					run,
+					verification: response?.executionThread?.verification,
+					t
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(UiBlocks, {
+					blocks: visibleBlocks,
+					t,
+					onTerminalInput,
+					projectId: run.projectId
 				})
 			]
 		})]
@@ -17522,9 +18574,9 @@ function ApprovalMessage({ approval, busy, onResolve, t }) {
 	const risk = approval.riskLevel ?? "medium";
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: "react-message approval premium-approval warn",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "OK"
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: "waiting_user",
+			visible: true
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble approval-bubble",
 			children: [
@@ -17584,13 +18636,26 @@ function ApprovalMessage({ approval, busy, onResolve, t }) {
 		})]
 	});
 }
-function OutcomeMessage({ run, runDetail, t }) {
+function OutcomeMessage({ run, runDetail, onTerminalInput, t }) {
 	const outcome = runDetail.review.outcomeSummary;
+	const response = runDetail?.conversationResponse ?? null;
+	const naturalReply = response?.naturalReply || (run.status === "completed" ? t.done : run.summary ?? t.failed);
+	const selectedBlocks = selectChatBlocks(response?.uiBlocks ?? []);
+	const visibleBlocks = selectedBlocks.length > 0 ? selectedBlocks : !response?.naturalReply ? [{
+		id: "legacy_result_summary",
+		type: "resultSummary",
+		title: t.result,
+		status: run.status,
+		verdict: run.status === "completed" ? "satisfied" : "failed",
+		objectiveSatisfied: run.status === "completed",
+		summary: run.summary ?? "",
+		bullets: [...outcome.didNow ?? [], ...outcome.verifiedNow ?? []].slice(0, 5)
+	}] : [];
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
 		className: `react-message assistant ${statusTone(run.status)}`,
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-			className: "react-avatar",
-			children: "JON"
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AssistantAvatar, {
+			state: jonPulseState(run.status),
+			visible: true
 		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 			className: "react-bubble outcome-bubble",
 			children: [
@@ -17598,44 +18663,13 @@ function OutcomeMessage({ run, runDetail, t }) {
 					className: "chat-meta",
 					children: t.result
 				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: run.status === "completed" ? t.completedSummary : t.establishedSummary }),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "preflight-grid compact",
-					children: [
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MiniList, {
-							title: t.did,
-							items: outcome.didNow
-						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MiniList, {
-							title: t.verified,
-							items: outcome.verifiedNow
-						}),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MiniList, {
-							title: t.notDone,
-							items: outcome.notDoneNow,
-							tone: "warn"
-						})
-					]
-				}),
-				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-					className: "proof-strip",
-					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
-						outcome.artifactsCreated ?? 0,
-						" ",
-						t.artifactCount
-					] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [
-						outcome.proofItems ?? 0,
-						" ",
-						t.evidenceCount
-					] })]
-				}),
-				runDetail.evidence?.filter((item) => item.hasScreenshot).slice(0, 3).map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
-					className: "proof-link",
-					href: `/api/runs/${run.id}/evidence/${item.id}/screenshot`,
-					target: "_blank",
-					rel: "noreferrer",
-					children: t.proofScreenshot
-				}, item.id))
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: naturalReply }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(UiBlocks, {
+					blocks: visibleBlocks,
+					t,
+					onTerminalInput,
+					projectId: run.projectId
+				})
 			]
 		})]
 	});

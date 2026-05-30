@@ -390,11 +390,35 @@ export async function run() {
     const pendingState = await waitForPendingApproval(server.baseUrl);
     assert.equal(pendingState.approval.category, "local_focus");
 
-    await fetchJson(server.baseUrl, `/api/approvals/${pendingState.approval.id}/decision`, {
+    const mobilePairing = await fetchJson(server.baseUrl, "/api/mobile/pairing/start", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    const mobileSession = await fetchJson(server.baseUrl, "/api/mobile/pairing/confirm", {
       method: "POST",
       body: JSON.stringify({
-        decision: APPROVAL_DECISION.APPROVED_ONCE,
-        rationale: "Controlled approval via HTTP test."
+        pairingCode: mobilePairing.pairingCode,
+        deviceName: "Operator server test"
+      })
+    });
+    const mobileAuth = {
+      "content-type": "application/json",
+      authorization: `Bearer ${mobileSession.sessionToken}`
+    };
+    const mobileApprovals = await fetchJson(server.baseUrl, "/api/mobile/projects/default/approvals", {
+      headers: mobileAuth
+    });
+    assert.equal(mobileApprovals.some((approval) => approval.id === pendingState.approval.id), true);
+    const mobileRuns = await fetchJson(server.baseUrl, "/api/mobile/projects/default/runs", {
+      headers: mobileAuth
+    });
+    assert.equal(mobileRuns.some((run) => run.pendingApprovalItems?.some((approval) => approval.id === pendingState.approval.id)), true);
+
+    await fetchJson(server.baseUrl, `/api/mobile/approvals/${pendingState.approval.id}/respond`, {
+      method: "POST",
+      headers: mobileAuth,
+      body: JSON.stringify({
+        decision: "approve"
       })
     });
 
@@ -486,6 +510,10 @@ export async function run() {
           parameters: {
             browserLaunch: {
               browserId: "edge"
+            },
+            computerAction: {
+              type: "launch_browser_search",
+              boundedLaunchOnly: true
             }
           }
         }
@@ -502,6 +530,10 @@ export async function run() {
           parameters: {
             browserLaunch: {
               browserId: "edge"
+            },
+            computerAction: {
+              type: "launch_browser_search",
+              boundedLaunchOnly: true
             }
           }
         },
@@ -533,6 +565,10 @@ export async function run() {
           parameters: {
             browserLaunch: {
               browserId: "edge"
+            },
+            computerAction: {
+              type: "launch_browser_search",
+              boundedLaunchOnly: true
             }
           }
         }
@@ -550,6 +586,10 @@ export async function run() {
           parameters: {
             browserLaunch: {
               browserId: "edge"
+            },
+            computerAction: {
+              type: "launch_browser_search",
+              boundedLaunchOnly: true
             }
           }
         },

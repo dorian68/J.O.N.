@@ -765,4 +765,37 @@ export class InternalLlmGateway {
   async #log(entry) {
     await this.runtimeLogger?.safeLog(entry);
   }
+
+  // Raw text generation for inline LLM directives — bypasses structured JSON mode
+  async generateText({ messages, runId = null, projectId = null } = {}) {
+    if (this.providerMode === "disabled") {
+      throw new LlmGatewayError("LLM provider is disabled.", { category: "provider_unavailable" });
+    }
+
+    // Prefer live provider over mock for text generation
+    const candidates = this.providerOrder
+      .map((alias) => ({ alias, provider: this.providers.get(alias) }))
+      .filter(({ provider }) => provider?.isEnabled() && typeof provider.generateText === "function");
+
+    const liveCandidate = candidates.find(({ alias }) => alias !== LLM_PROVIDER_ALIAS.MOCK_OFFLINE);
+    const selected = liveCandidate ?? candidates[0] ?? null;
+
+    if (!selected) {
+      throw new LlmGatewayError("No provider available for text generation.", { category: "provider_unavailable" });
+    }
+
+    const result = await selected.provider.generateText({ messages });
+
+    // Track usage against session totals
+    const tokens = result.tokenUsage?.totalTokens ?? 0;
+    if (tokens > 0) {
+      this.sessionUsage.totalTokens += tokens;
+      this.sessionUsage.callCount += 1;
+      if (result.estimatedCost != null) {
+        this.sessionUsage.estimatedCost += result.estimatedCost;
+      }
+    }
+
+    return { ...result, providerAlias: result.providerAlias ?? selected.alias };
+  }
 }

@@ -146,3 +146,17 @@ Current: static plan + up to 2 replans on failure. Full dynamic loop is the v2 t
 | verifyOutcome | observeAfterAction (screenshot diff) |
 | recoverOrReplan (replan path) | pause threshold (consecutive failures count) |
 | | windowNotFound timeout (5s hardcoded) |
+
+## 2026-05-07 Runtime Update
+
+The loop is now represented explicitly by `app/src/runtime/mission-execution-loop.js` for testable `observe -> decide -> act -> verify -> recover` behavior. Existing production paths still execute through `PrototypeAgent`, but desktop/browser/capture completion gates now call `SemanticOutcomeVerifier` where they previously relied only on procedural verification.
+
+Completion gate:
+
+- `COMPLETED` requires `verifiedByOutcomes === true`.
+- Required evidence and screenshots are critical checks when requested or when a real desktop/browser mission runs.
+- Extraction/artifact requests are critical when the prompt asks for extraction, table, summary, export, file, or artifact.
+- Evidence alignment is critical: off-target screenshots or unrelated page evidence block completion.
+- Terminal `waiting_for_input`, `needs_attention`, or `error` blocks mission-level completion.
+
+Recovery is now formalized by `app/src/runtime/recovery-planner.js`. It chooses between retry, reobserve/refocus, recapture proof, restore browser, repair malformed LLM output, request user approval, or stop with failure evidence.

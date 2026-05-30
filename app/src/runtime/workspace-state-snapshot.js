@@ -116,6 +116,7 @@ export class WorkspaceStateSnapshot {
     const verificationState = missionTracker ? missionTracker.whatIsVerified() : null;
     const evidenceState = missionTracker ? missionTracker.whatEvidenceExists() : null;
     const userNeed = missionTracker ? missionTracker.whatDoesJonNeedFromUser() : null;
+    const nextActionRecommended = missionTracker ? missionTracker.whatIsNext() : null;
 
     // Collect blockers from tracker
     if (missionTracker) {
@@ -172,6 +173,7 @@ export class WorkspaceStateSnapshot {
         verification: verificationState,
         evidence: evidenceState,
         userNeed,
+        nextActionRecommended,
         blockers
       },
 
@@ -187,7 +189,8 @@ export class WorkspaceStateSnapshot {
         hasPendingApprovals: pendingApprovals.length > 0,
         isBlocked: blockers.length > 0,
         objectiveSatisfied: missionTracker?.userObjectiveSatisfied ?? null,
-        verificationVerdict: missionTracker?.verificationVerdict ?? null
+        verificationVerdict: missionTracker?.verificationVerdict ?? null,
+        missingEvidenceCount: missionTracker?.finalVerification?.missingEvidence?.length ?? 0
       }
     };
   }
@@ -214,6 +217,7 @@ export class WorkspaceStateSnapshot {
         verification: missionTracker?.whatIsVerified() ?? null,
         evidence: missionTracker?.whatEvidenceExists() ?? null,
         userNeed: missionTracker?.whatDoesJonNeedFromUser() ?? null,
+        nextActionRecommended: missionTracker?.whatIsNext() ?? null,
         blockers: []
       },
       recentEvidence: [],
@@ -225,7 +229,8 @@ export class WorkspaceStateSnapshot {
         hasPendingApprovals: false,
         isBlocked: false,
         objectiveSatisfied: missionTracker?.userObjectiveSatisfied ?? null,
-        verificationVerdict: missionTracker?.verificationVerdict ?? null
+        verificationVerdict: missionTracker?.verificationVerdict ?? null,
+        missingEvidenceCount: missionTracker?.finalVerification?.missingEvidence?.length ?? 0
       }
     };
   }

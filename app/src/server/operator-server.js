@@ -17,12 +17,30 @@ const TLS_DIR = path.join(COWORK_HOME, "tls");
 
 function getLanIp() {
   const ifaces = os.networkInterfaces();
-  for (const list of Object.values(ifaces)) {
+  const candidates = [];
+  for (const [name, list] of Object.entries(ifaces)) {
     for (const iface of list) {
-      if (iface.family === "IPv4" && !iface.internal) return iface.address;
+      if (iface.family !== "IPv4" || iface.internal) continue;
+      if (iface.address.startsWith("169.254.")) continue;
+      const score = scoreLanAddress(iface.address, name);
+      candidates.push({ address: iface.address, score });
     }
   }
+  candidates.sort((a, b) => b.score - a.score);
+  if (candidates[0]) return candidates[0].address;
   return "127.0.0.1";
+}
+
+function scoreLanAddress(address, interfaceName = "") {
+  let score = 0;
+  if (/^192\.168\./.test(address)) score += 100;
+  if (/^10\./.test(address)) score += 95;
+  const secondOctet = Number(address.split(".")[1]);
+  if (/^172\./.test(address) && secondOctet >= 16 && secondOctet <= 31) score += 95;
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(address)) score += 20;
+  if (/wi-?fi|ethernet/i.test(interfaceName)) score += 25;
+  if (/tailscale|wsl|hyper-v|vethernet|virtual|vpn|bluetooth|hotspot/i.test(interfaceName)) score -= 50;
+  return score;
 }
 
 const UI_ROOT = path.join(APP_ROOT, "ui");
@@ -88,21 +106,39 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function readJsonBody(request) {
+const MAX_JSON_BODY_BYTES = Number.parseInt(process.env.COWORK_MAX_BODY_BYTES ?? "", 10) || 5 * 1024 * 1024; // 5 MB default
+
+async function readJsonBody(request, { maxBytes = MAX_JSON_BODY_BYTES } = {}) {
   const chunks = [];
+  let totalBytes = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.from(chunk));
+    const buf = Buffer.from(chunk);
+    totalBytes += buf.byteLength;
+    if (totalBytes > maxBytes) {
+      const err = new Error(`Request body exceeds maximum allowed size (${maxBytes} bytes).`);
+      err.code = "PAYLOAD_TOO_LARGE";
+      throw err;
+    }
+    chunks.push(buf);
   }
   if (chunks.length === 0) {
     return {};
   }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    const err = new Error("Request body is not valid JSON.");
+    err.code = "INVALID_JSON";
+    throw err;
+  }
 }
 
 function matchRoute(pathname, expression) {
   const match = pathname.match(expression);
   return match?.groups ?? null;
 }
+
+const ALLOWED_STATIC_EXTENSIONS = new Set([".html", ".js", ".css", ".json", ".png", ".svg", ".ico", ".txt", ".woff", ".woff2", ".ttf"]);
 
 async function serveStaticAsset(response, pathname) {
   const requested = pathname === "/"
@@ -112,8 +148,27 @@ async function serveStaticAsset(response, pathname) {
       : pathname === "/mobile" || pathname === "/mobile/"
         ? "/mobile/index.html"
         : pathname;
+
+  // Normalize to prevent path traversal via ../
   const assetPath = path.normalize(path.join(UI_ROOT, requested));
-  if (!assetPath.startsWith(UI_ROOT)) {
+
+  // Reject any path that escapes UI_ROOT after normalization
+  const relative = path.relative(UI_ROOT, assetPath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    sendError(response, 403, "Forbidden");
+    return true;
+  }
+
+  // Reject dotfiles (e.g. .env, .git)
+  const basename = path.basename(assetPath);
+  if (basename.startsWith(".")) {
+    sendError(response, 403, "Forbidden");
+    return true;
+  }
+
+  // Allowlist by extension
+  const ext = path.extname(assetPath).toLowerCase();
+  if (ext && !ALLOWED_STATIC_EXTENSIONS.has(ext)) {
     sendError(response, 403, "Forbidden");
     return true;
   }
@@ -331,6 +386,77 @@ export async function createOperatorServer({
         return;
       }
 
+      if (pathname === "/api/settings/preferences" && request.method === "GET") {
+        sendJson(response, 200, {
+          preferences: operatorService.getUserPreferencesSummary()
+        });
+        return;
+      }
+      if (pathname === "/api/settings/preferences" && request.method === "PUT") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, {
+          preferences: operatorService.updateUserPreferences(body.preferences ?? body)
+        });
+        return;
+      }
+      if (pathname === "/api/settings/preferences/reset" && request.method === "POST") {
+        sendJson(response, 200, {
+          preferences: operatorService.resetUserPreferences()
+        });
+        return;
+      }
+
+      if (pathname === "/api/connectors" && request.method === "GET") {
+        sendJson(response, 200, {
+          connectors: operatorService.listConnectors(),
+          actionLog: operatorService.getConnectorActionLog({ limit: 30 })
+        });
+        return;
+      }
+      if (pathname === "/api/connectors" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 201, {
+            connector: await operatorService.addConnector(body.connector ?? body)
+          });
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+      const desktopConnectorRoute = matchRoute(pathname, /^\/api\/connectors\/(?<connectorId>[^/]+)$/);
+      if (desktopConnectorRoute && request.method === "GET") {
+        try {
+          const connector = operatorService.getConnector(decodeURIComponent(desktopConnectorRoute.connectorId));
+          sendJson(response, 200, connector);
+        } catch (err) {
+          sendError(response, 404, err.message, { code: err.code });
+        }
+        return;
+      }
+      if (desktopConnectorRoute && request.method === "DELETE") {
+        try {
+          sendJson(response, 200, await operatorService.removeConnector(decodeURIComponent(desktopConnectorRoute.connectorId)));
+        } catch (err) {
+          sendError(response, 404, err.message, { code: err.code });
+        }
+        return;
+      }
+      if (pathname === "/api/connectors/email_draft/draft" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, {
+          ok: true,
+          ...(await operatorService.draftEmailViaConnector({
+            to: body.to,
+            subject: body.subject,
+            body: body.body,
+            runId: body.runId ?? null,
+            requestedBy: "desktop"
+          }))
+        });
+        return;
+      }
+
       if (pathname === "/api/agent/config" && request.method === "GET") {
         sendJson(response, 200, {
           config: operatorService.getAgentConfiguration()
@@ -529,14 +655,26 @@ export async function createOperatorServer({
           confidence: sv?.confidence ?? null,
           failureReason: sv?.failureReason ?? null,
           nextBestAction: sv?.nextBestAction ?? null,
+          nextActionRecommended: sv?.nextBestAction ?? mp?.semanticVerification?.nextBestAction ?? null,
+          proofStatus: {
+            evidenceUsed: sv?.evidenceUsed ?? mp?.proof?.evidenceUsedInVerification ?? [],
+            evidenceCount: detail.evidence?.length ?? 0,
+            artifactCount: detail.artifacts?.length ?? 0,
+            missingEvidence: sv?.missingEvidence ?? mp?.proof?.missingEvidence ?? []
+          },
           satisfiedOutcomes: sv?.satisfiedOutcomes ?? [],
           unsatisfiedOutcomes: sv?.unsatisfiedOutcomes ?? [],
           whereAreWe: mp ? {
             progress: mp.steps ? `${mp.steps.completed}/${mp.steps.total ?? "?"} steps` : null,
             consecutiveFailures: mp.steps?.consecutiveFailures ?? 0,
             activeSurface: mp.surfaces?.active ?? null,
-            finalStatus: mp.finalStatus ?? null
+            finalStatus: mp.finalStatus ?? null,
+            objectiveSatisfied: mp.semanticVerification?.objectiveSatisfied ?? sv?.objectiveSatisfied ?? null,
+            blocking: mp.semanticVerification?.failureReason ?? null
           } : null,
+          currentBlockage: sv?.objectiveSatisfied === false
+            ? (sv.failureReason ?? "Mission objective has not been verified.")
+            : null,
           userNeed: sv && !sv.objectiveSatisfied
             ? (sv.failureReason ? `Mission non vérifiée : ${sv.failureReason}` : null)
             : null,
@@ -680,7 +818,7 @@ export async function createOperatorServer({
       const projectWorkspaceTerminalInputRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/terminals\/(?<terminalId>[^/]+)\/input$/);
       if (projectWorkspaceTerminalInputRoute && request.method === "POST") {
         const body = await readJsonBody(request);
-        sendJson(response, 200, operatorService.writeWorkspaceTerminalInput(
+        sendJson(response, 200, await operatorService.writeWorkspaceTerminalInput(
           projectWorkspaceTerminalInputRoute.projectId,
           decodeURIComponent(projectWorkspaceTerminalInputRoute.terminalId),
           body
@@ -801,6 +939,81 @@ export async function createOperatorServer({
         return;
       }
 
+      const projectExternalTerminalsRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/external-terminals$/);
+      if (projectExternalTerminalsRoute && request.method === "GET") {
+        try {
+          sendJson(response, 200, await operatorService.detectExternalTerminals(projectExternalTerminalsRoute.projectId));
+        } catch (err) {
+          sendJson(response, 500, { error: err.message });
+        }
+        return;
+      }
+      if (projectExternalTerminalsRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.adoptExternalTerminal(projectExternalTerminalsRoute.projectId, body));
+        } catch (err) {
+          sendJson(response, 400, { error: err.message });
+        }
+        return;
+      }
+
+      const projectExternalTerminalStopRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/external-terminals\/(?<terminalId>[^/]+)\/stop$/);
+      if (projectExternalTerminalStopRoute && request.method === "POST") {
+        try {
+          sendJson(response, 200, await operatorService.stopExternalTerminalAdoption(
+            projectExternalTerminalStopRoute.projectId,
+            decodeURIComponent(projectExternalTerminalStopRoute.terminalId)
+          ));
+        } catch (err) {
+          sendJson(response, 400, { error: err.message });
+        }
+        return;
+      }
+
+      const projectWorkspacePlansRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/plans$/);
+      if (projectWorkspacePlansRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        sendJson(response, 201, operatorService.createWorkspacePlan(projectWorkspacePlansRoute.projectId, body));
+        return;
+      }
+      if (projectWorkspacePlansRoute && request.method === "GET") {
+        sendJson(response, 200, operatorService.listWorkspacePlans(projectWorkspacePlansRoute.projectId, {
+          conversationId: url.searchParams.get("conversationId") ?? null
+        }));
+        return;
+      }
+
+      const projectWorkspacePlanRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/plans\/(?<planId>[^/]+)$/);
+      if (projectWorkspacePlanRoute && request.method === "GET") {
+        sendJson(response, 200, operatorService.getWorkspacePlanState(
+          projectWorkspacePlanRoute.projectId,
+          projectWorkspacePlanRoute.planId
+        ));
+        return;
+      }
+
+      const projectWorkspacePlanActivateRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/plans\/(?<planId>[^/]+)\/activate$/);
+      if (projectWorkspacePlanActivateRoute && request.method === "POST") {
+        sendJson(response, 200, operatorService.activateWorkspacePlan(
+          projectWorkspacePlanActivateRoute.projectId,
+          projectWorkspacePlanActivateRoute.planId
+        ));
+        return;
+      }
+
+      const projectWorkspacePlanStageRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/workspace\/plans\/(?<planId>[^/]+)\/stages\/(?<stageId>[^/]+)$/);
+      if (projectWorkspacePlanStageRoute && request.method === "PATCH") {
+        const body = await readJsonBody(request);
+        sendJson(response, 200, operatorService.resolveWorkspacePlanStage(
+          projectWorkspacePlanStageRoute.projectId,
+          projectWorkspacePlanStageRoute.planId,
+          projectWorkspacePlanStageRoute.stageId,
+          body
+        ));
+        return;
+      }
+
       const projectTokenUsageRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)\/token-usage$/);
       if (projectTokenUsageRoute && request.method === "GET") {
         sendJson(response, 200, operatorService.getTokenUsageSummary(projectTokenUsageRoute.projectId));
@@ -892,6 +1105,24 @@ export async function createOperatorServer({
         return;
       }
 
+      if (pathname === "/api/mobile/client/logs" && request.method === "POST") {
+        const authHeader = request.headers["authorization"] ?? "";
+        const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+        const session = token ? operatorService.validateMobileSession(token) : null;
+        try {
+          const body = await readJsonBody(request, { maxBytes: 128 * 1024 });
+          const result = operatorService.recordMobileClientLogs(body.entries ?? body.logs ?? body, {
+            deviceId: session?.device?.id ?? null,
+            token,
+            sessionStatus: session ? "valid" : token ? "invalid" : "anonymous"
+          });
+          sendJson(response, 200, { ok: true, ...result });
+        } catch (err) {
+          sendError(response, err.code === "PAYLOAD_TOO_LARGE" ? 413 : 400, err.message);
+        }
+        return;
+      }
+
       // All routes below require a valid mobile session token
       const mobileAuthHeader = request.headers["authorization"] ?? "";
       const mobileToken = mobileAuthHeader.startsWith("Bearer ") ? mobileAuthHeader.slice(7) : null;
@@ -916,6 +1147,7 @@ export async function createOperatorServer({
           connection: "keep-alive",
           "access-control-allow-origin": "*"
         });
+        response.write(": jon-mobile-events\n\n");
         const flushBuffer = () => {
           const events = operatorService.getMobileEventsSince(since);
           for (const event of events) {
@@ -926,7 +1158,13 @@ export async function createOperatorServer({
         const unsub = operatorService.subscribeMobileEvents((event) => {
           writeSse(response, "mobile.event", event);
         });
-        request.on("close", () => unsub());
+        const heartbeat = setInterval(() => {
+          try { response.write(": heartbeat\n\n"); } catch {}
+        }, 25000);
+        request.on("close", () => {
+          clearInterval(heartbeat);
+          unsub();
+        });
         return;
       }
 
@@ -934,6 +1172,13 @@ export async function createOperatorServer({
       if (mobileRunsRoute && request.method === "GET") {
         if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
         sendJson(response, 200, operatorService.getMobileRuns(mobileRunsRoute.projectId));
+        return;
+      }
+
+      const mobileApprovalsRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/approvals$/);
+      if (mobileApprovalsRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, operatorService.getMobilePendingApprovals(mobileApprovalsRoute.projectId));
         return;
       }
 
@@ -951,6 +1196,136 @@ export async function createOperatorServer({
         sendJson(response, 200, { screenshotBase64: screenshot ?? null });
         return;
       }
+
+      const mobileDesktopStateRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/desktop\/state$/);
+      if (mobileDesktopStateRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, await operatorService.getMobileDesktopState(mobileDesktopStateRoute.projectId));
+        return;
+      }
+
+      const mobileDesktopActionRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/desktop\/action$/);
+      if (mobileDesktopActionRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          const result = await operatorService.dispatchMobileDesktopAction(
+            mobileDesktopActionRoute.projectId,
+            body.action ?? body,
+            { deviceId: mobileSession.device.id, token: mobileToken }
+          );
+          sendJson(response, 200, { ok: true, ...result });
+        } catch (err) {
+          sendError(response, err.code === "MOBILE_CONTROL_DISABLED" ? 403 : 400, err.message);
+        }
+        return;
+      }
+
+      const mobileControlStateRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/control\/state$/);
+      if (mobileControlStateRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, await operatorService.getMobileControlState(mobileControlStateRoute.projectId));
+        return;
+      }
+
+      const mobileControlActionRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/control\/action$/);
+      if (mobileControlActionRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          const result = await operatorService.dispatchMobileControlAction(
+            mobileControlActionRoute.projectId,
+            body.action ?? body,
+            { deviceId: mobileSession.device.id, token: mobileToken }
+          );
+          sendJson(response, 200, { ok: true, ...result });
+        } catch (err) {
+          sendError(response, err.code === "MOBILE_CONTROL_DISABLED" ? 403 : 400, err.message);
+        }
+        return;
+      }
+
+      const mobileBrowserTabsRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/browser\/tabs$/);
+      if (mobileBrowserTabsRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, await operatorService.getMobileBrowserTabs(mobileBrowserTabsRoute.projectId));
+        return;
+      }
+
+      const mobileBrowserTabsActionRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/browser\/tabs\/action$/);
+      if (mobileBrowserTabsActionRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          const result = await operatorService.dispatchMobileBrowserTabAction(
+            mobileBrowserTabsActionRoute.projectId,
+            body.action ?? body,
+            { deviceId: mobileSession.device.id, token: mobileToken }
+          );
+          sendJson(response, 200, { ok: true, ...result });
+        } catch (err) {
+          sendError(response, err.code === "MOBILE_CONTROL_DISABLED" ? 403 : 400, err.message);
+        }
+        return;
+      }
+
+      // ── Connectors ───────────────────────────────────────────────────────────
+      if (pathname === "/api/mobile/connectors" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, { connectors: operatorService.listConnectors() });
+        return;
+      }
+      if (pathname === "/api/mobile/connectors" && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 201, {
+            connector: await operatorService.addConnector({
+              ...(body.connector ?? body),
+              source: "mobile_configured"
+            })
+          });
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+
+      const connectorRoute = matchRoute(pathname, /^\/api\/mobile\/connectors\/(?<connectorId>[^/]+)$/);
+      if (connectorRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        try {
+          sendJson(response, 200, operatorService.getConnector(connectorRoute.connectorId));
+        } catch (err) {
+          sendError(response, 404, err.message);
+        }
+        return;
+      }
+
+      if (pathname === "/api/mobile/connectors/email_draft/drafts" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, { drafts: await operatorService.listConnectorDrafts() });
+        return;
+      }
+
+      if (pathname === "/api/mobile/connectors/email_draft/draft" && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          const result = await operatorService.draftEmailViaConnector({
+            to: body.to,
+            subject: body.subject,
+            body: body.body,
+            runId: body.runId ?? null,
+            requestedBy: mobileSession?.device?.id ?? null
+          });
+          sendJson(response, 200, { ok: true, ...result });
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
 
       if (pathname === "/api/mobile/status" && request.method === "GET") {
         if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
@@ -1007,6 +1382,21 @@ export async function createOperatorServer({
         return;
       }
 
+      const llmInlineResolveRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/llm-inline-resolve$/);
+      if (llmInlineResolveRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        const rawText = String(body?.text ?? "");
+        const contextType = String(body?.contextType ?? "type_text");
+        try {
+          const result = await operatorService.resolveLlmInlineText(llmInlineResolveRoute.projectId, rawText, contextType);
+          sendJson(response, 200, result);
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+
       // ─────────────────────────────────────────────────────────────────
 
       const projectRoute = matchRoute(pathname, /^\/api\/projects\/(?<projectId>[^/]+)$/);
@@ -1023,7 +1413,9 @@ export async function createOperatorServer({
 
       const runRoute = matchRoute(pathname, /^\/api\/runs\/(?<runId>[^/]+)$/);
       if (runRoute && request.method === "GET") {
-        const detail = await operatorService.getRunDetail(runRoute.runId);
+        const detail = await operatorService.getRunDetail(runRoute.runId, {
+          locale: url.searchParams.get("locale")
+        });
         if (!detail) {
           sendError(response, 404, "Run not found");
           return;
@@ -1152,8 +1544,16 @@ export async function createOperatorServer({
         sendError(response, 404, "Route not found");
       }
     } catch (error) {
+      if (error.code === "PAYLOAD_TOO_LARGE") {
+        sendError(response, 413, "Payload Too Large");
+        return;
+      }
+      if (error.code === "INVALID_JSON") {
+        sendError(response, 400, "Invalid JSON in request body");
+        return;
+      }
       console.error(`[operator-server] ${error.message}`);
-      sendError(response, 500, error.message, error.stack);
+      sendError(response, 500, error.message, shouldExposeDebugDetails() ? error.stack : null);
     }
   };
 
@@ -1163,7 +1563,10 @@ export async function createOperatorServer({
 
   // Default: bind on all interfaces so mobile can connect without config.
   // Set COWORK_BIND_HOST=127.0.0.1 to restrict to localhost only.
-  const bindHost = process.env.COWORK_BIND_HOST ?? "0.0.0.0";
+  // Set COWORK_LAN=1 to force LAN exposure even if a shell sets COWORK_BIND_HOST.
+  const bindHost = process.env.COWORK_LAN === "1"
+    ? "0.0.0.0"
+    : (process.env.COWORK_BIND_HOST ?? "0.0.0.0");
   await new Promise((resolve) => server.listen(port, bindHost, resolve));
   attachMobileTerminalWs(server, { validateSession: (token) => operatorService.validateMobileSession(token) });
   const address = server.address();
@@ -1188,14 +1591,14 @@ export async function createOperatorServer({
     lanUrl: `${scheme}://${serverInfo.lanIp}:${actualPort}`,
     tls: Boolean(tlsCredentials),
     operatorService,
-    async close() {
+    async close({ timeoutMs = 0 } = {}) {
       operatorService.off("state.changed", handleStateChanged);
       for (const response of eventSubscribers) {
         response.end();
       }
       eventSubscribers.clear();
       await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-      await operatorService.close();
+      await operatorService.close({ timeoutMs });
     }
   };
 }

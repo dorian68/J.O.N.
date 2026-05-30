@@ -12,7 +12,19 @@
   <link rel="manifest" href="manifest.json" />
 </head>
 <body>
-  <div id="jon-mobile-root"></div>
+  <div id="jon-mobile-root">
+    <div class="mobile-boot-fallback">
+      <strong>JON Mobile</strong>
+      <span>Chargement...</span>
+      <small>Si cet ecran reste affiche, recharge la page ou ouvre le lien dans Chrome/Safari.</small>
+    </div>
+  </div>
+  <noscript>
+    <div class="mobile-boot-fallback">
+      <strong>JavaScript requis</strong>
+      <span>Active JavaScript pour utiliser JON Mobile.</span>
+    </div>
+  </noscript>
   <!-- Self-contained bundle (React bundled locally, no CDN dependency) -->
   <script defer src="bundle.js"></script>
 </body>

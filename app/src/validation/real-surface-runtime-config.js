@@ -98,8 +98,8 @@ function normalizeResearchTarget(target, index) {
 }
 
 function normalizeWindowMatch(windowMatch) {
-  if (!isObject(windowMatch)) {
-    throw new Error("computer.windowMatch must be an object.");
+  if (!windowMatch || !isObject(windowMatch)) {
+    return null;
   }
 
   const normalized = {
@@ -111,7 +111,7 @@ function normalizeWindowMatch(windowMatch) {
   };
 
   if (!normalized.handleEquals && !normalized.titleEquals && !normalized.titleIncludes && !normalized.titlePattern) {
-    throw new Error("computer.windowMatch must define handleEquals, titleEquals, titleIncludes, or titlePattern.");
+    return null;
   }
 
   return normalized;
@@ -144,7 +144,7 @@ function normalizeRuntimeConfig(rawConfig = {}) {
       ? {
         mode: computerMode,
         mission: String(rawConfig.computer?.mission ?? DEFAULT_REAL_WINDOW_MISSION).trim() || DEFAULT_REAL_WINDOW_MISSION,
-        windowMatch: normalizeWindowMatch(rawConfig.computer?.windowMatch ?? {}),
+        windowMatch: normalizeWindowMatch(rawConfig.computer?.windowMatch ?? null),
         expectedTitle: String(rawConfig.computer?.expectedTitle ?? "").trim() || null
       }
       : {
@@ -189,7 +189,7 @@ export function buildResearchScenarioDefinition({ fixtureManifest, runtimeConfig
     }
     return {
       mode: "allowlisted_real_web",
-      mission: research.mission,
+      mission: research.mission ?? DEFAULT_REAL_WEB_RESEARCH_MISSION,
       allowlistedDomains: uniqueStrings(research.targets.map((target) => hostnameFor(target.url))),
       targets: research.targets,
       sourceTrustClassification: "allowlisted_real_web",
@@ -199,7 +199,7 @@ export function buildResearchScenarioDefinition({ fixtureManifest, runtimeConfig
 
   return {
     mode: "controlled_fixture",
-    mission: research.mission,
+    mission: research.mission ?? DEFAULT_RESEARCH_MISSION,
     allowlistedDomains: uniqueStrings([hostnameFor(fixtureManifest.baseUrl)]),
     hubUrl: fixtureManifest.hub,
     linkSpecs: FIXTURE_LINK_SPECS,
@@ -260,7 +260,7 @@ export function buildComputerObservationScenarioDefinition({ runtimeConfig }) {
   if (computer.mode === "real_local_window") {
     return {
       mode: "real_local_window",
-      mission: computer.mission,
+      mission: computer.mission ?? DEFAULT_REAL_WINDOW_MISSION,
       windowMatch: computer.windowMatch,
       surfaceClassification: "real_local_window",
       evidenceSensitivity: "real_local_window",
@@ -270,7 +270,7 @@ export function buildComputerObservationScenarioDefinition({ runtimeConfig }) {
 
   return {
     mode: "controlled_fixture_window",
-    mission: computer.mission,
+    mission: computer.mission ?? DEFAULT_FIXTURE_COMPUTER_MISSION,
     windowMatch: {
       titleEquals: "Controlled Browser Fixture Window"
     },

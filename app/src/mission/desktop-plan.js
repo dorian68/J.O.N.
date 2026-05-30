@@ -246,12 +246,16 @@ function selectApplication(mission, applications = [], preferredApplicationId = 
 function extractTextToType(mission) {
   const text = String(mission ?? "");
   const patterns = [
-    /\b(?:write|type|enter)\b\s+["“]?(.+?)["”]?(?:\s+(?:in|into|dans|sur)\b|[.?!]|$)/i,
-    /\b(?:écris|ecris|tape|saisis)\b\s+["“]?(.+?)["”]?(?:\s+(?:dans|sur|in|into)\b|[.?!]|$)/i
+    /\b(?:write|type|enter)\b\s+['"“”‘’](.+?)['"“”‘’]/i,
+    /\b(?:écris|ecris|tape|saisis)\b\s+['"“”‘’](.+?)['"“”‘’]/i,
+    /\b(?:write|type|enter)\b\s+(.+?)(?:\s+(?:in|into|dans|sur)\b|,\s*(?:then|and|puis|prends|capture|take)\b|[.?!]|$)/i,
+    /\b(?:écris|ecris|tape|saisis)\b\s+(.+?)(?:\s+(?:dans|sur|in|into)\b|,\s*(?:puis|et|prends|capture|take)\b|[.?!]|$)/i
   ];
   for (const pattern of patterns) {
     const match = text.match(pattern);
-    const candidate = String(match?.[1] ?? "").trim();
+    const candidate = String(match?.[1] ?? "")
+      .replace(/^['"“”‘’]+|['"“”‘’]+$/g, "")
+      .trim();
     if (candidate) {
       return candidate;
     }

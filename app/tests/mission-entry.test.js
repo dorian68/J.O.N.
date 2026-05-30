@@ -74,7 +74,9 @@ export async function run() {
   assert.equal(upworkDraft.parameters.browserLaunch.searchUrl.includes("google.com/search"), true);
   assert.equal(upworkDraft.parameters.browserLaunch.searchUrl.includes("Upwork"), true);
   assert.equal(upworkDraft.parameters.browserLaunch.searchUrl.includes("Excel"), true);
-  assert.equal(upworkDraft.parameters.computerAction.type, "launch_browser_search");
+  assert.equal(upworkDraft.parameters.computerAction.type, "browser_autonomy");
+  assert.equal(upworkDraft.parameters.browserAutonomy.visible, true);
+  assert.equal(upworkDraft.parameters.browserAutonomy.mode, "coworker_browser_loop");
 
   const linkedInDraft = normalizeMissionDraft({
     objective: "Open LinkedIn and list 3 data analyst jobs.",
@@ -89,7 +91,8 @@ export async function run() {
   assert.equal(linkedInDraft.parameters.browserLaunch.targetSite, "linkedin.com");
   assert.equal(linkedInDraft.parameters.browserLaunch.resultType, "jobs");
   assert.equal(linkedInDraft.parameters.browserLaunch.searchUrl.includes("site%3Alinkedin.com"), true);
-  assert.equal(linkedInDraft.parameters.computerAction.type, "launch_browser_search");
+  assert.equal(linkedInDraft.parameters.computerAction.type, "browser_autonomy");
+  assert.equal(linkedInDraft.parameters.browserAutonomy.allowlistedHosts.includes("linkedin.com"), true);
 
   const applicationDraft = normalizeMissionDraft({
     objective: "Open my note editor.",
@@ -140,13 +143,49 @@ export async function run() {
   }, contract);
   assert.equal(upworkSpec.mode, "computer");
   assert.equal(upworkSpec.parameters.browserLaunch.browserId, "chrome");
-  assert.equal(upworkSpec.parameters.computerAction.type, "launch_browser_search");
+  assert.equal(upworkSpec.parameters.computerAction.type, "browser_autonomy");
+  assert.equal(upworkSpec.parameters.browserAutonomy.visible, true);
   assert.equal(buildMissionStatement(upworkSpec).includes("Browser target site if needed: Upwork"), true);
   assert.equal(buildMissionStatement(upworkSpec).includes("Requested browser result type if needed: jobs"), true);
   assert.equal(buildMissionStatement(upworkSpec).includes("Requested browser result count if needed: 5"), true);
+  assert.equal(buildMissionStatement(upworkSpec).includes("Browser autonomy mode if needed: coworker_browser_loop"), true);
+
+  const upworkProfileSpec = normalizeMissionSpec({
+    objective: "Accéder à mon compte Upwork, extraire ma description de profil et la sauvegarder dans un fichier texte.",
+    deliverable: "Fichier texte contenant la description extraite.",
+    parameters: {
+      website: "Upwork",
+      browser: "Chrome"
+    }
+  }, contract);
+  assert.equal(upworkProfileSpec.parameters.computerAction.type, "browser_autonomy");
+  assert.equal(upworkProfileSpec.parameters.browserAutonomy.startUrl, "https://www.upwork.com/freelancers/~me");
+  assert.equal(upworkProfileSpec.parameters.browserAutonomy.allowlistedHosts.includes("upwork.com"), true);
 
   const appStatement = buildMissionStatement(applicationDraft, contract.modes.find((mode) => mode.id === "computer"));
   assert.equal(appStatement.includes("Preferred application if needed: obsidian"), true);
+
+  const harnessSpec = normalizeMissionSpec({
+    objective: "Open Notepad, write hello, and capture proof.",
+    benchmarkId: 1,
+    benchmarkTitle: "Notepad harness",
+    parameters: {
+      approvalPolicy: {
+        mode: "harness_mode",
+        allowedCategories: ["local_app_launch"],
+        allowedPrimitives: ["launch_application"]
+      },
+      acceptanceHarness: {
+        expectedTools: ["desktop.launchApplication"],
+        requiredApprovals: ["local_app_launch"],
+        maxRetries: 2
+      }
+    }
+  }, contract);
+  assert.equal(harnessSpec.parameters.approvalPolicy.mode, "harness_mode");
+  assert.equal(harnessSpec.parameters.approvalPolicy.benchmarkId, 1);
+  assert.deepEqual(harnessSpec.parameters.approvalPolicy.allowedPrimitives, ["launch_application"]);
+  assert.equal(harnessSpec.parameters.acceptanceHarness.maxRetries, 2);
 
   const formSpec = normalizeMissionSpec({
     mode: "form",

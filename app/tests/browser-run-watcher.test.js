@@ -17,6 +17,7 @@ class FakeBrowserSurface {
       blocker: { blocked: false, reason: null }
     };
     this.closed = false;
+    this.openSessionCalls = [];
   }
 
   mutate(patch) {
@@ -66,12 +67,13 @@ class FakeBrowserSurface {
     ].join("|")).toString("base64");
   }
 
-  async openBrowserSession() {
+  async openBrowserSession(options = {}) {
+    this.openSessionCalls.push(options);
     return {
       sessionId: "browser_session_fake",
       targetId: this.activeTargetId,
-      headless: true,
-      allowlistedHosts: ["fixture.local"]
+      headless: options.headless ?? true,
+      allowlistedHosts: options.allowlistedHosts ?? ["fixture.local"]
     };
   }
 
@@ -233,6 +235,7 @@ export async function run() {
     startUrl: "http://fixture.local/outcome-status.html",
     allowlistedHosts: ["fixture.local"],
     browserWatchIntervalMs: 0,
+    headless: false,
     browserVisionPolicy: {
       defaultDetail: "low",
       interactionDetail: "high",
@@ -266,7 +269,12 @@ export async function run() {
   assert.equal(result.multimodalFrames.every((frame) => frame.hasScreenshot), true);
   assert.equal(result.multimodalFrames.some((frame) => frame.visionDetail === "low"), true);
   assert.equal(result.multimodalFrames.some((frame) => frame.visionDetail === "high"), true);
+  assert.equal(operatorEvents.some((event) => event.type === "browser.plan_generated"), true);
+  assert.equal(operatorEvents.some((event) => event.type === "browser.step_planned" && event.payload?.step?.action === "navigate"), true);
+  assert.equal(operatorEvents.some((event) => event.type === "browser.step_running" && event.payload?.step?.action === "read_dom"), true);
+  assert.equal(operatorEvents.some((event) => event.type === "browser.step_succeeded" && event.payload?.step?.action === "capture_evidence"), true);
   assert.equal(operatorEvents.some((event) => event.type === "browser.watch_started"), true);
   assert.equal(operatorEvents.some((event) => event.type === "browser.watch_changed"), true);
+  assert.equal(operatorBrowser.openSessionCalls.at(-1)?.headless, false);
   assert.equal(operatorBrowser.closed, true);
 }

@@ -11,7 +11,7 @@
     "ui:build": "vite build --config ui/vite.config.mjs",
     "ui:build:mobile": "vite build --config ui/mobile/vite.mobile.config.mjs",
     "test": "node src/scripts/run-tests.js",
-    "preoperator:server": "npm run ui:build --silent",
+    "preoperator:server": "npm run ui:build --silent && npm run ui:build:mobile --silent",
     "fixtures:server": "node src/scripts/start-fixture-server.js",
     "operator:server": "node src/scripts/start-operator-server.js",
     "bench:browser": "node src/scripts/run-browser-benchmarks.js",

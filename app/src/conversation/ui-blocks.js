@@ -6,9 +6,16 @@ const UI_BLOCK_TYPES = Object.freeze([
   "chart",
   "reportPreview",
   "artifactCard",
+  "artifactPreview",
   "approvalCard",
   "actionPlan",
-  "evidenceGallery"
+  "evidenceGallery",
+  "resultSummary",
+  "proofCard",
+  "browserResultList",
+  "terminalPromptCard",
+  "errorRecoveryCard",
+  "nextStepCard"
 ]);
 
 function cleanText(value, maxLength = 1200) {
@@ -173,6 +180,95 @@ function normalizeEvidenceGalleryBlock(block, index) {
   };
 }
 
+function normalizeResultSummaryBlock(block, index) {
+  return {
+    id: normalizeBlockId(block, index),
+    type: "resultSummary",
+    title: cleanText(block.title, 120) || "Résumé du résultat",
+    status: cleanText(block.status, 60),
+    verdict: cleanText(block.verdict, 60),
+    objectiveSatisfied: block.objectiveSatisfied === true,
+    summary: cleanText(block.summary, 1200),
+    bullets: cleanList(block.bullets, 8, 260)
+  };
+}
+
+function normalizeProofCardBlock(block, index) {
+  return {
+    id: normalizeBlockId(block, index),
+    type: "proofCard",
+    title: cleanText(block.title, 120) || "Preuve",
+    label: cleanText(block.label, 160),
+    description: cleanText(block.description, 500),
+    href: cleanText(block.href, 300),
+    evidenceId: cleanText(block.evidenceId, 120),
+    kind: cleanText(block.kind, 60)
+  };
+}
+
+function normalizeBrowserResultListBlock(block, index) {
+  const results = Array.isArray(block.results) ? block.results : [];
+  return {
+    id: normalizeBlockId(block, index),
+    type: "browserResultList",
+    title: cleanText(block.title, 120) || "Résultats web",
+    results: results.slice(0, 12).map((result) => {
+      const entry = cleanObject(result);
+      return {
+        title: cleanText(entry.title, 180),
+        url: cleanText(entry.url ?? entry.href, 300),
+        snippet: cleanText(entry.snippet ?? entry.description, 500),
+        source: cleanText(entry.source ?? entry.domain, 120)
+      };
+    }).filter((result) => result.title || result.url || result.snippet)
+  };
+}
+
+function normalizeTerminalPromptCardBlock(block, index) {
+  return {
+    id: normalizeBlockId(block, index),
+    type: "terminalPromptCard",
+    title: cleanText(block.title, 120) || "Terminal en attente",
+    terminalId: cleanText(block.terminalId, 120),
+    prompt: cleanText(block.prompt, 800),
+    suggestedReply: cleanText(block.suggestedReply, 500),
+    requiresApproval: block.requiresApproval !== false
+  };
+}
+
+function normalizeArtifactPreviewBlock(block, index) {
+  return {
+    id: normalizeBlockId(block, index),
+    type: "artifactPreview",
+    title: cleanText(block.title, 120) || "Artefact",
+    description: cleanText(block.description, 500),
+    artifactId: cleanText(block.artifactId, 120),
+    href: cleanText(block.href, 300),
+    format: cleanText(block.format, 60)
+  };
+}
+
+function normalizeErrorRecoveryCardBlock(block, index) {
+  return {
+    id: normalizeBlockId(block, index),
+    type: "errorRecoveryCard",
+    title: cleanText(block.title, 120) || "Récupération",
+    blocker: cleanText(block.blocker, 700),
+    recovery: cleanText(block.recovery, 700),
+    retryable: Boolean(block.retryable)
+  };
+}
+
+function normalizeNextStepCardBlock(block, index) {
+  return {
+    id: normalizeBlockId(block, index),
+    type: "nextStepCard",
+    title: cleanText(block.title, 120) || "Prochaine action",
+    action: cleanText(block.action, 700),
+    reason: cleanText(block.reason, 500)
+  };
+}
+
 export function normalizeUiBlock(block, index = 0) {
   const candidate = cleanObject(block);
   const type = cleanText(candidate.type, 60);
@@ -189,12 +285,26 @@ export function normalizeUiBlock(block, index = 0) {
       return normalizeReportPreviewBlock(candidate, index);
     case "artifactCard":
       return normalizeArtifactCardBlock(candidate, index);
+    case "artifactPreview":
+      return normalizeArtifactPreviewBlock(candidate, index);
     case "approvalCard":
       return normalizeApprovalCardBlock(candidate, index);
     case "actionPlan":
       return normalizeActionPlanBlock(candidate, index);
     case "evidenceGallery":
       return normalizeEvidenceGalleryBlock(candidate, index);
+    case "resultSummary":
+      return normalizeResultSummaryBlock(candidate, index);
+    case "proofCard":
+      return normalizeProofCardBlock(candidate, index);
+    case "browserResultList":
+      return normalizeBrowserResultListBlock(candidate, index);
+    case "terminalPromptCard":
+      return normalizeTerminalPromptCardBlock(candidate, index);
+    case "errorRecoveryCard":
+      return normalizeErrorRecoveryCardBlock(candidate, index);
+    case "nextStepCard":
+      return normalizeNextStepCardBlock(candidate, index);
     case "text":
     default:
       return normalizeTextBlock({ ...candidate, type: "text" }, index);

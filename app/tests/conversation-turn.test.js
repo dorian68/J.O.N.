@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { FakeWindowProvider } from "../src/computer/fake-window-provider.js";
 import {
   buildDeterministicConversationTurn,
@@ -242,9 +245,20 @@ export async function run() {
   assert.equal(blocks[1].type, "folderList");
   assert.equal(blocks[1].folders[0].name, "Project");
 
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cowork-conversation-turn-"));
   const server = await createOperatorServer({
     port: 0,
     operatorServiceOptions: {
+      dbPath: path.join(tempRoot, "conversation.sqlite"),
+      env: {
+        ...process.env,
+        COWORK_LLM_RUNTIME_PROFILE: "test",
+        COWORK_LLM_PRODUCTION_STRICT: "0",
+        COWORK_LLM_PROVIDER_MODE: "mock_offline",
+        COWORK_LLM_ALLOW_MOCK_FALLBACK: "1",
+        COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK: "1",
+        COWORK_LLM_REQUIRE_OS_SECRET_STORE: "0"
+      },
       realSurfaceRuntimeConfig: FIXTURE_ONLY_REAL_SURFACES,
       computerProvider: new FakeWindowProvider([], {
         browsers: [
@@ -320,5 +334,44 @@ export async function run() {
     assert.equal(Boolean(completed?.payload?.turn?.reply), true);
   } finally {
     await server.close();
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  }
+
+  const unavailableTempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cowork-conversation-unavailable-"));
+  const unavailableServer = await createOperatorServer({
+    port: 0,
+    operatorServiceOptions: {
+      dbPath: path.join(unavailableTempRoot, "conversation.sqlite"),
+      realSurfaceRuntimeConfig: FIXTURE_ONLY_REAL_SURFACES,
+      computerProvider: new FakeWindowProvider([], {
+        browsers: [{ id: "chrome", label: "Google Chrome" }]
+      }),
+      llmGateway: {
+        getStatus: () => ({ deterministicFallback: false }),
+        generateStructured: async () => {
+          throw Object.assign(new Error("fetch failed"), {
+            category: "provider_unavailable"
+          });
+        }
+      }
+    }
+  });
+  try {
+    const dashboard = await fetchJson(unavailableServer.baseUrl, "/api/dashboard");
+    const projectId = dashboard.projects[0].id;
+    const blocked = await fetchJson(unavailableServer.baseUrl, `/api/projects/${projectId}/conversation/turn`, {
+      method: "POST",
+      body: JSON.stringify({
+        message: "Ouvre Chrome et cherche RemoteOK."
+      })
+    });
+    assert.equal(blocked.turn.action, "answer_directly");
+    assert.equal(blocked.turn.generationMode, "degraded_blocked");
+    assert.match(blocked.turn.reply, /bloqué côté modèle IA/);
+    assert.equal(blocked.preflight, null);
+    assert.equal(blocked.turn.uiBlocks.some((block) => block.type === "errorRecoveryCard"), true);
+  } finally {
+    await unavailableServer.close();
+    await fs.rm(unavailableTempRoot, { recursive: true, force: true });
   }
 }

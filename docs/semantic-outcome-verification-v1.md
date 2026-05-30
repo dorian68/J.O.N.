@@ -1,126 +1,112 @@
-# Semantic Outcome Verification — v1
+# Semantic Outcome Verification - v1
 
-## The Three Levels of Completion
+## Three Different Things
 
-There are three distinct levels, and only the third is sufficient for a completed run:
-
-| Level | Meaning | Sufficient? |
+| Level | Meaning | Can complete run? |
 |---|---|---|
-| **step completed** | Primitive executed without runtime error (typeText returned success) | NO |
-| **action verified** | Post-action perception delta confirms the action had visible effect | NO |
-| **user objective satisfied** | The actual goal from the user's prompt is demonstrably achieved | YES — required |
+| Step completed | A primitive returned without throwing. | No |
+| Action verified | Post-action observation supports the expected local effect. | No |
+| User objective satisfied | Mission-level verifier confirms objective, proof, alignment, artifacts, and blockers. | Yes |
 
-**Example:** mission = "Open Notepad and write hello".  
-- step completed = `typeText("hello")` returned `{ success: true }` — not enough.  
-- action verified = screenshot diff shows characters appeared in window — not enough alone.  
-- objective satisfied = screenshot + UIA tree confirm "hello" is in a Notepad body, `verifiedByOutcomes=true` — only then the run may be COMPLETED.
+## Hard Contract
 
----
+`run.status = "completed"` is allowed only when:
 
-## Completion Contract
+- `SemanticOutcomeVerifier.verify().verifiedByOutcomes === true`
+- required evidence exists
+- requested screenshots/captures exist
+- evidence aligns with the requested app/site/surface
+- requested extraction/artifacts exist
+- no unrecovered critical action failed
+- no unresolved browser blocker remains
+- no terminal is waiting/blocked/error
+- no approval remains unresolved
+
+## Critical Checks
+
+Critical checks now include:
+
+- `work_executed`
+- `required_evidence_collected`
+- `required_screenshot_captured`
+- `desktop_screenshot_captured`
+- `no_critical_failures`
+- `browser_fully_completed`
+- `browser_no_blockers`
+- `browser_search_executed`
+- `browser_requested_target_observed`
+- `launch_primitive_executed`
+- `type_primitive_executed`
+- `requested_text_verified`
+- `extraction_delivered`
+- `required_artifact_exists`
+- `evidence_aligned_with_mission`
+- `no_failure_cascade`
+- `no_terminal_blocker`
+
+These checks are not advisory. If any fails, `verifiedByOutcomes=false` and the run must not complete.
+
+## Failure Cascade Check — Adaptive Threshold (updated 2026-05-13)
+
+The `no_failure_cascade` check was previously hardcoded to fail when `consecutiveFailures >= 3`. This created a bias: short missions (3-5 steps) were judged too harshly; long missions (20+ steps) were too lenient.
+
+**New adaptive logic:**
 
 ```
-run.status = "completed"  ←→  verifiedByOutcomes === true
-run.status = "failed"     ←→  verifiedByOutcomes === false  (any critical check blocked)
+cascadeThreshold = max(3, ceil(totalTrackedSteps × 0.25))
 ```
 
-This is a hard rule enforced in `prototype-agent.js`:
-- Desktop path (line ~3235): `if (!desktopSemanticVerification.verifiedByOutcomes) throw Error(...)`
-- Browser path (line ~1928): `finalStatus = verifiedByOutcomes ? COMPLETED : FAILED`
+Fails if:
+- `consecutiveFailures >= cascadeThreshold` (25% cascade ratio on any size mission)
+- OR: `totalSteps >= 4 AND consecutiveFailures >= 3 AND consecutiveFailures >= 50% of total steps`
 
-A run must never be marked COMPLETED if `SemanticOutcomeVerifier.verify()` returns `verifiedByOutcomes: false`.
+This means:
+- 4-step mission with 3 consecutive failures → fails (75% cascade rate)
+- 20-step mission with 3 consecutive failures → threshold is 5 → passes if isolated
+- 20-step mission with 6+ consecutive failures → fails (30%+ cascade rate)
 
----
+## Evidence Alignment
 
-## Alternative Final Statuses
+`EvidenceAlignmentGuard` compares mission target hints against evidence metadata:
 
-| Status | Condition | Description |
-|---|---|---|
-| `completed` | `verifiedByOutcomes=true` | Objective confirmed achieved |
-| `failed` | Critical check failed, `verifiedByOutcomes=false` | Irrecoverable failure or no work done |
-| `blocked` | `consecutiveFailures >= 3` OR unresolved browser blocker | Loop halted by repeated failure cascade |
-| `needs_user` | `requiresUserInput=true` OR pending approval | Agent cannot proceed without human decision |
-| `partial` | `verificationVerdict="partial"` (advisory failures > 40% of checks) | Some work done, confidence low — user must confirm |
+- explicit target domains from URL/domain text
+- target apps such as Notepad, Edge, Chrome, Firefox, terminal
+- evidence URL/title/linked surface/storage path/metadata
+- browser final URL/title
+- desktop active window
 
-Note: `partial` does NOT map to `completed`. A partial verdict → run is marked `failed` or left for user review. Only `pass` verdict with `verifiedByOutcomes=true` → COMPLETED.
+Off-target evidence produces a failed `evidence_aligned_with_mission` check. Example: a mission targeting `nodejs.org` cannot complete with a screenshot from `example.com`.
 
----
+## Output Shape
 
-## OutcomeVerificationResult — Full Structure
-
-Returned by `SemanticOutcomeVerifier.verify()`:
+The verifier returns:
 
 ```js
 {
-  verifiedByOutcomes: boolean,        // PRIMARY GATE: must be true for COMPLETED
-  objectiveSatisfied: boolean,        // same value as verifiedByOutcomes (v1)
-  verificationVerdict: "pass" | "partial" | "fail",
-  confidence: "high" | "medium" | "low",
-
-  evidenceUsed: string[],             // IDs of evidence records used in verification
-  missingEvidence: string[],          // labels of checks that required evidence but had none
-  satisfiedOutcomes: string[],        // labels of passing checks
-  unsatisfiedOutcomes: string[],      // labels of failing checks
-
-  failureReason: string | null,       // joined label string of all failed checks
-  nextBestAction: string | null,      // suggested recovery string for operator/user
-  requiresUserInput: boolean,         // if true, agent should pause and ask user
-  userQuestion: string | null,        // question to surface if requiresUserInput
-
-  checks: Array<{                     // ordered list of all checks evaluated
-    id: string,                       // machine ID (e.g. "work_executed")
-    label: string,                    // human description
-    passed: boolean,
-    status: "pass" | "fail",
-    detail: object                    // check-specific data (counts, lists)
-  }>
+  verifiedByOutcomes,
+  objectiveSatisfied,
+  verificationVerdict,
+  confidence,
+  evidenceUsed,
+  missingEvidence,
+  satisfiedOutcomes,
+  unsatisfiedOutcomes,
+  failureReason,
+  nextBestAction,
+  requiresUserInput,
+  userQuestion,
+  criticalBlockers,
+  checks
 }
 ```
 
----
+## Implementation
 
-## LLM vs Deterministic
+- `app/src/runtime/semantic-outcome-verifier.js`
+- `app/src/runtime/evidence-alignment-guard.js`
+- central false-completion guard: `guardCompletedRunPatch` in `app/src/runtime/prototype-agent.js`
+- tests: `semantic-outcome-verifier.test.js`, `evidence-alignment-guard.test.js`, `run-completion-guard.test.js`
 
-**SemanticOutcomeVerifier v1 is fully deterministic — no LLM call.**
+The legacy research and form-preparation paths now record `semanticVerification` before they can complete. The runtime also has a central guard: if any path attempts `completed` without `semanticVerification.verifiedByOutcomes === true`, the patch is converted to `failed_false_completion_guard`.
 
-| Responsibility | Mechanism |
-|---|---|
-| Check: work was executed | `actionLog.filter(status=completed).length + browserResult.stepResults.length > 0` |
-| Check: evidence collected | `evidence.length + browserResult.evidence.length > 0` |
-| Check: no critical failures | `actionLog.filter(status=failed && !recoveryAttempted).length === 0` |
-| Check: browser fully completed | `browserResult.status === "completed"` |
-| Check: keyword-primitive match | regex on `mission` text vs `completedPrimitives[]` |
-| Check: browser blocker | `browserResult.blockers.filter(!resolved).length === 0` |
-| Verdict aggregation | rule: criticalBlockers.length === 0 → verifiedByOutcomes |
-
-LLM's role in the surrounding loop:
-- `decideNextStep`: LLM selects next action
-- `verifyOutcome` (per-step): LLM (or perception delta) confirms step effect
-- `recoverOrReplan`: LLM generates revised plan
-
-SemanticOutcomeVerifier sits **after** the loop, as a gate, not as a reasoning step.  
-A future v2 could pass a structured payload to the LLM for edge-case objectives, but v1 stays deterministic for auditability and zero-token cost.
-
----
-
-## Critical vs Advisory Checks
-
-```
-CRITICAL_CHECK_IDS = {
-  "work_executed",         // nothing done → cannot be complete
-  "browser_fully_completed", // browser reported partial/failed
-  "browser_no_blockers",   // unresolved blockers remain
-  "no_critical_failures",  // unrecovered failed primitives
-  "no_failure_cascade"     // ≥3 consecutive failures in tracker
-}
-```
-
-**Critical check failure** → `verifiedByOutcomes=false` → run MUST NOT be COMPLETED.
-
-**Advisory checks** (all others: `launch_primitive_executed`, `type_primitive_executed`, `screenshot_captured`, `browser_search_executed`, `browser_screenshot_captured`, `extraction_delivered`, `evidence_collected`):
-- Fired only when mission text matches a keyword pattern
-- Failure lowers `confidence` from `high` → `medium` → `low`
-- Enough advisory failures (>40% of total checks) → `verificationVerdict="partial"`
-- Do NOT block `verifiedByOutcomes`
-
-Advisory check failures produce a `nextBestAction` hint in the result — surfaced to the operator for transparency.
+Known gap: the verifier is still heuristic. It blocks many false completions, but it is not a substitute for deeper visual/DOM semantic understanding on every arbitrary desktop/browser surface.

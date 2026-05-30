@@ -14,6 +14,7 @@ export default defineConfig({
   build: {
     outDir: __dirname,
     emptyOutDir: false,
+    target: "es2018",
     minify: false,
     sourcemap: false,
     rollupOptions: {

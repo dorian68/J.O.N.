@@ -1,6 +1,7 @@
 import { DEFAULT_LLM_TIMEOUT_MS, LLM_PROVIDER_ALIAS } from "../../config.js";
 import { sanitizeForLogging } from "../../security/redaction.js";
 import { normalizeSecretValue } from "../../security/secret-normalization.js";
+import { parseJsonLoose } from "../output-recovery.js";
 
 function extractMessageContent(message) {
   if (typeof message === "string") {
@@ -203,14 +204,15 @@ export class OpenAiCompatibleProvider {
       }
 
       const content = extractMessageContent(payload?.choices?.[0]?.message);
-      let output;
-      try {
-        output = JSON.parse(content);
-      } catch {
+      const parsedOutput = parseJsonLoose(content);
+      if (!parsedOutput.ok || Array.isArray(parsedOutput.value)) {
         throw Object.assign(new Error("Provider returned a non-JSON structured output."), {
-          category: "malformed_output"
+          category: "malformed_output",
+          recoveryStrategy: parsedOutput.strategy,
+          recoveryError: parsedOutput.error
         });
       }
+      const output = parsedOutput.value;
 
       const tokenUsage = payload?.usage
         ? {
@@ -223,6 +225,8 @@ export class OpenAiCompatibleProvider {
       return {
         output,
         rawOutput: content,
+        repairedOutput: parsedOutput.repaired,
+        outputRecoveryStrategy: parsedOutput.strategy,
         providerModel,
         tokenUsage,
         estimatedCost: estimateCost(tokenUsage, this.pricing[modelAlias] ?? null)
@@ -232,6 +236,78 @@ export class OpenAiCompatibleProvider {
         throw Object.assign(new Error("Provider request timed out."), {
           category: "timeout"
         });
+      }
+      if (!error.category) {
+        throw Object.assign(new Error(sanitizeForLogging(error.message || "Provider request failed.")), {
+          category: "provider_unavailable"
+        });
+      }
+      error.message = sanitizeForLogging(error.message);
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async generateText({ messages }) {
+    const validation = this.validateConfig();
+    if (!validation.valid) {
+      throw Object.assign(new Error("OpenAI-compatible provider is not configured."), {
+        category: "auth_error",
+        issues: validation.issues
+      });
+    }
+
+    const providerModel = this.resolveModel("primary_reasoning") ?? this.resolveModel("utility_structuring");
+    if (!providerModel) {
+      throw Object.assign(new Error("No configured model for text generation."), { category: "malformed_output" });
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          [this.apiKeyHeader]: `${this.apiKeyPrefix}${this.apiKey}`,
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          model: providerModel,
+          ...(shouldSendTemperature(providerModel) ? { temperature: 0.7 } : {}),
+          messages
+        })
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw Object.assign(
+          new Error(sanitizeForLogging(payload?.error?.message ?? `Provider request failed with status ${response.status}.`)),
+          { category: categorizeProviderError(response.status), retryAfterMs: parseRetryAfterMs(response.headers) }
+        );
+      }
+
+      const text = extractMessageContent(payload?.choices?.[0]?.message);
+      const tokenUsage = payload?.usage
+        ? {
+          inputTokens: payload.usage.prompt_tokens ?? null,
+          outputTokens: payload.usage.completion_tokens ?? null,
+          totalTokens: payload.usage.total_tokens ?? null
+        }
+        : null;
+
+      return {
+        text,
+        providerModel,
+        providerAlias: this.providerAlias,
+        tokenUsage,
+        estimatedCost: estimateCost(tokenUsage, this.pricing?.primary_reasoning ?? null)
+      };
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw Object.assign(new Error("Provider request timed out."), { category: "timeout" });
       }
       if (!error.category) {
         throw Object.assign(new Error(sanitizeForLogging(error.message || "Provider request failed.")), {

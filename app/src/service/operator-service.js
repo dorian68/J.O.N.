@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import crypto from "node:crypto";
 import { EventEmitter } from "node:events";
 import {
   auditConversationTurn,
@@ -9,6 +10,8 @@ import {
 import { createFixtureServer } from "../fixtures/fixture-server.js";
 import { createPrototypeRuntime } from "../runtime/create-prototype-runtime.js";
 import { ApprovalBroker } from "../runtime/approval-broker.js";
+import { applySurfaceRouteToMission, routeMissionToSurface } from "../runtime/surface-router.js";
+import { resolveApprovalByPolicy, shouldUseInteractiveApproval } from "../policy/approval-resolution-policy.js";
 import { BenchmarkService } from "./benchmark-service.js";
 import { summarizeLlmCalls } from "./llm-analytics.js";
 import { FakeWindowProvider } from "../computer/fake-window-provider.js";
@@ -29,6 +32,7 @@ import {
 } from "../config.js";
 import { createId, nowIso } from "../utils/ids.js";
 import { buildRunReviewModel } from "./run-review-model.js";
+import { buildConversationResponsePlan } from "../conversation/conversation-response-planner.js";
 import { buildOperationalDeepReadinessReport } from "../release/operational-deep-readiness.js";
 import { ensureDir, isPathInside, removePathIfExists } from "../utils/files.js";
 import {
@@ -48,6 +52,7 @@ import {
 } from "./mission-entry.js";
 import { missionModeToScenarioType, scenarioTypeToMissionMode, validateMissionUnderstandingOutput } from "../mission/mission-understanding.js";
 import {
+  buildDeterministicConversationTurn,
   SAFE_CAPABILITY_IDS,
   validateConversationTurnOutput
 } from "../conversation/conversation-turn.js";
@@ -75,6 +80,14 @@ import {
   summarizeUserMemory,
   updateUserMemoryFromConversationTurn
 } from "../memory/user-memory.js";
+import {
+  USER_PREFERENCES_SETTING_KEY,
+  defaultUserPreferences,
+  inferUserPreferencePatchFromMessage,
+  normalizeUserPreferences,
+  summarizeUserPreferences,
+  updateUserPreferences as mergeUserPreferences
+} from "../preferences/user-preferences.js";
 import {
   applyCapabilityOverrides,
   buildCapabilityFeedbackStats,
@@ -105,6 +118,7 @@ import {
   validateStoredCapabilityCandidate
 } from "../capabilities/capability-candidate-workspace.js";
 import { buildDeterministicCapabilityDescriptionOutput } from "../llm/deterministic-fallbacks.js";
+import { ConnectorRegistry } from "../connectors/connector-registry.js";
 import {
   BUILTIN_SKILL_MANIFESTS,
   USER_SKILL_MANIFESTS_SETTING_KEY,
@@ -123,6 +137,14 @@ import {
   evaluateTerminalIntervention,
   normalizeTerminalSession
 } from "../workspace/terminal-orchestration.js";
+import {
+  buildWorkspacePlan,
+  computePlanStatus,
+  PLAN_STATUS,
+  planSummary
+} from "../workspace/workspace-plan.js";
+import { aggregatePlanState } from "../workspace/project-state-aggregator.js";
+import { WorkspaceOrchestratorLoop } from "../workspace/orchestrator-loop.js";
 import { getTokenGovernancePolicy } from "../llm/token-governance.js";
 import {
   CliTerminalSupervisor,
@@ -138,6 +160,103 @@ import { WorkspaceBrowserProvider } from "../browser/workspace-browser-provider.
 import { MobileDeviceRegistry } from "../mobile/mobile-device-registry.js";
 import { MobileGateway, MobileAuditLog } from "../mobile/mobile-gateway.js";
 import { MobileEventBuffer } from "../mobile/mobile-event-stream.js";
+import { runReflectiveRecovery, RECOVERY_ACTION } from "../recovery/reflective-recovery.js";
+import {
+  resolveInlineMissionDirectives,
+  resolveInlineTextDirectives
+} from "../mission/inline-llm-directives.js";
+
+const DESKTOP_CONTROL_ACTIONS = new Set([
+  "captureScreen",
+  "clickAt",
+  "typeText",
+  "pressKey",
+  "hotkey",
+  "scroll",
+  "focusWindow",
+  "listWindows",
+  "getWindowIcon"
+]);
+
+const MOBILE_CONTROL_ACTIONS = new Set([
+  "openSession",
+  "capture",
+  "navigate",
+  "clickAt",
+  "typeText",
+  "pressKey",
+  "scroll",
+  "back",
+  "forward",
+  "reload"
+]);
+
+const MOBILE_CONTROL_KEYS = new Set([
+  "Enter",
+  "Escape",
+  "Backspace",
+  "Delete",
+  "Tab",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown"
+]);
+
+const MOBILE_TAB_ACTIONS = new Set([
+  // Lifecycle
+  "openTab", "focusTab", "closeTab", "navigateTab", "reloadTab",
+  // Agentic observation + interaction
+  "observeTab", "screenshotTab",
+  "clickElement", "typeText", "pressKey", "scrollTab",
+  "extractText", "waitForSelector",
+  "evaluateScript", "cdpCommand"
+]);
+
+const MOBILE_CLIENT_LOG_LEVELS = new Set(["debug", "info", "warn", "error"]);
+const MOBILE_CLIENT_LOG_MAX_BATCH = 50;
+
+function redactMobileClientLogDetails(value, depth = 0) {
+  if (value == null) return null;
+  if (depth > 3) return "[depth-limit]";
+  if (typeof value === "string") {
+    return value.length > 900 ? `${value.slice(0, 900)}...[${value.length}]` : value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((entry) => redactMobileClientLogDetails(entry, depth + 1));
+  }
+  if (typeof value === "object") {
+    const out = {};
+    for (const [key, entry] of Object.entries(value).slice(0, 30)) {
+      if (/password|secret|token|authorization|cookie|credential/i.test(key)) {
+        out[key] = "[redacted]";
+      } else {
+        out[key] = redactMobileClientLogDetails(entry, depth + 1);
+      }
+    }
+    return out;
+  }
+  return String(value);
+}
+
+function normalizeMobileClientLogEntry(entry = {}) {
+  const level = MOBILE_CLIENT_LOG_LEVELS.has(entry.level) ? entry.level : "info";
+  const event = String(entry.event ?? "client.event").slice(0, 120);
+  const message = String(entry.message ?? "").slice(0, 900);
+  const clientTimestamp = typeof entry.timestamp === "string" ? entry.timestamp.slice(0, 40) : null;
+  return {
+    level,
+    event,
+    message,
+    clientTimestamp,
+    details: redactMobileClientLogDetails(entry.details ?? null)
+  };
+}
 
 function buildScenarioCatalog({ researchDefinition, computerDefinition }) {
   return [
@@ -242,6 +361,20 @@ function searchUrlFromQuery(query = "") {
     return null;
   }
   return `https://www.google.com/search?q=${encodeURIComponent(normalized)}`;
+}
+
+function normalizeBrowserUrlInput(input = "", { allowBlank = false } = {}) {
+  const raw = String(input ?? "").trim();
+  if (!raw) return allowBlank ? "about:blank" : "";
+  if (allowBlank && raw.toLowerCase() === "about:blank") return "about:blank";
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return raw;
+  if (/^(localhost|(?:\d{1,3}\.){3}\d{1,3})(?::\d+)?(?:[/?#].*)?$/i.test(raw)) {
+    return `http://${raw}`;
+  }
+  if (/^[^\s/]+\.[^\s]+(?:[/?#].*)?$/i.test(raw)) {
+    return `https://${raw}`;
+  }
+  return searchUrlFromQuery(raw) ?? raw;
 }
 
 function recommendationMissionRequest(recommendation, orchestration = {}) {
@@ -362,14 +495,29 @@ function surfaceLockForPreflight(preflight = null) {
 }
 
 function compactConversationHistory(turns = []) {
-  return turns.slice(-12).map((turn) => ({
+  return turns.slice(-8).map((turn) => ({
     role: turn.role,
     kind: turn.kind,
-    content: compactConversationMessage(turn.content).slice(0, 2000),
+    content: compactConversationMessage(turn.content).slice(0, 900),
     intentType: turn.payload?.intentType ?? null,
     action: turn.payload?.action ?? null,
     createdAt: turn.createdAt
   }));
+}
+
+function shouldAttachRecentRunContext(message = "") {
+  return /\b(continue|continuer|reprends?|resume|dernier|last|run|mission|erreur|error|crash|failed|bloqu[eé]|preuve|evidence|audit|inspecte)\b/i.test(message);
+}
+
+function isManualHandoffDoneMessage(message = "") {
+  return /\b(c['’ ]?est fait|cest fait|j['’ ]?ai fait|j ai fini|fait|termin[eé]|continue|continuer|reprends?|resume|done|completed)\b/i.test(message);
+}
+
+function missionFingerprint(value = "") {
+  return compactConversationMessage(value).toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function conversationTurnRecord({ projectId, conversationId = null, role, kind, content, payload = null, metadata = {} }) {
@@ -857,6 +1005,51 @@ function combineConversationReply({ plannerReply, capabilityText, action, genera
   return [planned, capability].filter(Boolean).join(" ");
 }
 
+function shouldBlockMissionFallback(error) {
+  return ["provider_unavailable", "timeout", "rate_limit", "circuit_open"].includes(error?.category);
+}
+
+function buildConversationPlannerFallback({ message, error, availableCliAgents = [] } = {}) {
+  const deterministic = validateConversationTurnOutput({
+    ...buildDeterministicConversationTurn({ message, availableCliAgents }),
+    _availableCliAgents: availableCliAgents
+  }, { message });
+  if (shouldBlockMissionFallback(error) && [
+    "prepare_mission_preflight",
+    "start_bounded_run_after_confirmation",
+    "launch_workspace_cli"
+  ].includes(deterministic.action)) {
+    return {
+      output: validateConversationTurnOutput({
+        intentType: "simple_conversation",
+        action: "answer_directly",
+        reply: "Je suis bloqué côté modèle IA pour l’instant. Je n’ai lancé aucune action sur ton ordinateur. Réessaie dans quelques secondes ou vérifie la connexion/configuration du provider.",
+        requiresClarification: false,
+        clarificationQuestion: "",
+        capabilityRequests: [],
+        missionDraft: null,
+        uiBlocks: [{
+          type: "errorRecoveryCard",
+          title: "IA indisponible",
+          blocker: "Le provider LLM n’a pas répondu, donc JON s’arrête avant toute action desktop/browser.",
+          recovery: "Réessayer quand le provider est disponible.",
+          retryable: true
+        }],
+        safetyNotes: ["No desktop/browser action was started because the LLM provider was unavailable."]
+      }, { message }),
+      callRecord: error.callRecord ?? null,
+      generationMode: "degraded_blocked",
+      fallbackReason: error.category ?? error.message
+    };
+  }
+  return {
+    output: deterministic,
+    callRecord: error.callRecord ?? null,
+    generationMode: "deterministic_fallback",
+    fallbackReason: error.category ?? error.message
+  };
+}
+
 function visibleUiBlocksForTurn({ plannerOutput, capabilityExecution, agentConfig }) {
   const showInternalPlans = Boolean(agentConfig?.guardrails?.showInternalPlansInChat);
   const plannerBlocks = (plannerOutput.uiBlocks ?? []).filter((block) => {
@@ -990,19 +1183,26 @@ async function launchScenarioForService(service, {
         requestedScenarioId: scenarioId
       });
     case "computer": {
-      const computerActionType = preflight?.understanding?.computerActionType
-        ?? missionSpec?.parameters?.computerAction?.type
-        ?? null;
-      const requestedBrowserId = preflight?.understanding?.selectedBrowser?.id
-        ?? missionSpec?.parameters?.browserLaunch?.browserId
-        ?? null;
-      const requestedSearchQuery = preflight?.understanding?.browserSearchQuery
-        ?? missionSpec?.parameters?.browserLaunch?.searchQuery
-        ?? "";
-      const requestedLaunchUrl = preflight?.understanding?.browserLaunchUrl
-        ?? missionSpec?.parameters?.browserLaunch?.searchUrl
-        ?? missionSpec?.parameters?.browserLaunch?.url
-        ?? searchUrlFromQuery(requestedSearchQuery);
+      const routeOverridesPreflight = Boolean(missionSpec?.routing?.frameOverride || missionSpec?.routing?.surfaceRouter?.parametersApplied);
+      const computerActionType = routeOverridesPreflight
+        ? (missionSpec?.parameters?.computerAction?.type ?? preflight?.understanding?.computerActionType ?? null)
+        : (preflight?.understanding?.computerActionType ?? missionSpec?.parameters?.computerAction?.type ?? null);
+      const requestedBrowserId = routeOverridesPreflight
+        ? (missionSpec?.parameters?.browserLaunch?.browserId ?? preflight?.understanding?.selectedBrowser?.id ?? null)
+        : (preflight?.understanding?.selectedBrowser?.id ?? missionSpec?.parameters?.browserLaunch?.browserId ?? null);
+      const requestedSearchQuery = routeOverridesPreflight
+        ? (missionSpec?.parameters?.browserLaunch?.searchQuery ?? preflight?.understanding?.browserSearchQuery ?? "")
+        : (preflight?.understanding?.browserSearchQuery ?? missionSpec?.parameters?.browserLaunch?.searchQuery ?? "");
+      const requestedLaunchUrl = routeOverridesPreflight
+        ? (missionSpec?.parameters?.browserAutonomy?.startUrl
+          ?? missionSpec?.parameters?.browserLaunch?.searchUrl
+          ?? missionSpec?.parameters?.browserLaunch?.url
+          ?? preflight?.understanding?.browserLaunchUrl
+          ?? searchUrlFromQuery(requestedSearchQuery))
+        : (preflight?.understanding?.browserLaunchUrl
+          ?? missionSpec?.parameters?.browserLaunch?.searchUrl
+          ?? missionSpec?.parameters?.browserLaunch?.url
+          ?? searchUrlFromQuery(requestedSearchQuery));
       const browserActionRequested = ["launch_browser", "launch_browser_search", "capture_browser_window"].includes(computerActionType);
       const browserLaunchRequest = browserActionRequested && requestedBrowserId
         ? { id: requestedBrowserId }
@@ -1081,19 +1281,20 @@ async function launchScenarioForService(service, {
         });
       }
       if (computerActionType === "browser_autonomy") {
-        const allowlistedHosts = preflight?.understanding?.allowlistedHosts
-          ?? missionSpec?.parameters?.browserAutonomy?.allowlistedHosts
+        const allowlistedHosts = missionSpec?.parameters?.browserAutonomy?.allowlistedHosts
+          ?? preflight?.understanding?.allowlistedHosts
           ?? (project?.allowlistedDomains ?? []);
-        const startUrl = preflight?.understanding?.browserLaunchUrl
-          ?? missionSpec?.parameters?.browserAutonomy?.startUrl
-          ?? null;
+        const startUrl = requestedLaunchUrl ?? null;
         return service.runtimeHandle.runtime.startComputerObservationScenario({
           projectId,
           mission: mission ?? "Use governed browser automation to execute the requested web task.",
           desktopAction: {
             type: "browser_autonomy",
             allowlistedHosts,
-            startUrl
+            startUrl,
+            browserId: requestedBrowserId,
+            searchQuery: requestedSearchQuery || null,
+            targetSite: missionSpec?.parameters?.browserLaunch?.targetSite ?? null
           },
           surfaceClassification: "real_local_browser",
           evidenceSensitivity: "real_local_browser",
@@ -1172,7 +1373,8 @@ export class OperatorService extends EventEmitter {
     realSurfaceRuntimeConfig = null,
     realSurfaceConfigPath = null,
     computerProvider = null,
-    cliAllowedCommands = null
+    cliAllowedCommands = null,
+    llmGateway = null
   } = {}) {
     const resolvedFixtureServer = fixtureServer ?? await createFixtureServer();
     const resolvedRuntimeConfig = realSurfaceRuntimeConfig ?? await loadRealSurfaceRuntimeConfig({
@@ -1188,6 +1390,9 @@ export class OperatorService extends EventEmitter {
         ? new PowerShellWindowProvider()
         : controlledComputerProvider()
     );
+    // External terminal detection always uses a real PowerShell provider on this machine.
+    // In tests an explicit computerProvider is passed (FakeWindowProvider) — reuse it so tests stay isolated.
+    const resolvedExternalTerminalProvider = computerProvider ?? new PowerShellWindowProvider();
     const cliAgentCatalog = listAvailableCliAgents({ env });
     const resolvedCliAllowedCommands = cliAllowedCommands ?? (
       cliAgentCatalog.length > 0
@@ -1200,10 +1405,46 @@ export class OperatorService extends EventEmitter {
     runtimeHandle = await createPrototypeRuntime({
       dbPath,
       browserOptions,
-      approvalResolver: (request) => approvalBroker.requestApproval(request),
+      llmGateway,
+      env,
+      approvalResolver: async (request) => {
+        const run = request?.runId ? runtimeHandle.database.getRun(request.runId) : null;
+        const policyResult = resolveApprovalByPolicy({ request, run, env });
+        if (!shouldUseInteractiveApproval(policyResult)) {
+          return {
+            decision: policyResult.decision,
+            rationale: policyResult.rationale,
+            metadata: {
+              ...(policyResult.metadata ?? {}),
+              auditEventType: policyResult.auditEventType
+            }
+          };
+        }
+        if (request?.runId) {
+          runtimeHandle.database.insertEvent(request.runId, createEvent("approval.user_required", EVENT_ACTOR.POLICY, "Approval requires an explicit user decision.", {
+            approvalId: request.id,
+            category: request.category,
+            primitive: request.metadata?.primitive ?? null,
+            policyMode: policyResult.metadata?.approvalPolicy?.mode ?? "user_mode"
+          }));
+        }
+        return approvalBroker.requestApproval(request);
+      },
       computerProvider: resolvedComputerProvider,
       workspaceLauncher: (projectId, payload) => service?.startWorkspaceTerminalProcess(projectId, payload),
-      browserLauncher: async (projectId, payload) => service?.browserProvider.createSession({ projectId, ...payload }),
+      browserLauncher: async (projectId, payload = {}) => {
+        const session = await service?.browserProvider.createSession({ projectId, ...payload });
+        if (payload?.returnController && session?.id) {
+          const handle = service?.browserProvider.getAutomationHandle(session.id);
+          return {
+            session,
+            controller: handle?.controller ?? null,
+            targetId: handle?.targetId ?? null,
+            persistent: handle?.persistent === true
+          };
+        }
+        return session;
+      },
       policyHooks: {
         onApprovalRequested: async (approvalRecord, action) => {
           runtimeHandle.database.insertApproval(action.runId, approvalRecord);
@@ -1219,7 +1460,12 @@ export class OperatorService extends EventEmitter {
           runtimeHandle.database.insertEvent(action.runId, createEvent("approval.requested", EVENT_ACTOR.POLICY, `Approval requested: ${approvalRecord.actionLabel}.`, {
             approvalId: approvalRecord.id,
             category: approvalRecord.category,
-            riskLevel: approvalRecord.riskLevel
+            riskLevel: approvalRecord.riskLevel,
+            actionLabel: approvalRecord.actionLabel,
+            reason: approvalRecord.reason,
+            expectedEffect: approvalRecord.expectedEffect,
+            targetLabel: approvalRecord.targetLabel,
+            primitive: approvalRecord.metadata?.primitive ?? null
           }));
           runtimeHandle.database.insertEvent(action.runId, createEvent("run.paused", EVENT_ACTOR.POLICY, "Run paused pending operator approval.", {
             approvalId: approvalRecord.id
@@ -1256,7 +1502,12 @@ export class OperatorService extends EventEmitter {
           }
           service?.emitStateChanged("approval.requested", {
             runId: action.runId,
-            approvalId: approvalRecord.id
+            approvalId: approvalRecord.id,
+            actionLabel: approvalRecord.actionLabel,
+            reason: approvalRecord.reason,
+            riskLevel: approvalRecord.riskLevel,
+            category: approvalRecord.category,
+            primitive: approvalRecord.metadata?.primitive ?? null
           });
         },
         onApprovalResolved: async (approvalRecord, action) => {
@@ -1282,8 +1533,24 @@ export class OperatorService extends EventEmitter {
 
           runtimeHandle.database.insertEvent(action.runId, createEvent(decisionEventType, EVENT_ACTOR.OPERATOR, `Approval resolved: ${approvalRecord.actionLabel}.`, {
             approvalId: approvalRecord.id,
-            decision: approvalRecord.decision
+            decision: approvalRecord.decision,
+            policyDecision: approvalRecord.metadata?.approvalPolicy?.decision ?? null
           }));
+          if (approvalRecord.metadata?.approvalPolicy?.decision === "auto_resolved") {
+            runtimeHandle.database.insertEvent(action.runId, createEvent("approval.auto_resolved", EVENT_ACTOR.POLICY, `Approval auto-resolved by harness policy: ${approvalRecord.actionLabel}.`, {
+              approvalId: approvalRecord.id,
+              decision: approvalRecord.decision,
+              benchmarkId: approvalRecord.metadata?.approvalPolicy?.benchmarkId ?? null,
+              primitive: approvalRecord.metadata?.approvalPolicy?.primitive ?? null
+            }));
+          } else if (approvalRecord.metadata?.approvalPolicy?.decision === "policy_blocked") {
+            runtimeHandle.database.insertEvent(action.runId, createEvent("approval.policy_blocked", EVENT_ACTOR.POLICY, `Approval blocked by policy: ${approvalRecord.actionLabel}.`, {
+              approvalId: approvalRecord.id,
+              decision: approvalRecord.decision,
+              benchmarkId: approvalRecord.metadata?.approvalPolicy?.benchmarkId ?? null,
+              primitive: approvalRecord.metadata?.approvalPolicy?.primitive ?? null
+            }));
+          }
 
           if (approvalRecord.decision === APPROVAL_DECISION.APPROVED_ONCE) {
             runtimeHandle.database.updateRun(action.runId, {
@@ -1306,8 +1573,16 @@ export class OperatorService extends EventEmitter {
           service?.emitStateChanged("approval.resolved", {
             runId: action.runId,
             approvalId: approvalRecord.id,
-            decision: approvalRecord.decision
+            decision: approvalRecord.decision,
+            policyDecision: approvalRecord.metadata?.approvalPolicy?.decision ?? null
           });
+          if (approvalRecord.metadata?.approvalPolicy?.decision === "auto_resolved") {
+            service?.emitStateChanged("approval.auto_resolved", {
+              runId: action.runId,
+              approvalId: approvalRecord.id,
+              decision: approvalRecord.decision
+            });
+          }
         }
       }
     });
@@ -1317,6 +1592,8 @@ export class OperatorService extends EventEmitter {
       approvalBroker,
       runtimeHandle,
       computerProvider: resolvedComputerProvider,
+      computerProviderExplicit: Boolean(computerProvider),
+      externalTerminalProvider: resolvedExternalTerminalProvider,
       benchmarkService: new BenchmarkService(),
       realSurfaceRuntimeConfig: resolvedRuntimeConfig,
       cliAllowedCommands: resolvedCliAllowedCommands,
@@ -1332,6 +1609,8 @@ export class OperatorService extends EventEmitter {
     approvalBroker,
     runtimeHandle,
     computerProvider,
+    computerProviderExplicit = false,
+    externalTerminalProvider = null,
     benchmarkService,
     realSurfaceRuntimeConfig,
     cliAllowedCommands = null,
@@ -1342,11 +1621,15 @@ export class OperatorService extends EventEmitter {
     this.approvalBroker = approvalBroker;
     this.runtimeHandle = runtimeHandle;
     this.computerProvider = computerProvider;
+    this.computerProviderExplicit = computerProviderExplicit;
+    this.externalTerminalProvider = externalTerminalProvider ?? computerProvider;
     this.benchmarkService = benchmarkService;
     this.realSurfaceRuntimeConfig = realSurfaceRuntimeConfig;
+    this.computerProviderMode = realSurfaceRuntimeConfig?.computer?.mode ?? "controlled_fixture_window";
     this.activeRuns = new Map();
     this.isClosing = false;
     this.workspaceMonitoringInterval = null;
+    this.externalTerminalPollers = new Map();
     this.cliAllowedCommands = cliAllowedCommands ?? undefined;
     this.cliAgentCatalog = Array.isArray(cliAgentCatalog) ? cliAgentCatalog : listAvailableCliAgents();
     this.cliTerminalSupervisor = new CliTerminalSupervisor({
@@ -1369,6 +1652,7 @@ export class OperatorService extends EventEmitter {
       defaultHeadless: true,
       onEvent: (event) => this.#handleBrowserEvent(event)
     });
+    this.connectorRegistry = new ConnectorRegistry();
     this.mobileDeviceRegistry = new MobileDeviceRegistry();
     this.mobileAuditLog = new MobileAuditLog();
     this.mobileEventBuffer = new MobileEventBuffer();
@@ -1376,6 +1660,15 @@ export class OperatorService extends EventEmitter {
       deviceRegistry: this.mobileDeviceRegistry,
       auditLog: this.mobileAuditLog,
       operatorService: this
+    });
+    this.orchestratorLoop = new WorkspaceOrchestratorLoop({
+      database: this.runtimeHandle.database,
+      llmGateway: this.runtimeHandle.llmGateway,
+      emitEvent: (type, payload) => this.emitStateChanged(type, payload),
+      launchTerminal: (projectId, payload) => this.startWorkspaceTerminalProcess(projectId, payload),
+      writeTerminalInput: (projectId, terminalId, payload) => this.writeWorkspaceTerminalInput(projectId, terminalId, payload),
+      injectConversationMessage: (projectId, conversationId, msg) => this.#injectWorkspacePlanMessage(projectId, conversationId, msg),
+      auditLog: (entry) => this.#auditOrchestratorEntry(entry)
     });
   }
 
@@ -1398,6 +1691,11 @@ export class OperatorService extends EventEmitter {
     }
     this.isClosing = true;
     this.stopWorkspaceMonitoring();
+    this.orchestratorLoop?.shutdown();
+    for (const terminalId of this.externalTerminalPollers.keys()) {
+      this.#stopExternalTerminalPolling(terminalId);
+    }
+    await this.browserProvider.shutdownAllSessions().catch(() => {});
     this.cliTerminalSupervisor.close();
     this.ptyTerminalSupervisor.close();
     await this.runtimeHandle.close();
@@ -1415,6 +1713,34 @@ export class OperatorService extends EventEmitter {
 
   getUserMemorySummary() {
     return summarizeUserMemory(this.getUserMemory());
+  }
+
+  getUserPreferences() {
+    return normalizeUserPreferences(
+      this.runtimeHandle.database.getAppSetting(
+        USER_PREFERENCES_SETTING_KEY,
+        defaultUserPreferences()
+      ).value
+    );
+  }
+
+  getUserPreferencesSummary() {
+    return summarizeUserPreferences(this.getUserPreferences());
+  }
+
+  updateUserPreferences(patch = {}) {
+    const current = this.getUserPreferences();
+    const next = mergeUserPreferences(current, patch);
+    const setting = this.runtimeHandle.database.upsertAppSetting(USER_PREFERENCES_SETTING_KEY, next);
+    return summarizeUserPreferences({
+      ...setting.value,
+      updatedAt: setting.updatedAt
+    });
+  }
+
+  resetUserPreferences() {
+    this.runtimeHandle.database.deleteAppSetting(USER_PREFERENCES_SETTING_KEY);
+    return this.getUserPreferencesSummary();
   }
 
   listUserMemoryRecords({ projectId = null, category = null, limit = 50 } = {}) {
@@ -1457,6 +1783,7 @@ export class OperatorService extends EventEmitter {
       loadedAt: nowIso(),
       projectId: selectedProjectId,
       userMemory: this.getUserMemorySummary(),
+      userPreferences: this.getUserPreferencesSummary(),
       memoryRecords,
       projectMemory,
       recentSessionSummaries: conversations
@@ -1512,7 +1839,7 @@ export class OperatorService extends EventEmitter {
     );
   }
 
-  #recordUserMemoryFromConversationTurn({ projectId, conversationId, message, turn }) {
+  #recordUserMemoryFromConversationTurn({ projectId, conversationId, message, turn, availableBrowsers = [] }) {
     const current = this.getUserMemory();
     const updated = updateUserMemoryFromConversationTurn(current, {
       projectId,
@@ -1540,6 +1867,28 @@ export class OperatorService extends EventEmitter {
         ...record,
         createdAt,
         updatedAt: createdAt
+      });
+    }
+    const preferencePatch = inferUserPreferencePatchFromMessage(message, { availableBrowsers });
+    if (preferencePatch) {
+      const preferenceSummary = this.updateUserPreferences(preferencePatch);
+      this.runtimeHandle.database.insertMemoryRecord?.({
+        id: createId("mem"),
+        scope: "user",
+        projectId,
+        category: "preference",
+        text: `preferredBrowser=${preferenceSummary.preferredBrowser?.label ?? preferenceSummary.preferredBrowser?.id}`,
+        confidence: preferenceSummary.preferredBrowser?.confidence ?? 0.8,
+        sourceType: "conversation",
+        sourceId: conversationId,
+        metadata: {
+          conversationId,
+          preferenceType: "preferredBrowser",
+          preferredBrowser: preferenceSummary.preferredBrowser,
+          observedAt: nowIso()
+        },
+        createdAt: nowIso(),
+        updatedAt: nowIso()
       });
     }
     return updated;
@@ -2209,6 +2558,8 @@ export class OperatorService extends EventEmitter {
       status: updated.status,
       decisionAction: decision.action
     });
+    // Notify orchestrator so it can trigger semantic verification immediately
+    this.orchestratorLoop?.onTerminalStatusChange(updated.id, detection.status).catch(() => {});
   }
 
   #recordCliTerminalError(event) {
@@ -2344,11 +2695,16 @@ export class OperatorService extends EventEmitter {
     const generatedProvider = generatedCandidatesToExternalToolProvider(
       this.listCapabilityCandidates({ status: CAPABILITY_CANDIDATE_STATUS.ENABLED })
     );
+    const connectorProviders = this.connectorRegistry.listExternalToolProviders();
+    const externalToolProviders = [
+      ...(generatedProvider.tools.length > 0 ? [generatedProvider] : []),
+      ...connectorProviders
+    ];
     const graph = refreshCapabilityGraph(this.runtimeHandle.database, {
       applications: availableApplications,
       browsers: availableBrowsers,
       agentConfiguration: this.getAgentConfiguration(),
-      externalToolProviders: generatedProvider.tools.length > 0 ? [generatedProvider] : []
+      externalToolProviders
     });
     const overrides = this.runtimeHandle.database.listCapabilityGraphOverrides();
     const feedbackRecords = this.runtimeHandle.database.listCapabilityFeedback({ limit: 500 });
@@ -2839,6 +3195,15 @@ export class OperatorService extends EventEmitter {
     const costTotal = llmCalls.reduce((acc, c) => acc + (c.estimatedCost ?? 0), 0);
     const durationMs = run.updatedAt && run.createdAt
       ? new Date(run.updatedAt) - new Date(run.createdAt) : null;
+    const conversationResponse = buildConversationResponsePlan({
+      run,
+      events,
+      pendingApprovals: this.listPendingApprovals(runId),
+      approvals,
+      evidence,
+      artifacts,
+      locale: run.metadata?.locale ?? run.metadata?.userLocale ?? "fr"
+    });
 
     return {
       run: {
@@ -2898,10 +3263,24 @@ export class OperatorService extends EventEmitter {
       whereAreWe: run.metadata?.missionProgress?.steps
         ? `${run.metadata.missionProgress.steps.completed ?? 0}/${run.metadata.missionProgress.steps.total ?? "?"} steps — ${run.metadata.semanticVerification?.verificationVerdict ?? "unverified"}`
         : null,
+      missionStatusSurface: {
+        objectiveSatisfied: run.metadata?.semanticVerification?.objectiveSatisfied ?? null,
+        evidenceUsed: run.metadata?.semanticVerification?.evidenceUsed ?? run.metadata?.missionProgress?.proof?.evidenceUsedInVerification ?? [],
+        missingEvidence: run.metadata?.semanticVerification?.missingEvidence ?? run.metadata?.missionProgress?.proof?.missingEvidence ?? [],
+        currentBlockage: run.metadata?.semanticVerification?.objectiveSatisfied === false
+          ? (run.metadata?.semanticVerification?.failureReason ?? "Mission objective has not been verified.")
+          : null,
+        nextActionRecommended: run.metadata?.semanticVerification?.nextBestAction
+          ?? run.metadata?.missionProgress?.semanticVerification?.nextBestAction
+          ?? null,
+        waitingForUser: Boolean(run.metadata?.missionProgress?.userInteraction?.waitingForUser),
+        whatJonNeedsFromUser: run.metadata?.missionProgress?.userInteraction?.reason ?? null
+      },
       falseCompletionGuard: {
         verifiedByOutcomes: run.metadata?.semanticVerification?.verifiedByOutcomes ?? null,
-        wouldBefalseCompleted: run.status === "completed" && run.metadata?.semanticVerification?.verifiedByOutcomes === false
-      }
+        wouldBefalseCompleted: run.status === "completed" && run.metadata?.semanticVerification?.verifiedByOutcomes !== true
+      },
+      conversationResponse
     };
   }
 
@@ -2948,12 +3327,27 @@ export class OperatorService extends EventEmitter {
     }));
   }
 
-  async getRunDetail(runId) {
+  async getRunDetail(runId, { locale = null } = {}) {
     const bundle = await this.runtimeHandle.runtime.getRunBundle(runId);
     if (!bundle) {
       return null;
     }
-    return buildRunReviewModel(bundle, this.listPendingApprovals(runId));
+    const pendingApprovals = this.listPendingApprovals(runId);
+    const detail = buildRunReviewModel(bundle, pendingApprovals);
+    const responseLocale = locale ?? detail.run?.metadata?.locale ?? detail.run?.metadata?.userLocale ?? "fr";
+    return {
+      ...detail,
+      conversationResponse: buildConversationResponsePlan({
+        run: detail.run,
+        review: detail.review,
+        events: detail.events,
+        pendingApprovals: detail.pendingApprovals,
+        approvals: detail.approvals,
+        evidence: detail.evidence,
+        artifacts: detail.artifacts,
+        locale: responseLocale
+      })
+    };
   }
 
   getWorkspaceState(projectId, { conversationId = null } = {}) {
@@ -2978,6 +3372,8 @@ export class OperatorService extends EventEmitter {
     const alerts = decisions
       .filter((decision) => ["request_human_approval", "suggest_user_reply", "escalate_human"].includes(decision.action))
       .slice(-8);
+    const activePlans = this.runtimeHandle.database.listWorkspacePlans(projectId, { conversationId }) ?? [];
+    const activePlanIds = this.orchestratorLoop?.getActivePlanIds() ?? [];
     return {
       missionBrief,
       terminals,
@@ -2986,6 +3382,8 @@ export class OperatorService extends EventEmitter {
       availableCliAgents: this.getPublicCliAgentCatalog(),
       alerts,
       liveProcesses: this.cliTerminalSupervisor.list(),
+      plans: activePlans,
+      activePlanIds,
       summary: buildWorkspaceStateSummary({ missionBrief, terminals, decisions }),
       browserStrategy: {
         preferredMode: "workspace_browser_mode",
@@ -3003,6 +3401,98 @@ export class OperatorService extends EventEmitter {
         ]
       }
     };
+  }
+
+  // ── Workspace Orchestrator — Plan CRUD ────────────────────────────────────
+
+  createWorkspacePlan(projectId, payload = {}) {
+    const project = this.runtimeHandle.database.getProject(projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}.`);
+    const plan = buildWorkspacePlan({
+      projectId,
+      conversationId: payload.conversationId ?? null,
+      objective: payload.objective ?? payload.mission ?? "",
+      stages: Array.isArray(payload.stages) ? payload.stages : [],
+      metadata: payload.metadata ?? {}
+    });
+    const saved = this.runtimeHandle.database.upsertWorkspacePlan(plan);
+    this.emitStateChanged("workspace.plan.created", {
+      projectId, planId: saved.id, objective: saved.objective, stageCount: saved.stages.length
+    });
+    return { plan: saved };
+  }
+
+  activateWorkspacePlan(projectId, planId) {
+    const plan = this.runtimeHandle.database.getWorkspacePlan(planId);
+    if (!plan || plan.projectId !== projectId) throw new Error(`Workspace plan not found: ${planId}.`);
+    const active = { ...plan, status: PLAN_STATUS.ACTIVE, updatedAt: nowIso() };
+    const saved = this.runtimeHandle.database.upsertWorkspacePlan(active);
+    this.orchestratorLoop.startPlan(saved);
+    this.emitStateChanged("workspace.plan.activated", { projectId, planId: saved.id });
+    return { plan: saved };
+  }
+
+  getWorkspacePlanState(projectId, planId) {
+    const plan = this.runtimeHandle.database.getWorkspacePlan(planId);
+    if (!plan || plan.projectId !== projectId) throw new Error(`Workspace plan not found: ${planId}.`);
+    const verifications = this.runtimeHandle.database.listWorkspacePlanVerifications(planId);
+    return {
+      plan,
+      planState: aggregatePlanState(plan, verifications),
+      verifications,
+      summary: planSummary(plan)
+    };
+  }
+
+  listWorkspacePlans(projectId, { conversationId = null } = {}) {
+    const plans = this.runtimeHandle.database.listWorkspacePlans(projectId, { conversationId, limit: 20 });
+    return { plans: plans.map(p => planSummary(p)) };
+  }
+
+  resolveWorkspacePlanStage(projectId, planId, stageId, resolution = {}) {
+    const plan = this.runtimeHandle.database.getWorkspacePlan(planId);
+    if (!plan || plan.projectId !== projectId) throw new Error(`Workspace plan not found: ${planId}.`);
+    const stage = plan.stages.find(s => s.id === stageId);
+    if (!stage) throw new Error(`Stage not found: ${stageId}.`);
+    const newStatus = resolution.status ?? "pending";
+    const updated = {
+      ...plan,
+      stages: plan.stages.map(s => s.id === stageId ? { ...s, status: newStatus, metadata: { ...s.metadata, ...(resolution.metadata ?? {}) } } : s),
+      updatedAt: nowIso()
+    };
+    const saved = this.runtimeHandle.database.upsertWorkspacePlan(updated);
+    // If user unblocked a stage, re-trigger orchestration
+    if (["pending", "running"].includes(newStatus)) {
+      this.orchestratorLoop.startPlan(saved);
+    }
+    this.emitStateChanged("workspace.plan.stage_resolved", { projectId, planId, stageId, newStatus });
+    return { plan: saved };
+  }
+
+  // ── Workspace Orchestrator — private helpers ───────────────────────────────
+
+  #injectWorkspacePlanMessage(projectId, conversationId, { kind, content, payload = {} }) {
+    if (this.isClosing) return;
+    try {
+      const convId = conversationId
+        ?? this.runtimeHandle.database.listConversations(projectId, { limit: 1 })[0]?.id
+        ?? null;
+      if (!convId) return;
+      this.runtimeHandle.database.insertConversationTurn(conversationTurnRecord({
+        projectId, conversationId: convId,
+        role: "assistant", kind,
+        content: String(content ?? "").slice(0, 4000),
+        payload
+      }));
+      this.emitStateChanged("workspace.plan.conversation_message", { projectId, conversationId: convId, kind });
+    } catch { /* absorb */ }
+  }
+
+  #auditOrchestratorEntry(entry) {
+    try {
+      // Reuse existing audit infra — just emit as SSE event for traceability
+      this.emitStateChanged("workspace.orchestrator.audit", entry);
+    } catch { /* absorb */ }
   }
 
   upsertWorkspaceMissionBrief(projectId, payload = {}) {
@@ -3238,12 +3728,13 @@ export class OperatorService extends EventEmitter {
     };
   }
 
-  writeWorkspaceTerminalInput(projectId, terminalId, payload = {}) {
+  async writeWorkspaceTerminalInput(projectId, terminalId, payload = {}) {
     const terminal = this.runtimeHandle.database.getWorkspaceTerminalSession(terminalId);
     if (!terminal || terminal.projectId !== projectId) {
       throw new Error(`Workspace terminal not found: ${terminalId}.`);
     }
     const isTerminalPty = terminal.metadata?.terminalType === "pty";
+    const isExternalTerminal = terminal.metadata?.terminalType === "external";
     const input = String(payload.input ?? payload.text ?? "");
     if (isTerminalPty) {
       // PTY terminals accept raw keystrokes directly — no approval or sensitivity checks
@@ -3251,6 +3742,39 @@ export class OperatorService extends EventEmitter {
       return {
         terminal,
         decision: null,
+        workspace: this.getWorkspaceState(projectId, { conversationId: terminal.conversationId })
+      };
+    }
+    if (isExternalTerminal) {
+      if (!input) throw new Error("Terminal input is required.");
+      if (hasSensitiveTerminalInput(input)) {
+        throw new Error("Terminal input appears to contain a secret or credential and was blocked.");
+      }
+      const processId = terminal.metadata?.externalProcessId ?? null;
+      const windowHandle = terminal.metadata?.windowHandle ?? null;
+      if (!processId && !windowHandle) throw new Error("External terminal has no processId or windowHandle — cannot send input.");
+      const result = await this.externalTerminalProvider.sendExternalTerminalInput(processId, input, windowHandle);
+      if (!result?.success) {
+        throw new Error(`Failed to send input to external terminal: ${result?.reason ?? "unknown error"}`);
+      }
+      const updated = this.runtimeHandle.database.updateWorkspaceTerminalSession(terminal.id, {
+        updatedAt: nowIso()
+      });
+      const decision = this.runtimeHandle.database.insertWorkspaceTerminalDecision({
+        id: createId("wtd"),
+        terminalId: terminal.id,
+        projectId,
+        conversationId: terminal.conversationId,
+        decisionType: "terminal_input",
+        action: "input_sent",
+        reason: `Input sent to external terminal via ${result.method ?? "writeconsole"}.`,
+        requiresApproval: false,
+        payload: { method: result.method, sentLength: result.sentLength },
+        createdAt: nowIso()
+      });
+      return {
+        terminal: updated,
+        decision,
         workspace: this.getWorkspaceState(projectId, { conversationId: terminal.conversationId })
       };
     }
@@ -3388,6 +3912,121 @@ export class OperatorService extends EventEmitter {
     return terminal?.metadata?.terminalType === "pipe";
   }
 
+  // ── External terminal detection & adoption ──────────────────────────────────
+
+  async detectExternalTerminals(projectId) {
+    if (!this.externalTerminalProvider?.listExternalTerminals) {
+      return { terminals: [], unsupported: true };
+    }
+    const detected = await this.externalTerminalProvider.listExternalTerminals();
+    const trackedSessions = this.runtimeHandle.database.listWorkspaceTerminalSessions(projectId, { limit: 200 });
+    const trackedHandles = new Set(
+      trackedSessions
+        .filter((s) => s.metadata?.terminalType === "external" && s.status !== "detached")
+        .map((s) => String(s.metadata?.windowHandle ?? ""))
+        .filter(Boolean)
+    );
+    const available = detected.map((t) => ({
+      ...t,
+      alreadyAdopted: trackedHandles.has(String(t.windowHandle ?? ""))
+    }));
+    return { terminals: available, unsupported: false };
+  }
+
+  adoptExternalTerminal(projectId, payload = {}) {
+    const project = this.runtimeHandle.database.getProject(projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}.`);
+    if (!payload.windowHandle && !payload.processId) {
+      throw new Error("windowHandle or processId is required to adopt an external terminal.");
+    }
+    const label = String(payload.label ?? payload.title ?? "External Terminal").slice(0, 160);
+    const processId = payload.processId ?? null;
+    const windowHandle = String(payload.windowHandle ?? "");
+    const canReadBuffer = Boolean(payload.canReadBuffer);
+    const result = this.attachWorkspaceTerminal(projectId, {
+      label,
+      command: payload.executablePath ?? payload.processName ?? "external",
+      cwd: "",
+      status: "attached",
+      authorized: false,
+      autonomyMode: "assisted",
+      conversationId: payload.conversationId ?? null,
+      agentKind: "unknown",
+      metadata: {
+        terminalType: "external",
+        windowHandle,
+        externalProcessId: processId,
+        processName: payload.processName ?? null,
+        executablePath: payload.executablePath ?? null,
+        canReadBuffer,
+        adoptedAt: nowIso()
+      }
+    });
+    if (canReadBuffer) {
+      this.#startExternalTerminalPolling(result.terminal.id, processId, windowHandle || null);
+    }
+    return result;
+  }
+
+  #startExternalTerminalPolling(terminalId, processId, windowHandle = null) {
+    if (this.externalTerminalPollers.has(terminalId)) return;
+    const POLL_INTERVAL_MS = 3000;
+    const interval = setInterval(async () => {
+      const terminal = this.runtimeHandle.database.getWorkspaceTerminalSession(terminalId);
+      if (!terminal || terminal.status === "detached") {
+        this.#stopExternalTerminalPolling(terminalId);
+        return;
+      }
+      try {
+        const result = await this.externalTerminalProvider.readExternalTerminalBuffer(processId, windowHandle);
+        if (!result?.success) return;
+        const newOutput = result.text ?? result.lines?.join("\n") ?? "";
+        if (!newOutput || newOutput === terminal.recentOutput) return;
+        const trimmed = newOutput.slice(-4000);
+        const detection = detectTerminalState({ recentOutput: trimmed, processRunning: true });
+        this.runtimeHandle.database.updateWorkspaceTerminalSession(terminalId, {
+          recentOutput: trimmed,
+          status: detection.status !== "attached" ? detection.status : terminal.status,
+          updatedAt: nowIso()
+        });
+        this.emitStateChanged("workspace.terminal.updated", {
+          projectId: terminal.projectId,
+          terminalId,
+          status: terminal.status
+        });
+      } catch {
+        // polling failure is silent — terminal may have closed
+      }
+    }, POLL_INTERVAL_MS);
+    this.externalTerminalPollers.set(terminalId, interval);
+  }
+
+  #stopExternalTerminalPolling(terminalId) {
+    const interval = this.externalTerminalPollers.get(terminalId);
+    if (interval) {
+      clearInterval(interval);
+      this.externalTerminalPollers.delete(terminalId);
+    }
+  }
+
+  stopExternalTerminalAdoption(projectId, terminalId) {
+    const terminal = this.runtimeHandle.database.getWorkspaceTerminalSession(terminalId);
+    if (!terminal || terminal.projectId !== projectId) {
+      throw new Error(`Workspace terminal not found: ${terminalId}.`);
+    }
+    this.#stopExternalTerminalPolling(terminalId);
+    const updated = this.runtimeHandle.database.updateWorkspaceTerminalSession(terminalId, {
+      status: "detached",
+      updatedAt: nowIso()
+    });
+    this.emitStateChanged("workspace.terminal.updated", {
+      projectId,
+      terminalId,
+      status: "detached"
+    });
+    return { terminal: updated, workspace: this.getWorkspaceState(projectId) };
+  }
+
   getPipeTerminalHistory(projectId, terminalId) {
     return this.runtimeHandle.database.listWorkspaceTerminalEvents(projectId, {
       terminalId,
@@ -3504,7 +4143,56 @@ export class OperatorService extends EventEmitter {
   getMobileStatus(projectId) {
     const devices = this.mobileDeviceRegistry.listDevices();
     const recentCommands = this.mobileAuditLog.list({ limit: 20 });
-    return { devices, recentCommands, projectId };
+    return {
+      devices,
+      recentCommands,
+      projectId: this.#resolveMobileProjectId(projectId) ?? projectId,
+      pendingApprovals: this.getMobilePendingApprovals(projectId)
+    };
+  }
+
+  getMobilePendingApprovals(projectId = null) {
+    const resolvedId = this.#resolveMobileProjectId(projectId);
+    const approvals = this.listPendingApprovals();
+    return approvals
+      .filter((approval) => !resolvedId || approval.projectId === resolvedId || this.runtimeHandle.database.getRun(approval.runId)?.projectId === resolvedId)
+      .map((approval) => ({
+        id: approval.id,
+        runId: approval.runId,
+        projectId: approval.projectId ?? this.runtimeHandle.database.getRun(approval.runId)?.projectId ?? null,
+        category: approval.category ?? null,
+        actionLabel: approval.actionLabel ?? approval.category ?? "Action",
+        reason: approval.reason ?? "",
+        riskLevel: approval.riskLevel ?? "medium",
+        createdAt: approval.createdAt ?? null
+      }));
+  }
+
+  recordMobileClientLogs(rawEntries, sessionContext = {}) {
+    const entries = (Array.isArray(rawEntries) ? rawEntries : [rawEntries])
+      .slice(0, MOBILE_CLIENT_LOG_MAX_BATCH)
+      .map(normalizeMobileClientLogEntry);
+    const tokenHash = sessionContext.token
+      ? crypto.createHash("sha256").update(sessionContext.token).digest("hex").slice(0, 16)
+      : null;
+    for (const entry of entries) {
+      this.mobileAuditLog.record({
+        deviceId: sessionContext.deviceId ?? "mobile-client",
+        tokenHash,
+        commandType: `client.${entry.event}`,
+        params: {
+          level: entry.level,
+          message: entry.message,
+          clientTimestamp: entry.clientTimestamp,
+          details: entry.details,
+          sessionStatus: sessionContext.sessionStatus ?? "unknown"
+        },
+        status: entry.level === "error" ? "error" : "ok",
+        error: entry.level === "error" ? { code: "CLIENT_LOG", message: entry.message || entry.event } : null,
+        createdAt: nowIso()
+      });
+    }
+    return { recorded: entries.length };
   }
 
   getMobileRuns(projectId) {
@@ -3512,13 +4200,58 @@ export class OperatorService extends EventEmitter {
     if (!resolvedId) return [];
     const runs = this.listRuns(resolvedId);
     return runs.map((r) => ({
-      id: r.id,
-      mission: String(r.mission ?? "").slice(0, 120),
-      status: r.status,
-      lifecycleStage: r.lifecycleStage,
-      summary: r.summary ?? null,
-      createdAt: r.createdAt,
-      updatedAt: r.updatedAt
+      ...(() => {
+        const events = this.runtimeHandle.database.listEvents(r.id).slice(-120);
+        const approvals = this.runtimeHandle.database.listApprovals(r.id);
+        const evidence = this.runtimeHandle.database.listEvidence(r.id);
+        const artifacts = this.runtimeHandle.database.listArtifacts(r.id);
+        const pendingApprovals = this.listPendingApprovals(r.id);
+        const conversationResponse = buildConversationResponsePlan({
+          run: r,
+          events,
+          approvals,
+          pendingApprovals,
+          evidence,
+          artifacts,
+          locale: "fr"
+        });
+        const activeTool = [...(conversationResponse.executionThread?.toolCalls ?? [])]
+          .reverse()
+          .find((tool) => ["running", "planned"].includes(tool.status))
+          ?? null;
+        return {
+          id: r.id,
+          mission: String(r.mission ?? "").slice(0, 160),
+          status: r.status,
+          lifecycleStage: r.lifecycleStage,
+          summary: r.summary ?? null,
+          naturalReply: conversationResponse.naturalReply,
+          whereAreWe: conversationResponse.whereAreWe,
+          executionThread: {
+            mission: conversationResponse.executionThread?.mission ?? null,
+            activeStep: (conversationResponse.executionThread?.plan ?? []).find((step) => step.status === "active") ?? null,
+            toolCalls: (conversationResponse.executionThread?.toolCalls ?? []).slice(-8),
+            state: conversationResponse.executionThread?.state ?? null,
+            verification: conversationResponse.executionThread?.verification ?? null
+          },
+          activeTool,
+          pendingApprovals: pendingApprovals.length,
+          pendingApprovalItems: pendingApprovals.map((approval) => ({
+            id: approval.id,
+            runId: approval.runId,
+            projectId: r.projectId,
+            category: approval.category ?? null,
+            actionLabel: approval.actionLabel ?? approval.category ?? "Action",
+            reason: approval.reason ?? "",
+            riskLevel: approval.riskLevel ?? "medium",
+            createdAt: approval.createdAt ?? null
+          })),
+          evidenceCount: evidence.length,
+          artifactCount: artifacts.length,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt
+        };
+      })()
     }));
   }
 
@@ -3535,6 +4268,235 @@ export class OperatorService extends EventEmitter {
       waitingForInput: t.status === "waiting_for_input",
       createdAt: t.createdAt
     }));
+  }
+
+  async getMobileControlState(projectId) {
+    const resolvedId = this.#resolveMobileProjectId(projectId);
+    const enabled = this.#mobileRemoteControlEnabled();
+    if (!resolvedId) {
+      return { enabled, projectId: null, surface: "browser", active: false, session: null };
+    }
+    const state = await this.browserProvider.getControlState(resolvedId);
+    return {
+      enabled,
+      projectId: resolvedId,
+      mode: "browser_remote_control",
+      ...state
+    };
+  }
+
+  async dispatchMobileControlAction(projectId, rawAction, sessionContext = {}) {
+    const resolvedId = this.#resolveMobileProjectId(projectId);
+    if (!resolvedId) {
+      throw Object.assign(new Error("No active project."), { code: "NO_PROJECT" });
+    }
+    if (!this.#mobileRemoteControlEnabled()) {
+      throw Object.assign(new Error("Mobile remote control is disabled."), { code: "MOBILE_CONTROL_DISABLED" });
+    }
+    const project = this.runtimeHandle.database.getProject(resolvedId);
+    const action = this.#normalizeMobileControlAction(rawAction, project);
+    let status = "ok";
+    let result = null;
+    let error = null;
+
+    try {
+      result = await this.browserProvider.executeControlAction(resolvedId, action);
+      this.mobileEventBuffer.pushRaw("workspace.state_changed", {
+        projectId: resolvedId,
+        surface: "browser",
+        action: action.type,
+        url: result?.state?.currentUrl ?? null
+      });
+      return result;
+    } catch (err) {
+      status = "error";
+      error = { code: err.code ?? "UNKNOWN", message: err.message };
+      throw Object.assign(new Error(error.message), { code: error.code });
+    } finally {
+      this.mobileAuditLog.record({
+        deviceId: sessionContext.deviceId ?? action._deviceId ?? null,
+        tokenHash: sessionContext.token ? crypto.createHash("sha256").update(sessionContext.token).digest("hex").slice(0, 16) : null,
+        commandType: `control.${action.type}`,
+        params: this.#redactMobileControlAction(action),
+        status,
+        error,
+        createdAt: nowIso()
+      });
+    }
+  }
+
+  async getMobileDesktopState(projectId) {
+    const enabled = this.#mobileRemoteControlEnabled();
+    const realProvider = this.externalTerminalProvider;
+    const t0 = Date.now();
+    try {
+      const [capture, windows] = await Promise.all([
+        Promise.resolve().then(() => realProvider.captureScreen()),
+        Promise.resolve().then(() => realProvider.listVisibleWindows()).catch(() => [])
+      ]);
+      const captureMs = Date.now() - t0;
+      let screenshotBase64 = null;
+      let screenshotMimeType = "image/jpeg";
+      if (capture?.outputPath) {
+        const buf = await fs.readFile(capture.outputPath).catch(() => null);
+        if (buf) {
+          screenshotBase64 = buf.toString("base64");
+          // Detect PNG by magic bytes in case format changed
+          if (buf[0] === 0x89 && buf[1] === 0x50) screenshotMimeType = "image/png";
+        }
+      }
+      const totalMs = Date.now() - t0;
+      const vs = capture?.virtualScreen ?? {};
+      return {
+        enabled,
+        active: true,
+        screenshotBase64,
+        screenshotMimeType,
+        screenX: vs.x ?? 0,
+        screenY: vs.y ?? 0,
+        screenWidth: vs.width ?? 1920,
+        screenHeight: vs.height ?? 1080,
+        windows: Array.isArray(windows) ? windows : [],
+        perf: { captureMs, totalMs, payloadBytes: screenshotBase64 ? Math.round(screenshotBase64.length * 0.75) : 0 }
+      };
+    } catch (err) {
+      return {
+        enabled,
+        active: false,
+        screenshotBase64: null,
+        screenshotMimeType: "image/jpeg",
+        screenX: 0,
+        screenY: 0,
+        screenWidth: 1920,
+        screenHeight: 1080,
+        windows: [],
+        error: err.message,
+        perf: { captureMs: Date.now() - t0, totalMs: Date.now() - t0, payloadBytes: 0 }
+      };
+    }
+  }
+
+  async dispatchMobileDesktopAction(projectId, rawAction, sessionContext = {}) {
+    if (!this.#mobileRemoteControlEnabled()) {
+      throw Object.assign(new Error("Mobile remote control is disabled."), { code: "MOBILE_CONTROL_DISABLED" });
+    }
+    const type = String(rawAction.type ?? "").trim();
+    if (!DESKTOP_CONTROL_ACTIONS.has(type)) {
+      throw Object.assign(new Error(`Unsupported desktop action: ${type || "missing"}`), { code: "UNKNOWN_ACTION" });
+    }
+    // Always use the real PowerShell provider for desktop control
+    const realProvider = this.externalTerminalProvider;
+
+    let actionResult = null;
+    const shouldReturnState = type === "captureScreen";
+    switch (type) {
+    case "captureScreen":
+      break;
+    case "clickAt": {
+      const x = Math.round(Number(rawAction.x));
+      const y = Math.round(Number(rawAction.y));
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw Object.assign(new Error("clickAt requires finite x, y pixel coordinates."), { code: "INVALID_PARAMS" });
+      }
+      actionResult = await realProvider.clickPoint(null, { x, y });
+      break;
+    }
+    case "typeText": {
+      const text = String(rawAction.text ?? "").slice(0, 2000);
+      actionResult = await realProvider.typeText(null, text);
+      break;
+    }
+    case "pressKey":
+    case "hotkey": {
+      const keys = String(rawAction.keys ?? rawAction.key ?? "").trim();
+      if (!keys) throw Object.assign(new Error("pressKey/hotkey requires keys."), { code: "INVALID_PARAMS" });
+      actionResult = await realProvider.sendHotkey(null, keys);
+      break;
+    }
+    case "scroll": {
+      const delta = Math.round(Number(rawAction.delta ?? 0));
+      actionResult = await realProvider.scrollWindow(null, delta);
+      break;
+    }
+    case "focusWindow": {
+      const handle = String(rawAction.handle ?? "").trim();
+      if (!handle) throw Object.assign(new Error("focusWindow requires handle."), { code: "INVALID_PARAMS" });
+      actionResult = await realProvider.focusWindow(handle);
+      break;
+    }
+    case "listWindows": {
+      const windows = await realProvider.listVisibleWindows();
+      actionResult = { windows };
+      break;
+    }
+    case "getWindowIcon": {
+      const handle = String(rawAction.handle ?? "").trim();
+      if (!handle) throw Object.assign(new Error("getWindowIcon requires handle."), { code: "INVALID_PARAMS" });
+      actionResult = await realProvider.getWindowIcon(handle);
+      break;
+    }
+    }
+
+    const state = shouldReturnState
+      ? await this.getMobileDesktopState(projectId)
+      : null;
+    this.mobileEventBuffer.pushRaw("workspace.state_changed", {
+      projectId,
+      surface: "desktop",
+      action: type
+    });
+    return state
+      ? { action: type, result: actionResult, state }
+      : { action: type, result: actionResult };
+  }
+
+  async getMobileBrowserTabs(projectId) {
+    const resolvedId = this.#resolveMobileProjectId(projectId);
+    if (!resolvedId) {
+      return { projectId: null, active: false, session: null, tabs: [] };
+    }
+    return {
+      projectId: resolvedId,
+      ...(await this.browserProvider.getTabsState(resolvedId))
+    };
+  }
+
+  async dispatchMobileBrowserTabAction(projectId, rawAction, sessionContext = {}) {
+    const resolvedId = this.#resolveMobileProjectId(projectId);
+    if (!resolvedId) {
+      throw Object.assign(new Error("No active project."), { code: "NO_PROJECT" });
+    }
+    if (!this.#mobileRemoteControlEnabled()) {
+      throw Object.assign(new Error("Mobile remote control is disabled."), { code: "MOBILE_CONTROL_DISABLED" });
+    }
+    const project = this.runtimeHandle.database.getProject(resolvedId);
+    const action = this.#normalizeMobileTabAction(rawAction, project);
+    let status = "ok";
+    let result = null;
+    let error = null;
+    try {
+      result = await this.browserProvider.executeTabAction(resolvedId, action);
+      this.mobileEventBuffer.pushRaw("workspace.state_changed", {
+        projectId: resolvedId,
+        surface: "browser",
+        action: `tab.${action.type}`
+      });
+      return result;
+    } catch (err) {
+      status = "error";
+      error = { code: err.code ?? "UNKNOWN", message: err.message };
+      throw Object.assign(new Error(error.message), { code: error.code });
+    } finally {
+      this.mobileAuditLog.record({
+        deviceId: sessionContext.deviceId ?? null,
+        tokenHash: sessionContext.token ? crypto.createHash("sha256").update(sessionContext.token).digest("hex").slice(0, 16) : null,
+        commandType: `tab.${action.type}`,
+        params: this.#redactMobileTabAction(action),
+        status,
+        error,
+        createdAt: nowIso()
+      });
+    }
   }
 
   async dispatchMobileCommand(commandType, params, sessionContext) {
@@ -3555,6 +4517,217 @@ export class OperatorService extends EventEmitter {
   #resolveMobileProjectId(projectId) {
     if (projectId && this.runtimeHandle.database.getProject(projectId)) return projectId;
     return this.listProjects()[0]?.id ?? null;
+  }
+
+  async resolveLlmInlineText(projectId, rawText, contextType = "type_text") {
+    const resolvedProjectId = this.#resolveMobileProjectId(projectId);
+    const project = resolvedProjectId ? this.runtimeHandle.database.getProject(resolvedProjectId) : null;
+    if (!project) throw Object.assign(new Error("No active project."), { code: "NO_PROJECT" });
+    const { hadDirectives, text, generations } = await resolveInlineTextDirectives(
+      rawText,
+      this.runtimeHandle.llmGateway,
+      contextType
+    );
+    return { projectId: resolvedProjectId, text, hadInlineLlm: hadDirectives, generations: generations ?? [] };
+  }
+
+  #mobileRemoteControlEnabled() {
+    return process.env.COWORK_MOBILE_REMOTE_CONTROL !== "0";
+  }
+
+  #normalizeMobileControlAction(rawAction = {}, project = null) {
+    const type = String(rawAction.type ?? rawAction.action ?? "").trim();
+    if (!MOBILE_CONTROL_ACTIONS.has(type)) {
+      throw Object.assign(new Error(`Unsupported mobile control action: ${type || "missing"}`), { code: "UNKNOWN_CONTROL_ACTION" });
+    }
+    const normalized = {
+      type,
+      allowlistedHosts: [] // open mode — mobile human operator can navigate freely
+    };
+    if (type === "navigate") {
+      const url = String(rawAction.url ?? "").trim();
+      if (!url || url.length > 2000) {
+        throw Object.assign(new Error("navigate requires a URL under 2000 characters."), { code: "INVALID_PARAMS" });
+      }
+      normalized.url = url;
+    }
+    if (type === "clickAt") {
+      const x = Number(rawAction.x);
+      const y = Number(rawAction.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1) {
+        throw Object.assign(new Error("clickAt requires normalized x/y between 0 and 1."), { code: "INVALID_PARAMS" });
+      }
+      normalized.x = x;
+      normalized.y = y;
+      normalized.normalized = true;
+    }
+    if (type === "typeText") {
+      const text = String(rawAction.text ?? "");
+      if (text.length > 2000) {
+        throw Object.assign(new Error("Text too long (max 2000 chars)."), { code: "TEXT_TOO_LONG" });
+      }
+      normalized.text = text;
+    }
+    if (type === "pressKey") {
+      const key = String(rawAction.key ?? "").trim();
+      if (!MOBILE_CONTROL_KEYS.has(key)) {
+        throw Object.assign(new Error("Unsupported key for mobile control."), { code: "INVALID_PARAMS" });
+      }
+      normalized.key = key;
+    }
+    if (type === "scroll") {
+      const deltaY = Number(rawAction.deltaY ?? 640);
+      normalized.deltaY = Number.isFinite(deltaY)
+        ? Math.max(-3000, Math.min(3000, deltaY))
+        : 640;
+    }
+    return normalized;
+  }
+
+  // ── Connector API ────────────────────────────────────────────────────────────
+
+  listConnectors() {
+    return this.connectorRegistry.listConnectors();
+  }
+
+  getConnector(connectorId) {
+    const connector = this.connectorRegistry.getConnector(connectorId);
+    if (!connector) throw Object.assign(new Error(`Unknown connector: ${connectorId}`), { code: "UNKNOWN_CONNECTOR" });
+    return connector;
+  }
+
+  async addConnector(input = {}) {
+    const connector = await this.connectorRegistry.addConnector(input);
+    await this.refreshCapabilityGraph().catch(() => null);
+    this.emitStateChanged("connectors.changed", {
+      connectorId: connector.connectorId,
+      type: connector.type ?? null,
+      status: connector.status
+    });
+    return connector;
+  }
+
+  async removeConnector(connectorId) {
+    const result = await this.connectorRegistry.removeConnector(connectorId);
+    await this.refreshCapabilityGraph().catch(() => null);
+    this.emitStateChanged("connectors.changed", {
+      connectorId,
+      removed: true
+    });
+    return result;
+  }
+
+  async draftEmailViaConnector({ to, subject, body, runId = null, requestedBy = null } = {}) {
+    return this.connectorRegistry.draftEmail({ to, subject, body, runId, requestedBy });
+  }
+
+  listConnectorDrafts() {
+    return this.connectorRegistry.listDrafts();
+  }
+
+  getConnectorActionLog({ limit = 50, connectorId = null } = {}) {
+    return this.connectorRegistry.getActionLog({ limit, connectorId });
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+
+  #normalizeMobileTabAction(rawAction = {}, project = null) {
+    const type = String(rawAction.type ?? rawAction.action ?? "").trim();
+    if (!MOBILE_TAB_ACTIONS.has(type)) {
+      throw Object.assign(new Error(`Unsupported mobile tab action: ${type || "missing"}`), { code: "UNKNOWN_TAB_ACTION" });
+    }
+    const normalized = { type, allowlistedHosts: [] };
+
+    // ── URL-required actions ────────────────────────────────────────────────
+    if (type === "openTab" || type === "navigateTab") {
+      const url = normalizeBrowserUrlInput(rawAction.url ?? "", { allowBlank: type === "openTab" });
+      if (!url || url.length > 2000) throw Object.assign(new Error(`${type} requires a URL under 2000 characters.`), { code: "INVALID_PARAMS" });
+      normalized.url = url;
+    }
+
+    // ── targetId-required actions ───────────────────────────────────────────
+    if (["focusTab", "closeTab", "navigateTab"].includes(type)) {
+      const targetId = String(rawAction.targetId ?? "").trim();
+      if (!targetId) throw Object.assign(new Error(`${type} requires targetId.`), { code: "INVALID_PARAMS" });
+      normalized.targetId = targetId;
+    }
+
+    // ── Optional targetId (falls back to active tab) ────────────────────────
+    if (["reloadTab", "observeTab", "screenshotTab", "clickElement", "typeText",
+         "pressKey", "scrollTab", "extractText", "waitForSelector",
+         "evaluateScript", "cdpCommand"].includes(type)) {
+      if (rawAction.targetId) normalized.targetId = String(rawAction.targetId).trim();
+    }
+
+    // ── Action-specific params ──────────────────────────────────────────────
+    if (type === "clickElement" || type === "typeText" || type === "waitForSelector" || type === "extractText") {
+      if (rawAction.selector) normalized.selector = String(rawAction.selector).slice(0, 2000);
+    }
+    if (type === "typeText") {
+      const text = String(rawAction.text ?? rawAction.value ?? "").slice(0, 4000);
+      if (!text) throw Object.assign(new Error("typeText requires text."), { code: "INVALID_PARAMS" });
+      normalized.text = text;
+    }
+    if (type === "pressKey") {
+      const key = String(rawAction.key ?? "").trim();
+      if (!key) throw Object.assign(new Error("pressKey requires key."), { code: "INVALID_PARAMS" });
+      normalized.key = key;
+    }
+    if (type === "scrollTab") {
+      normalized.deltaY = Number(rawAction.deltaY ?? rawAction.delta ?? 640);
+      if (!Number.isFinite(normalized.deltaY)) normalized.deltaY = 640;
+    }
+    if (type === "extractText" && rawAction.fieldMap && typeof rawAction.fieldMap === "object") {
+      normalized.fieldMap = rawAction.fieldMap;
+    }
+    if (type === "waitForSelector") {
+      const selector = String(rawAction.selector ?? "").trim();
+      if (!selector) throw Object.assign(new Error("waitForSelector requires selector."), { code: "INVALID_PARAMS" });
+      normalized.selector = selector;
+      if (rawAction.state) normalized.state = String(rawAction.state);
+    }
+    if (type === "evaluateScript") {
+      const expression = String(rawAction.expression ?? rawAction.script ?? "").trim();
+      if (!expression || expression.length > 10000) {
+        throw Object.assign(new Error("evaluateScript requires JavaScript under 10000 characters."), { code: "INVALID_PARAMS" });
+      }
+      normalized.expression = expression;
+      if (Object.hasOwn(rawAction, "arg")) normalized.arg = rawAction.arg;
+    }
+    if (type === "cdpCommand") {
+      const method = String(rawAction.method ?? "").trim();
+      if (!/^[A-Za-z0-9_.]+$/.test(method)) {
+        throw Object.assign(new Error("cdpCommand requires a valid CDP method name."), { code: "INVALID_PARAMS" });
+      }
+      normalized.method = method;
+      normalized.params = rawAction.params && typeof rawAction.params === "object" ? rawAction.params : {};
+    }
+
+    return normalized;
+  }
+
+  #redactMobileControlAction(action = {}) {
+    const safe = { ...action };
+    delete safe.allowlistedHosts;
+    if (typeof safe.text === "string") {
+      safe.textLength = safe.text.length;
+      delete safe.text;
+    }
+    return safe;
+  }
+
+  #redactMobileTabAction(action = {}) {
+    const safe = { ...action };
+    delete safe.allowlistedHosts;
+    if (typeof safe.expression === "string") {
+      safe.expressionLength = safe.expression.length;
+      delete safe.expression;
+    }
+    if (safe.arg != null) {
+      safe.hasArg = true;
+      delete safe.arg;
+    }
+    return safe;
   }
 
   async #processMobileChatMessage(projectId, message) {
@@ -3671,8 +4844,13 @@ export class OperatorService extends EventEmitter {
     return {
       fixtureManifest: this.fixtureManifest,
       llmGatewayStatus: this.runtimeHandle.runtime.getLlmGatewayStatus(),
+      connectors: {
+        connectors: this.listConnectors(),
+        actionLog: this.getConnectorActionLog({ limit: 12 })
+      },
       llmDashboard: summarizeLlmCalls(projectLlmCalls, selectedProjectRuns),
       userMemory: this.getUserMemorySummary(),
+      userPreferences: this.getUserPreferencesSummary(),
       userMemoryRecords: selectedProjectId
         ? this.listUserMemoryRecords({ projectId: selectedProjectId, limit: 50 })
         : this.listUserMemoryRecords({ limit: 50 }),
@@ -3759,8 +4937,20 @@ export class OperatorService extends EventEmitter {
 
   async startMission(projectId, missionRequest) {
     const missionEntry = this.getMissionEntryContract();
-    const rawMission = missionRequest?.missionSpec ?? missionRequest;
+    const rawMissionInitial = missionRequest?.missionSpec ?? missionRequest;
+
+    // Resolve any /llm{...} directives in the objective before routing
+    const inlineResolution = await resolveInlineMissionDirectives(
+      String(rawMissionInitial?.objective ?? ""),
+      this.runtimeHandle.llmGateway
+    );
+    const rawMission = inlineResolution.hadDirectives
+      ? { ...rawMissionInitial, objective: inlineResolution.expandedObjective }
+      : rawMissionInitial;
+
     const availableBrowsers = await this.listInstalledBrowsers();
+    const availableApplications = await this.listInstalledApplications();
+    const userPreferences = this.getUserPreferences();
     const confirmedPreflight = missionRequest?.preflight ? {
       ...missionRequest.preflight,
       understanding: validateMissionUnderstandingOutput(
@@ -3808,11 +4998,82 @@ export class OperatorService extends EventEmitter {
         }
         : {})
     };
-    const missionSpec = normalizeMissionSpec({
+    const routeInput = {
       ...rawMission,
       parameters: mergedParameters,
       ...(preflightMode ? { mode: preflightMode } : {})
-    }, missionEntry);
+    };
+    const workspaceSnapshot = (() => {
+      try {
+        return this.getWorkspaceState(projectId);
+      } catch {
+        return null;
+      }
+    })();
+    const surfaceRoute = routeMissionToSurface({
+      missionSpec: routeInput,
+      objective: routeInput.objective,
+      constraints: routeInput.constraints,
+      availableBrowsers,
+      availableApplications,
+      workspaceStateSnapshot: workspaceSnapshot,
+      userPreferences,
+      riskPolicy: {
+        mode: routeInput.parameters?.approvalPolicy?.mode ?? "user_mode"
+      }
+    });
+    const surfaceRouteOverridesPreflightFrame = Boolean(
+      preflightMode
+      && preflightMode !== "computer"
+      && surfaceRoute.selectedMode === "computer"
+      && ["browser", "desktop", "terminal", "files"].includes(surfaceRoute.selectedSurface)
+    );
+    const shouldApplySurfaceParameters = !preflightMode || preflightMode === "computer" || surfaceRouteOverridesPreflightFrame;
+    const routedMission = shouldApplySurfaceParameters
+      ? applySurfaceRouteToMission({
+        ...routeInput,
+        mode: surfaceRouteOverridesPreflightFrame ? "auto" : routeInput.mode
+      }, surfaceRoute)
+      : {
+        ...routeInput,
+        routing: {
+          ...(routeInput.routing ?? {}),
+          surfaceRouter: {
+            selectedSurface: surfaceRoute.selectedSurface,
+            selectedProvider: surfaceRoute.selectedProvider,
+            routingReason: surfaceRoute.routingReason,
+            requiredApproval: surfaceRoute.requiredApproval,
+            expectedTools: surfaceRoute.expectedTools,
+            fallbackSurface: surfaceRoute.fallbackSurface,
+            confidence: surfaceRoute.confidence,
+            blockers: surfaceRoute.blockers,
+            parametersApplied: false,
+            reason: "Confirmed preflight selected a non-computer execution frame."
+          }
+        }
+      };
+    if (surfaceRouteOverridesPreflightFrame) {
+      routedMission.routing = {
+        ...(routedMission.routing ?? {}),
+        frameOverride: {
+          from: preflightMode,
+          to: surfaceRoute.selectedMode,
+          selectedSurface: surfaceRoute.selectedSurface,
+          reason: "SurfaceRouter selected a concrete local/browser surface, so the run must not fall back to the controlled research fixture."
+        }
+      };
+    }
+    if (surfaceRoute.selectedSurface === "desktop" && !this.computerProviderExplicit && this.computerProviderMode !== "real_local_window") {
+      throw new Error(
+        `Mission desktop bloquée : le provider actif est en mode '${this.computerProviderMode}' (FakeWindowProvider). ` +
+        `Définir computer.mode = "real_local_window" dans real-surface-runtime.local.json pour activer le contrôle desktop réel.`
+      );
+    }
+    const missionSpec = normalizeMissionSpec(routedMission, missionEntry);
+    missionSpec.routing = {
+      ...missionSpec.routing,
+      ...(routedMission.routing ?? {})
+    };
     if (confirmedPreflight) {
       missionSpec.routing = {
         ...missionSpec.routing,
@@ -3822,6 +5083,19 @@ export class OperatorService extends EventEmitter {
         routingConfidence: confirmedPreflight.understanding.routingConfidence
       };
     }
+    if (inlineResolution.hadDirectives) {
+      missionSpec.parameters.inlineGeneratedContent = inlineResolution.generations.map((g) => ({
+        id: g.id,
+        content: g.output,
+        prompt: g.prompt,
+        intendedUse: "type_text_payload",
+        provider: g.provider,
+        model: g.model,
+        createdAt: g.createdAt,
+        tokenUsage: g.tokenUsage
+      }));
+      missionSpec.routing.originalObjective = String(rawMissionInitial?.objective ?? "");
+    }
     const orchestration = normalizeMissionOrchestration(missionRequest?.orchestration);
     const requestedConversationId = compactConversationMessage(
       missionRequest?.conversationId ?? missionRequest?.context?.conversationId ?? ""
@@ -3829,6 +5103,24 @@ export class OperatorService extends EventEmitter {
     const conversation = requestedConversationId
       ? this.ensureConversation(projectId, { conversationId: requestedConversationId })
       : null;
+
+    const pendingManualHandoff = this.#findPendingManualBrowserHandoffRun(projectId, {
+      conversationId: conversation?.id ?? null,
+      objective: missionSpec.objective
+    });
+    if (pendingManualHandoff) {
+      this.emitStateChanged("mission.manual_browser_handoff.already_waiting", {
+        projectId,
+        conversationId: conversation?.id ?? null,
+        runId: pendingManualHandoff.id,
+        reason: pendingManualHandoff.metadata?.manualBrowserHandoff?.reason ?? pendingManualHandoff.summary
+      });
+      return {
+        runId: pendingManualHandoff.id,
+        conversation: conversation ? this.runtimeHandle.database.getConversation(conversation.id) : null,
+        awaitingUser: true
+      };
+    }
 
     const launch = await this.#launchMissionRun({
       projectId,
@@ -3839,6 +5131,16 @@ export class OperatorService extends EventEmitter {
       entryPoint: "mission_entry_gui",
       selectedBy: "user_start"
     });
+    this.#patchRunMetadata(launch.runId, (metadata) => ({
+      ...metadata,
+      computerProvider: {
+        providerName: this.computerProviderMode === "real_local_window" ? "PowerShellWindowProvider" : "FakeWindowProvider",
+        providerMode: this.computerProviderMode,
+        isRealDesktopControl: this.computerProviderMode === "real_local_window",
+        selectedSurface: surfaceRoute.selectedSurface ?? null,
+        routingReason: surfaceRoute.routingReason ?? null
+      }
+    }));
     if (conversation) {
       const linkedRunIds = Array.from(new Set([
         ...(Array.isArray(conversation.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : []),
@@ -3867,7 +5169,8 @@ export class OperatorService extends EventEmitter {
     const preflight = await this.runtimeHandle.runtime.previewMissionPreflight({
       projectId,
       missionDraft,
-      preferredScenarioType: missionDraft.mode ? missionModeToScenarioType(missionDraft.mode) : null
+      preferredScenarioType: missionDraft.mode ? missionModeToScenarioType(missionDraft.mode) : null,
+      userPreferences: this.getUserPreferencesSummary()
     });
     return {
       missionDraft,
@@ -4002,6 +5305,27 @@ export class OperatorService extends EventEmitter {
         clarificationResponseTo: pendingClarification?.id ?? null
       }
     }));
+    const resumedManualBrowserHandoff = await this.#maybeResumeManualBrowserHandoffFromConversation({
+      projectId,
+      conversation,
+      message
+    });
+    if (resumedManualBrowserHandoff) {
+      this.emitStateChanged("conversation.turn.completed", {
+        projectId,
+        conversationId: conversation.id,
+        turnId: resumedManualBrowserHandoff.turn.id,
+        intentType: resumedManualBrowserHandoff.turn.intentType,
+        action: resumedManualBrowserHandoff.turn.action,
+        generationMode: resumedManualBrowserHandoff.turn.generationMode
+      });
+      return {
+        conversation: this.runtimeHandle.database.getConversation(conversation.id),
+        turn: resumedManualBrowserHandoff.turn,
+        preflight: null,
+        missionDraft: resumedManualBrowserHandoff.turn.missionDraft
+      };
+    }
     if (resolvedClarification) {
       const turn = {
         ...resolvedClarification.turn,
@@ -4091,6 +5415,7 @@ export class OperatorService extends EventEmitter {
     const availableBrowsers = await this.listInstalledBrowsers();
     const availableApplications = await this.listInstalledApplications();
     const agentConfig = this.getAgentConfiguration();
+    const userPreferences = this.getUserPreferencesSummary();
     const capabilityGraph = await this.getCapabilityGraph();
     const relevantCapabilityGraph = compactCapabilityGraphForPrompt(capabilityGraph.nodes, {
       mission: message,
@@ -4103,7 +5428,9 @@ export class OperatorService extends EventEmitter {
     const externalContext = compactExternalConversationContext(turnRequest.context && typeof turnRequest.context === "object" ? turnRequest.context : {});
     const availableCliAgents = this.getPublicCliAgentCatalog();
     const userMemory = this.getUserMemorySummary();
-    const recentRunContext = this.#buildRecentRunContext(projectId, message);
+    const recentRunContext = shouldAttachRecentRunContext(message)
+      ? this.#buildRecentRunContext(projectId, message)
+      : null;
     let workspaceTerminals = null;
     try {
       const ws = this.getWorkspaceState(projectId, { conversationId: conversation.id });
@@ -4113,6 +5440,7 @@ export class OperatorService extends EventEmitter {
       message,
       capabilityGraph: conversationCapabilityGraph,
       userMemory,
+      userPreferences,
       recentRunContext,
       conversationContext: {
         ...externalContext,
@@ -4147,6 +5475,7 @@ export class OperatorService extends EventEmitter {
           guardrails: JSON.stringify(agentConfig.guardrails),
           capabilityGraph: JSON.stringify(conversationCapabilityGraph),
           userMemory: JSON.stringify(userMemory),
+          userPreferences: JSON.stringify(userPreferences),
           conversationContext: JSON.stringify(input.conversationContext ?? null),
           safeCapabilities: JSON.stringify(input.safeCapabilities),
           availableBrowsers: JSON.stringify(promptBrowsers),
@@ -4160,27 +5489,36 @@ export class OperatorService extends EventEmitter {
     ];
 
     const conversationTurnPolicy = getTokenGovernancePolicy(REASONING_STAGE.CONVERSATION_TURN);
-    const conversationTurnResult = await this.runtimeHandle.llmGateway.generateStructured({
-      runId: createId("conv"),
-      projectId,
-      callType: LLM_CALL_TYPE.CONVERSATION_TURN,
-      modelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-      promptRefs,
-      input,
-      metadata: {
-        reasoningStage: REASONING_STAGE.CONVERSATION_TURN,
-        conversationTurn: true,
-        conversationId: conversation.id,
-        requestedModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
-        tokenGovernancePolicyId: conversationTurnPolicy.id
-      },
-      validateOutput: (output) => validateConversationTurnOutput({ ...output, _availableCliAgents: availableCliAgents }, { message })
-    });
-    const plannerResult = {
-      output: conversationTurnResult.output,
-      callRecord: conversationTurnResult.callRecord,
-      generationMode: "llm"
-    };
+    let plannerResult;
+    try {
+      const conversationTurnResult = await this.runtimeHandle.llmGateway.generateStructured({
+        runId: createId("conv"),
+        projectId,
+        callType: LLM_CALL_TYPE.CONVERSATION_TURN,
+        modelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
+        promptRefs,
+        input,
+        metadata: {
+          reasoningStage: REASONING_STAGE.CONVERSATION_TURN,
+          conversationTurn: true,
+          conversationId: conversation.id,
+          requestedModelAlias: LLM_MODEL_ALIAS.UTILITY_STRUCTURING,
+          tokenGovernancePolicyId: conversationTurnPolicy.id
+        },
+        validateOutput: (output) => validateConversationTurnOutput({ ...output, _availableCliAgents: availableCliAgents }, { message })
+      });
+      plannerResult = {
+        output: conversationTurnResult.output,
+        callRecord: conversationTurnResult.callRecord,
+        generationMode: "llm"
+      };
+    } catch (error) {
+      plannerResult = buildConversationPlannerFallback({
+        message,
+        error,
+        availableCliAgents
+      });
+    }
 
     const capabilityExecution = await executeSafeConversationCapabilities({
       requests: plannerResult.output.capabilityRequests,
@@ -4204,24 +5542,50 @@ export class OperatorService extends EventEmitter {
     let preflight = null;
     let missionDraft = plannerResult.output.missionDraft;
     if (["prepare_mission_preflight", "start_bounded_run_after_confirmation"].includes(plannerResult.output.action) && missionDraft) {
-      const preview = await this.previewMission(projectId, {
-        missionSpec: {
-          objective: missionDraft.objective,
-          deliverable: missionDraft.deliverable,
-          constraints: missionDraft.constraints,
-          forbiddenActions: missionDraft.forbiddenActions,
-          mode: missionDraft.mode || "",
-          parameters: missionDraft.parameters ?? {}
-        }
-      });
-      preflight = preview.preflight;
-      missionDraft = preview.missionDraft;
-      preflight = enrichPreflightWithChoiceRequest({
-        message,
-        missionDraft,
-        preflight,
-        availableApplications
-      });
+      try {
+        const preview = await this.previewMission(projectId, {
+          missionSpec: {
+            objective: missionDraft.objective,
+            deliverable: missionDraft.deliverable,
+            constraints: missionDraft.constraints,
+            forbiddenActions: missionDraft.forbiddenActions,
+            mode: missionDraft.mode || "",
+            parameters: missionDraft.parameters ?? {}
+          }
+        });
+        preflight = preview.preflight;
+        missionDraft = preview.missionDraft;
+        preflight = enrichPreflightWithChoiceRequest({
+          message,
+          missionDraft,
+          preflight,
+          availableApplications
+        });
+      } catch (preflightError) {
+        plannerResult = {
+          ...plannerResult,
+          output: {
+            ...plannerResult.output,
+            intentType: "simple_conversation",
+            action: "answer_directly",
+            reply: "Je suis bloqué pendant la préparation de mission. Je n’ai lancé aucune action sur ton ordinateur. Réessaie quand le provider IA est disponible.",
+            requiresClarification: false,
+            clarificationQuestion: "",
+            missionDraft: null,
+            uiBlocks: [{
+              type: "errorRecoveryCard",
+              title: "Préparation impossible",
+              blocker: preflightError.message,
+              recovery: "Réessayer après rétablissement du provider IA ou de la configuration runtime.",
+              retryable: true
+            }]
+          },
+          generationMode: plannerResult.generationMode === "llm" ? "degraded_blocked" : plannerResult.generationMode,
+          fallbackReason: preflightError.category ?? preflightError.message
+        };
+        preflight = null;
+        missionDraft = null;
+      }
     }
 
     // Auto-launch when JON has confirmed the mission spec needs no clarification
@@ -4239,46 +5603,135 @@ export class OperatorService extends EventEmitter {
         const preflightMode = preflight.understanding?.chosenExecutionFrame
           ? scenarioTypeToMissionMode(preflight.understanding.chosenExecutionFrame)
           : null;
-        const autoMissionSpec = normalizeMissionSpec({
+        const rawAutoMission = {
           objective: missionDraft.objective,
           deliverable: missionDraft.deliverable,
           constraints: missionDraft.constraints,
           forbiddenActions: missionDraft.forbiddenActions,
           mode: preflightMode || missionDraft.mode || "",
           parameters: missionDraft.parameters ?? {}
-        }, this.getMissionEntryContract());
+        };
+        const workspaceSnapshot = (() => {
+          try {
+            return this.getWorkspaceState(projectId, { conversationId: conversation.id });
+          } catch {
+            return null;
+          }
+        })();
+        const autoSurfaceRoute = routeMissionToSurface({
+          missionSpec: rawAutoMission,
+          objective: rawAutoMission.objective,
+          constraints: rawAutoMission.constraints,
+          availableBrowsers,
+          availableApplications,
+          workspaceStateSnapshot: workspaceSnapshot,
+          userPreferences,
+          riskPolicy: {
+            mode: rawAutoMission.parameters?.approvalPolicy?.mode ?? "user_mode"
+          }
+        });
+        const autoRouteOverridesPreflightFrame = Boolean(
+          preflightMode
+          && preflightMode !== "computer"
+          && autoSurfaceRoute.selectedMode === "computer"
+          && ["browser", "desktop", "terminal", "files"].includes(autoSurfaceRoute.selectedSurface)
+        );
+        const shouldApplyAutoSurfaceRoute = !preflightMode
+          || preflightMode === "computer"
+          || autoRouteOverridesPreflightFrame
+          || autoSurfaceRoute.selectedSurface === "browser";
+        const routedAutoMission = shouldApplyAutoSurfaceRoute
+          ? applySurfaceRouteToMission({
+            ...rawAutoMission,
+            mode: autoRouteOverridesPreflightFrame ? "auto" : rawAutoMission.mode
+          }, autoSurfaceRoute)
+          : {
+            ...rawAutoMission,
+            routing: {
+              ...(rawAutoMission.routing ?? {}),
+              surfaceRouter: {
+                selectedSurface: autoSurfaceRoute.selectedSurface,
+                selectedProvider: autoSurfaceRoute.selectedProvider,
+                routingReason: autoSurfaceRoute.routingReason,
+                requiredApproval: autoSurfaceRoute.requiredApproval,
+                expectedTools: autoSurfaceRoute.expectedTools,
+                fallbackSurface: autoSurfaceRoute.fallbackSurface,
+                confidence: autoSurfaceRoute.confidence,
+                blockers: autoSurfaceRoute.blockers,
+                parametersApplied: false,
+                reason: "Confirmed preflight did not require a concrete local/browser surface override."
+              }
+            }
+          };
+        if (autoRouteOverridesPreflightFrame) {
+          routedAutoMission.routing = {
+            ...(routedAutoMission.routing ?? {}),
+            frameOverride: {
+              from: preflightMode,
+              to: autoSurfaceRoute.selectedMode,
+              selectedSurface: autoSurfaceRoute.selectedSurface,
+              reason: "SurfaceRouter selected a concrete local/browser surface, so the run must use the cowork browser loop."
+            }
+          };
+        }
+        const autoMissionSpec = normalizeMissionSpec(routedAutoMission, this.getMissionEntryContract());
         autoMissionSpec.routing = {
           ...autoMissionSpec.routing,
+          ...(routedAutoMission.routing ?? {}),
           modeSource: "agent_preflight_auto_confirmed",
           preflightId: preflight.preflightId ?? null,
           chosenExecutionFrame: preflight.understanding?.chosenExecutionFrame,
           routingConfidence: preflight.understanding?.routingConfidence
         };
-        const autoLaunch = await this.#launchMissionRun({
-          projectId,
-          missionSpec: autoMissionSpec,
-          confirmedPreflight: preflight,
-          orchestration: { autoContinue: false, maxAutoRuns: 1 },
+        const pendingManualHandoff = this.#findPendingManualBrowserHandoffRun(projectId, {
           conversationId: conversation.id,
-          entryPoint: "conversation_auto_launch",
-          selectedBy: "jon_auto_confirm"
+          objective: autoMissionSpec.objective
         });
-        autoLaunchedRunId = autoLaunch.runId;
-        const linkedRunIds = Array.from(new Set([
-          ...(Array.isArray(conversation.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : []),
-          autoLaunch.runId
-        ]));
-        this.runtimeHandle.database.updateConversation(conversation.id, {
-          metadata: {
-            ...(conversation.metadata ?? {}),
-            linkedRunIds,
-            latestRunId: autoLaunch.runId,
-            latestRunStartedAt: nowIso()
-          },
-          updatedAt: nowIso()
-        });
-        // Clear preflight so UI does not show a stale "confirm" button
-        preflight = null;
+        if (pendingManualHandoff) {
+          const message = "Je suis déjà en attente de ton action dans le navigateur pour cette mission. Termine l’étape manuelle dans la fenêtre ouverte, puis réponds-moi \"c’est fait\" pour que je reprenne.";
+          plannerResult = {
+            ...plannerResult,
+            output: {
+              ...plannerResult.output,
+              reply: message,
+              action: "waiting_for_manual_browser_handoff",
+              uiBlocks: [{
+                type: "nextStepCard",
+                title: "Action manuelle nécessaire",
+                text: message,
+                runId: pendingManualHandoff.id
+              }]
+            }
+          };
+          autoLaunchedRunId = pendingManualHandoff.id;
+          preflight = null;
+        } else {
+          const autoLaunch = await this.#launchMissionRun({
+            projectId,
+            missionSpec: autoMissionSpec,
+            confirmedPreflight: preflight,
+            orchestration: { autoContinue: false, maxAutoRuns: 1 },
+            conversationId: conversation.id,
+            entryPoint: "conversation_auto_launch",
+            selectedBy: "jon_auto_confirm"
+          });
+          autoLaunchedRunId = autoLaunch.runId;
+          const linkedRunIds = Array.from(new Set([
+            ...(Array.isArray(conversation.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : []),
+            autoLaunch.runId
+          ]));
+          this.runtimeHandle.database.updateConversation(conversation.id, {
+            metadata: {
+              ...(conversation.metadata ?? {}),
+              linkedRunIds,
+              latestRunId: autoLaunch.runId,
+              latestRunStartedAt: nowIso()
+            },
+            updatedAt: nowIso()
+          });
+          // Clear preflight so UI does not show a stale "confirm" button
+          preflight = null;
+        }
       } catch (launchError) {
         console.error("[conversation] auto-launch failed:", launchError.message);
       }
@@ -4444,7 +5897,8 @@ export class OperatorService extends EventEmitter {
       projectId,
       conversationId: conversation.id,
       message,
-      turn
+      turn,
+      availableBrowsers
     });
 
     for (const capability of relevantCapabilityGraph.topCapabilities.slice(0, 3)) {
@@ -4539,6 +5993,181 @@ export class OperatorService extends EventEmitter {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     throw new Error("Timed out while waiting for the mission chain to settle.");
+  }
+
+  #findPendingManualBrowserHandoffRun(projectId, { conversationId = null, objective = "" } = {}) {
+    const targetFingerprint = missionFingerprint(objective);
+    return this.runtimeHandle.database.listRuns(projectId)
+      .filter((run) => run.status === RUN_STATUS.PAUSED)
+      .filter((run) => run.lifecycleStage === "awaiting_manual_browser_handoff")
+      .filter((run) => run.metadata?.manualBrowserHandoff?.awaitingUser === true)
+      .filter((run) => {
+        if (conversationId && run.metadata?.conversationId && run.metadata.conversationId !== conversationId) {
+          return false;
+        }
+        if (!targetFingerprint) {
+          return true;
+        }
+        const runFingerprint = missionFingerprint(run.metadata?.missionSpec?.objective ?? run.mission ?? "");
+        return runFingerprint.includes(targetFingerprint) || targetFingerprint.includes(runFingerprint);
+      })
+      .sort((left, right) => String(right.updatedAt ?? right.createdAt ?? "").localeCompare(String(left.updatedAt ?? left.createdAt ?? "")))
+      .at(0) ?? null;
+  }
+
+  async #maybeResumeManualBrowserHandoffFromConversation({ projectId, conversation, message }) {
+    if (!isManualHandoffDoneMessage(message)) {
+      return null;
+    }
+    const pendingRun = this.#findPendingManualBrowserHandoffRun(projectId, {
+      conversationId: conversation.id
+    });
+    if (!pendingRun) {
+      return null;
+    }
+
+    const originalMissionSpec = pendingRun.metadata?.missionSpec ?? {
+      mode: "computer",
+      objective: pendingRun.mission,
+      deliverable: "Résultat vérifié et preuve visible si disponible",
+      parameters: {}
+    };
+    const handoff = pendingRun.metadata?.manualBrowserHandoff ?? {};
+    const originalUrl = originalMissionSpec.parameters?.browserLaunch?.url
+      ?? originalMissionSpec.parameters?.browserAutonomy?.startUrl
+      ?? handoff.observedUrl
+      ?? null;
+    const resumeMissionSpec = normalizeMissionSpec({
+      ...originalMissionSpec,
+      parameters: {
+        ...(originalMissionSpec.parameters ?? {}),
+        browserAutonomy: {
+          ...(originalMissionSpec.parameters?.browserAutonomy ?? {}),
+          ...(originalUrl ? { startUrl: originalUrl } : {}),
+          visible: true,
+          mode: "coworker_browser_loop",
+          resumedAfterManualHandoff: true
+        }
+      }
+    }, this.getMissionEntryContract());
+    const orchestration = normalizeMissionOrchestration({
+      autoContinue: pendingRun.metadata?.orchestration?.autoContinueRequested === true,
+      maxAutoRuns: pendingRun.metadata?.orchestration?.maxAutoRuns ?? 1
+    });
+    const launch = await this.#launchMissionRun({
+      projectId,
+      missionSpec: resumeMissionSpec,
+      confirmedPreflight: null,
+      orchestration,
+      conversationId: conversation.id,
+      entryPoint: "manual_browser_handoff_resume",
+      chainId: pendingRun.metadata?.orchestration?.chainId ?? createId("chain"),
+      rootRunId: pendingRun.metadata?.orchestration?.rootRunId ?? pendingRun.id,
+      parentRunId: pendingRun.id,
+      runIndex: Number(pendingRun.metadata?.orchestration?.runIndex ?? 1) + 1,
+      rootMission: pendingRun.metadata?.orchestration?.rootMission ?? originalMissionSpec.objective ?? pendingRun.mission,
+      selectedBy: "user_manual_handoff_done",
+      selectedRecommendationSlot: "manual_handoff_resume",
+      recommendedByRunId: pendingRun.id
+    });
+
+    this.runtimeHandle.database.updateRun(pendingRun.id, {
+      status: RUN_STATUS.STOPPED,
+      lifecycleStage: "manual_handoff_resumed",
+      summary: `Action manuelle confirmée. JON reprend dans ${launch.runId}.`,
+      metadata: {
+        ...(pendingRun.metadata ?? {}),
+        manualBrowserHandoff: {
+          ...(handoff ?? {}),
+          awaitingUser: false,
+          resumedAt: nowIso(),
+          resumedRunId: launch.runId
+        }
+      },
+      updatedAt: nowIso()
+    });
+    this.runtimeHandle.database.insertEvent(pendingRun.id, createEvent("run.manual_handoff_resumed", EVENT_ACTOR.OPERATOR, "User confirmed the manual browser handoff; JON resumed in a follow-up run.", {
+      resumedRunId: launch.runId
+    }));
+
+    const reply = "C’est noté. Je reprends la mission à partir de l’étape utile, sans relancer la même boucle Google. Je vais observer le navigateur, vérifier si le blocage est levé, puis continuer jusqu’au prochain point qui nécessite ton aide.";
+    const turn = {
+      id: createId("turn"),
+      projectId,
+      conversationId: conversation.id,
+      message,
+      intentType: "desktop_action",
+      action: "resume_manual_browser_handoff",
+      reply,
+      requiresClarification: false,
+      clarificationQuestion: "",
+      capabilityRequests: [],
+      uiBlocks: [{
+        type: "nextStepCard",
+        title: "Reprise de mission",
+        text: reply,
+        runId: launch.runId
+      }],
+      capabilityResults: [],
+      missionDraft: resumeMissionSpec,
+      preflight: null,
+      generationMode: "manual_handoff_resume",
+      fallbackReason: null,
+      llm: {
+        providerAlias: "conversation_state",
+        modelAlias: null,
+        providerModel: null,
+        estimatedCost: 0,
+        tokenUsage: null,
+        tokenGovernance: null
+      },
+      generatedAt: nowIso()
+    };
+
+    this.runtimeHandle.database.insertConversationTurn(conversationTurnRecord({
+      projectId,
+      conversationId: conversation.id,
+      role: "assistant",
+      kind: "turn",
+      content: reply,
+      payload: {
+        conversationId: conversation.id,
+        intentType: turn.intentType,
+        action: turn.action,
+        uiBlocks: turn.uiBlocks,
+        linkedRunId: launch.runId,
+        resumedFromRunId: pendingRun.id
+      },
+      metadata: {
+        conversationId: conversation.id,
+        generationMode: turn.generationMode,
+        linkedRunId: launch.runId,
+        resumedFromRunId: pendingRun.id
+      }
+    }));
+
+    const linkedRunIds = Array.from(new Set([
+      ...(Array.isArray(conversation.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : []),
+      pendingRun.id,
+      launch.runId
+    ]));
+    this.runtimeHandle.database.updateConversation(conversation.id, {
+      metadata: {
+        ...(conversation.metadata ?? {}),
+        linkedRunIds,
+        latestRunId: launch.runId,
+        latestRunStartedAt: nowIso(),
+        pendingManualBrowserHandoffRunId: null
+      },
+      updatedAt: nowIso()
+    });
+    this.emitStateChanged("mission.manual_browser_handoff.resumed", {
+      projectId,
+      conversationId: conversation.id,
+      previousRunId: pendingRun.id,
+      runId: launch.runId
+    });
+    return { turn, runId: launch.runId };
   }
 
   async resolveApproval(approvalId, decision, rationale = null) {
@@ -4970,6 +6599,10 @@ export class OperatorService extends EventEmitter {
     const tracked = (async () => {
       try {
         await completion;
+      } catch {
+        // Run already marked failed by the agent — fall through to post-run cleanup.
+      }
+      try {
         await this.#maybePostDegradedModePrompt(runId).catch(() => {});
         await this.#maybeRecoverIncompleteMission(runId).catch((error) => {
           this.runtimeHandle.database.insertEvent(runId, createEvent("run.recovery.error", EVENT_ACTOR.SYSTEM, "Automatic capability recovery stopped after an orchestration error.", {
@@ -4990,6 +6623,12 @@ export class OperatorService extends EventEmitter {
           });
         });
         await this.#maybePostAuthPrompt(runId).catch(() => {});
+        await this.#maybePostManualBrowserHandoffPrompt(runId).catch(() => {});
+        await this.#maybePostRunOutcomePrompt(runId).catch((error) => {
+          this.runtimeHandle.database.insertEvent(runId, createEvent("conversation.outcome_notice.error", EVENT_ACTOR.SYSTEM, "Failed to post natural run outcome into the conversation.", {
+            error: error.message
+          }));
+        });
       } finally {
         this.activeRuns.delete(runId);
         this.emitStateChanged("run.settled", {
@@ -5005,6 +6644,138 @@ export class OperatorService extends EventEmitter {
       entryPoint
     });
     return tracked;
+  }
+
+  async #maybePostRunOutcomePrompt(runId) {
+    const run = this.runtimeHandle.database.getRun(runId);
+    if (!run || ![RUN_STATUS.COMPLETED, RUN_STATUS.FAILED].includes(run.status)) {
+      return null;
+    }
+    if (run.metadata?.runOutcomeNoticePostedAt) {
+      return null;
+    }
+    const conversationId = run.metadata?.conversationId ?? run.metadata?.conversation?.id ?? null;
+    const conversation = conversationId ? this.runtimeHandle.database.getConversation(conversationId) : null;
+    if (!conversation) {
+      return null;
+    }
+
+    const detail = await this.getRunDetail(runId, { locale: "fr" }).catch(() => null);
+    const response = detail?.conversationResponse ?? null;
+
+    let failedMessage = `Je n’ai pas pu terminer la mission. ${compactConversationMessage(run.summary)}`;
+    let recoveryPayload = null;
+    if (run.status === RUN_STATUS.FAILED) {
+      const recovery = await runReflectiveRecovery({
+        mission: run.metadata?.missionSpec?.objective ?? run.mission ?? "",
+        runId,
+        projectId: run.projectId,
+        runStatus: run.status,
+        runSummary: run.summary ?? "",
+        blockerInfo: run.metadata?.manualBrowserHandoff ?? null,
+        verificationResult: run.metadata?.semanticVerification ?? null,
+        runError: run.metadata?.runError ?? null,
+        runMetadata: run.metadata ?? {},
+        llmGateway: this.runtimeHandle.llmGateway ?? null
+      }).catch(() => null);
+
+      if (recovery?.message) {
+        failedMessage = recovery.message;
+      }
+      if (recovery) {
+        recoveryPayload = {
+          id: recovery.id,
+          failureCause: recovery.diagnosis.cause,
+          decisionAction: recovery.decision.action,
+          alternativesCount: recovery.alternatives.length,
+          selectedAlternative: recovery.decision.selectedAlternative ?? null
+        };
+      }
+
+      // AUTO_RETRY: actually re-launch the mission — only once per run (prevents loops)
+      if (
+        recovery?.decision?.action === RECOVERY_ACTION.AUTO_RETRY &&
+        !run.metadata?.autoRetryRunId &&
+        run.metadata?.missionSpec
+      ) {
+        try {
+          const retryLaunch = await this.#launchMissionRun({
+            projectId: run.projectId,
+            missionSpec: run.metadata.missionSpec,
+            confirmedPreflight: null,
+            orchestration: { maxAutoRuns: 1, autoContinue: false, continuationMode: null },
+            conversationId,
+            entryPoint: "reflective_recovery",
+            parentRunId: runId,
+            rootRunId: run.metadata?.orchestration?.rootRunId ?? runId,
+            chainId: run.metadata?.orchestration?.chainId ?? createId("chain"),
+            runIndex: (run.metadata?.orchestration?.runIndex ?? 1) + 1,
+            rootMission: run.metadata?.orchestration?.rootMission ?? run.metadata.missionSpec.objective,
+            selectedBy: "auto_retry"
+          });
+          this.#patchRunMetadata(runId, (metadata) => ({
+            ...metadata,
+            autoRetryRunId: retryLaunch.runId
+          }));
+          if (recoveryPayload) {
+            recoveryPayload.autoRetryRunId = retryLaunch.runId;
+          }
+        } catch {
+          // auto-retry failed to launch — message still shown, no loop
+        }
+      }
+    }
+
+    const message = compactConversationMessage(response?.naturalReply) || (
+      run.status === RUN_STATUS.COMPLETED
+        ? `C’est fait. J’ai terminé la mission et j’ai vérifié le résultat lié au run ${run.id}.`
+        : failedMessage
+    );
+    const action = run.status === RUN_STATUS.COMPLETED ? "report_run_completed" : "report_run_failed";
+
+    this.runtimeHandle.database.insertConversationTurn(conversationTurnRecord({
+      projectId: run.projectId,
+      conversationId,
+      role: "assistant",
+      kind: "turn",
+      content: message,
+      payload: {
+        conversationId,
+        intentType: "mission_outcome",
+        action,
+        linkedRunId: runId,
+        whereAreWe: response?.whereAreWe ?? null,
+        uiBlocks: response?.uiBlocks ?? [],
+        reflectiveRecovery: recoveryPayload
+      },
+      metadata: {
+        generationMode: "post_run_outcome",
+        linkedRunId: runId
+      }
+    }));
+    this.#patchRunMetadata(runId, (metadata) => ({
+      ...metadata,
+      runOutcomeNoticePostedAt: nowIso()
+    }));
+    this.runtimeHandle.database.updateConversation(conversationId, {
+      metadata: {
+        ...(conversation.metadata ?? {}),
+        latestRunOutcome: {
+          runId,
+          status: run.status,
+          summary: run.summary,
+          postedAt: nowIso()
+        }
+      },
+      updatedAt: nowIso()
+    });
+    this.emitStateChanged("conversation.run_outcome.posted", {
+      projectId: run.projectId,
+      conversationId,
+      runId,
+      status: run.status
+    });
+    return { posted: true, message };
   }
 
   async #maybeContinueMissionChain(runId) {
@@ -5422,6 +7193,108 @@ export class OperatorService extends EventEmitter {
       runId
     });
     this.emitStateChanged("conversation.degraded_mode.posted", {
+      projectId: run.projectId,
+      conversationId: conversation.id,
+      runId
+    });
+  }
+
+  async #maybePostManualBrowserHandoffPrompt(runId) {
+    const run = this.runtimeHandle.database.getRun(runId);
+    if (!run) return;
+    if (run.status !== RUN_STATUS.PAUSED || run.lifecycleStage !== "awaiting_manual_browser_handoff") return;
+    const handoff = run.metadata?.manualBrowserHandoff;
+    if (!handoff?.awaitingUser || handoff.promptPostedAt) return;
+
+    const conversationId = run.metadata?.conversationId ?? run.metadata?.conversation?.id ?? null;
+    const conversation = conversationId ? this.runtimeHandle.database.getConversation(conversationId) : null;
+    if (!conversation) return;
+
+    const heuristicMessage = [
+      `Je suis en pause dans le navigateur : ${handoff.reason ?? "une action manuelle est nécessaire."}`,
+      handoff.userAction ?? "Fais l’action demandée dans le navigateur, puis réponds-moi \"c’est fait\".",
+      "Dès que tu me confirmes, je réobserve l’écran et je reprends la mission au lieu de relancer la même boucle."
+    ].filter(Boolean).join(" ");
+
+    const recovery = await runReflectiveRecovery({
+      mission: run.metadata?.missionSpec?.objective ?? run.mission ?? "",
+      runId,
+      projectId: run.projectId,
+      runStatus: run.status,
+      runSummary: run.summary ?? "",
+      blockerInfo: {
+        type: handoff.type ?? null,
+        observedUrl: handoff.observedUrl ?? null,
+        httpStatus: null
+      },
+      verificationResult: null,
+      runError: null,
+      runMetadata: run.metadata ?? {},
+      llmGateway: this.runtimeHandle.llmGateway ?? null
+    }).catch(() => null);
+
+    const message = recovery?.message ?? heuristicMessage;
+
+    this.runtimeHandle.database.insertConversationTurn(conversationTurnRecord({
+      projectId: run.projectId,
+      conversationId: conversation.id,
+      role: "assistant",
+      kind: "mission_paused",
+      content: message,
+      payload: {
+        conversationId: conversation.id,
+        intentType: "desktop_action",
+        action: "waiting_for_manual_browser_handoff",
+        uiBlocks: [{
+          type: "nextStepCard",
+          title: "Action manuelle nécessaire",
+          text: message,
+          runId,
+          status: "waiting_user"
+        }],
+        linkedRunId: runId,
+        manualBrowserHandoff: {
+          type: handoff.type ?? null,
+          reason: handoff.reason ?? null,
+          userAction: handoff.userAction ?? null,
+          observedUrl: handoff.observedUrl ?? null,
+          observedTitle: handoff.observedTitle ?? null
+        },
+        reflectiveRecovery: recovery ? {
+          id: recovery.id,
+          failureCause: recovery.diagnosis.cause,
+          decisionAction: recovery.decision.action,
+          alternativesCount: recovery.alternatives.length
+        } : null
+      },
+      metadata: {
+        generationMode: "manual_browser_handoff_prompt",
+        linkedRunId: runId
+      }
+    }));
+
+    this.#patchRunMetadata(runId, (metadata) => ({
+      ...metadata,
+      manualBrowserHandoff: {
+        ...(metadata.manualBrowserHandoff ?? {}),
+        promptPostedAt: nowIso()
+      }
+    }));
+    this.runtimeHandle.database.updateConversation(conversation.id, {
+      metadata: {
+        ...(conversation.metadata ?? {}),
+        pendingManualBrowserHandoffRunId: runId
+      },
+      updatedAt: nowIso()
+    });
+    this.mobileEventBuffer?.pushRaw("jon.needs_user", {
+      projectId: run.projectId,
+      conversationId: conversation.id,
+      message,
+      runId,
+      kind: "manual_browser_handoff"
+    });
+    this.emitStateChanged("conversation.manual_browser_handoff.posted", {
       projectId: run.projectId,
       conversationId: conversation.id,
       runId

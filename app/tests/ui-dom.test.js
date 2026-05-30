@@ -297,7 +297,87 @@ function buildFixture() {
         resultStatus: "success",
         tokenUsage: { totalTokens: 120 },
         createdAt: nowIso(-1200)
-      }]
+      }],
+      conversationResponse: {
+        naturalReply: "Je suis en pause : j’ai besoin de ton accord pour continuer. JON doit ouvrir le navigateur pour continuer.",
+        currentWorkingStatus: "J’attends ton accord avant de continuer.",
+        uiBlocks: [
+          {
+            id: "approval_browser_block",
+            type: "approvalCard",
+            title: "Accord nécessaire",
+            actionLabel: "Lancer Microsoft Edge ?",
+            reason: "JON doit ouvrir le navigateur pour continuer.",
+            riskLevel: "medium"
+          },
+          {
+            id: "proof_evidence_active",
+            type: "proofCard",
+            title: "Preuve",
+            label: "Preuve active",
+            description: "Preuve active",
+            href: `/api/runs/${activeRun.id}/evidence/evidence_active/screenshot`,
+            evidenceId: "evidence_active",
+            kind: "screenshot"
+          }
+        ],
+        executionThread: {
+          mission: {
+            objective: "Ouvre le navigateur et cherche cinestar",
+            deliverable: "Recherche visible dans le navigateur",
+            constraints: [],
+            status: "paused"
+          },
+          plan: [
+            { id: "understand", label: "Step 1", status: "completed", reason: "" },
+            { id: "approval", label: "Step 2", status: "blocked", reason: "JON doit ouvrir le navigateur pour continuer." }
+          ],
+          toolCalls: [
+            {
+              id: "tool_browser_open",
+              tool: "browser.open",
+              reason: "Ouvrir Microsoft Edge",
+              status: "planned",
+              inputSummary: "Microsoft Edge",
+              outputSummary: "",
+              evidenceId: "",
+              durationMs: null,
+              createdAt: nowIso(-900)
+            },
+            {
+              id: "tool_approval",
+              tool: "approval.request",
+              reason: "Action locale visible",
+              status: "planned",
+              inputSummary: "Lancer Microsoft Edge ?",
+              outputSummary: "",
+              evidenceId: "",
+              durationMs: null,
+              createdAt: nowIso(-800)
+            }
+          ],
+          state: {
+            activeWindow: "",
+            activeBrowser: "",
+            activeBrowserUrl: "",
+            activeTerminal: "Codex CLI",
+            pendingApprovals: 1,
+            evidenceCount: 1,
+            artifactCount: 1,
+            blockage: "JON doit ouvrir le navigateur pour continuer.",
+            nextAction: "Attendre l’accord utilisateur"
+          },
+          verification: {
+            objectiveSatisfied: false,
+            verdict: "partial",
+            confidence: null,
+            evidenceUsed: ["evidence_active"],
+            missingEvidence: ["navigateur ouvert"],
+            proofRequired: true,
+            proofAvailable: true
+          }
+        }
+      }
     },
     turns: [
       {
@@ -322,7 +402,16 @@ function buildFixture() {
           action: "prepare_mission_preflight",
           requiresClarification: true,
           clarificationQuestion: "Quel navigateur veux-tu utiliser ?",
-          uiBlocks: [],
+          uiBlocks: [{
+            id: "turn_proof",
+            type: "proofCard",
+            title: "Preuve",
+            label: "Preuve active",
+            description: "Preuve active",
+            href: `/api/runs/${activeRun.id}/evidence/evidence_active/screenshot`,
+            evidenceId: "evidence_active",
+            kind: "screenshot"
+          }],
           preflight: {
             understanding: {
               missionSummary: "Ouvrir un navigateur",
@@ -493,6 +582,56 @@ export async function run() {
     await assert.equal(await page.locator(".react-composer-row textarea").inputValue(), "");
     await assert.equal(await page.getByText("Ouvrir Microsoft Edge").count() >= 1, true);
     await assert.equal(await page.getByRole("button", { name: "Confirmer" }).count() >= 1, true);
+    await assert.equal(await page.getByText("Preuve active").count() >= 1, true);
+    await assert.equal(await page.getByText("Ouvrir une capture preuve").count() >= 1, true);
+    await assert.equal(await page.locator(".jon-pulse.waiting_user").count() >= 1, true);
+    await assert.equal(
+      await page.locator(".jon-pulse.waiting_user .jon-pulse-node.satellite.one").first().evaluate((el) => getComputedStyle(el).animationName),
+      "none"
+    );
+    await page.evaluate(() => {
+      const host = document.createElement("div");
+      host.setAttribute("data-testid", "jon-pulse-animation-probe");
+      host.className = "react-message assistant";
+      host.innerHTML = `
+        <div class="react-avatar">
+          <div class="jon-pulse acting" aria-label="JON">
+            <span class="jon-pulse-node main"></span>
+            <span class="jon-pulse-link one"></span>
+            <span class="jon-pulse-link two"></span>
+            <span class="jon-pulse-node satellite one"></span>
+            <span class="jon-pulse-node satellite two"></span>
+          </div>
+        </div>`;
+      document.body.appendChild(host);
+    });
+    await assert.match(
+      await page.locator('[data-testid="jon-pulse-animation-probe"] .jon-pulse-node.satellite.one').evaluate((el) => getComputedStyle(el).animationName),
+      /jon-satellite-orbit/
+    );
+    await assert.equal(
+      await page.locator('[data-testid="jon-pulse-animation-probe"] .react-avatar').evaluate((el) => getComputedStyle(el).backgroundColor),
+      "rgba(0, 0, 0, 0)"
+    );
+    await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.setAttribute("data-testid", "typing-row-probe");
+      probe.className = "typing-row";
+      probe.innerHTML = "<span></span><span></span><span></span>";
+      document.body.appendChild(probe);
+    });
+    await assert.equal(
+      await page.locator('[data-testid="typing-row-probe"]').evaluate((el) => getComputedStyle(el).display),
+      "none"
+    );
+    await assert.equal(
+      await page.locator(".react-message:has(.turn-bubble) .react-bubble").first().evaluate((el) => getComputedStyle(el).backgroundColor),
+      "rgba(0, 0, 0, 0)"
+    );
+    await assert.equal(
+      await page.locator(".react-message:has(.turn-bubble) .react-bubble").first().evaluate((el) => getComputedStyle(el).borderTopColor),
+      "rgba(0, 0, 0, 0)"
+    );
 
     // WorkspaceTerminalMessage is now in JON (workspace pilot conversation) only
     await page.locator('[data-testid="jon-conversation-item"]').click();
@@ -505,13 +644,20 @@ export async function run() {
     await page.locator('[data-testid="choice-card"]').waitFor({ state: "visible" });
 
     // Open trace inspector from the single right workspace rail
-    await page.getByLabel("Ouvrir l'inspecteur").click();
+    await page.getByLabel("Ouvrir les coulisses").click();
     await page.locator('[data-testid="run-inspector"].open').waitFor({ state: "visible" });
-    await assert.equal(await page.locator(".run-trace-list").count() >= 1, true);
+    await assert.equal(await page.locator('[data-testid="execution-thread"]').count() >= 1, true);
     await assert.equal(await page.getByText("Ouvre le navigateur et cherche cinestar").count() >= 1, true);
+    await assert.equal(await page.locator('[data-testid="execution-thread"]').getByText("Step 1", { exact: true }).count(), 0);
+    await assert.equal(await page.getByText("Comprendre la demande").count() >= 1, true);
+    await assert.equal(await page.getByText("Demander ton accord").count() >= 1, true);
     await assert.equal(await page.getByText("Autre mission hors conversation").count(), 0);
     await assert.equal(await page.getByText("Codex CLI attend une confirmation.").count() >= 1, true);
-    await page.getByRole("button", { name: "Réduire l'inspecteur" }).click();
+    await assert.equal(await page.getByText("browser.open").count() >= 1, true);
+    await assert.equal(await page.getByText("approval.request").count() >= 1, true);
+    await assert.equal(await page.locator(".react-message:has(.turn-bubble) .jon-pulse").count() <= 1, true);
+    await assert.equal(await page.getByText("Résultat prêt.").count(), 0);
+    await page.getByRole("button", { name: "Réduire les coulisses" }).click();
     await page.locator('[data-testid="workspace-rail"]').waitFor({ state: "visible" });
 
     // Open terminal sidebar from the same right workspace rail

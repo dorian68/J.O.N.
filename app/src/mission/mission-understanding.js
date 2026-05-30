@@ -15,6 +15,20 @@ const MODE_KEYWORDS = Object.freeze({
     "research",
     "search",
     "compare",
+    "list",
+    "current",
+    "deal",
+    "deals",
+    "offer",
+    "offers",
+    "price",
+    "prices",
+    "product",
+    "products",
+    "smartphone",
+    "smartphones",
+    "android",
+    "ebay",
     "page",
     "pages",
     "site",
@@ -26,6 +40,13 @@ const MODE_KEYWORDS = Object.freeze({
     "find",
     "chercher",
     "recherche",
+    "liste",
+    "lister",
+    "offre",
+    "offres",
+    "prix",
+    "produit",
+    "produits",
     "compare",
     "page",
     "pages",
@@ -251,14 +272,44 @@ function detectGeneralDesktopActionIntent(text) {
   return /\b(open|launch|start|ouvrir|ouvre|lance|demarre)\b[\s\S]{0,80}\b(editeur|editor|notepad|bloc notes)\b/.test(normalized);
 }
 
+function detectBrowserAutonomyIntent(text, {
+  launchRequested = false,
+  searchRequested = false,
+  preferredTargetSite = "",
+  preferredLaunchUrl = "",
+  preferredSearchUrl = "",
+  preferredResultType = "",
+  preferredResultCount = null
+} = {}) {
+  const browserSurface = Boolean(
+    launchRequested
+      || searchRequested
+      || preferredTargetSite
+      || preferredLaunchUrl
+      || preferredSearchUrl
+  );
+  if (!browserSurface) {
+    return false;
+  }
+  const needsOutcome = Boolean(preferredResultType || preferredResultCount || searchRequested)
+    || /\b(list|lister|liste|show|find|trouve|trouver|current|deals?|offres?|jobs?|postes?|missions?|articles?|products?|produits?|extract|extraire|copy|copie|copier|description|profile|profil|compare|comparer|summary|résumé|resume|screenshot|capture|preuve|proof|save|sauvegarde|sauvegarder|fichier|file|links?|liens?)\b/i.test(text);
+  const siteNavigation = Boolean(searchRequested || preferredTargetSite || preferredLaunchUrl || preferredSearchUrl)
+    || /\b(go to|aller sur|va sur|ouvre le site|open the site|open site|acc[eè]de|accéder|visite)\b/i.test(text);
+  return Boolean(needsOutcome && siteNavigation);
+}
+
 function findExplicitBrowserChoice(text, browserCatalog = [], preferredBrowserId = "") {
+  const explicit = browserCatalog.find((browser) => {
+    return browserAliasesFor(browser).some((alias) => text.includes(alias));
+  }) ?? null;
+  if (explicit) {
+    return explicit;
+  }
   const preferred = String(preferredBrowserId ?? "").trim().toLowerCase();
   if (preferred) {
     return browserCatalog.find((browser) => browser.id === preferred) ?? null;
   }
-  return browserCatalog.find((browser) => {
-    return browserAliasesFor(browser).some((alias) => text.includes(alias));
-  }) ?? null;
+  return null;
 }
 
 function browserChoiceSummary(browser) {
@@ -478,12 +529,16 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
   });
   const browserCatalog = normalizeBrowserCatalog(input.availableBrowsers ?? []);
   const parameters = input.missionSpec?.parameters ?? input.parameters ?? {};
+  const runtimePreferredBrowserId = input.userPreferences?.preferredBrowser?.id
+    ?? input.runtimePreferences?.preferredBrowser?.id
+    ?? "";
   const preferredBrowserId = normalizeBrowserIdHint(
     parameters?.browserLaunch?.browserId
       ?? parameters?.browserLaunch?.browserLabel
       ?? parameters?.browserId
       ?? parameters?.browser
       ?? parameters?.application
+      ?? runtimePreferredBrowserId
   );
   const preferredSearchQuery = parameters?.browserLaunch?.searchQuery
     ?? parameters?.searchQuery
@@ -517,6 +572,8 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
   const forcedActionType = parameters?.computerAction?.type
     ?? parameters?.computerActionType
     ?? "";
+  const boundedLaunchOnly = parameters?.computerAction?.boundedLaunchOnly === true
+    || parameters?.boundedLaunchOnly === true;
   const applicationLaunchRequested = Boolean(
     input.missionSpec?.parameters?.applicationLaunch?.applicationId
     || input.parameters?.applicationLaunch?.applicationId
@@ -536,11 +593,12 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
     || preferredSearchUrl
     || preferredResultType
     || preferredResultCount
-    || ["launch_browser", "launch_browser_search"].includes(normalizedForcedActionType)
+    || ["launch_browser", "launch_browser_search", "browser_autonomy"].includes(normalizedForcedActionType)
   );
   const browserScopedActionRequested = Boolean(
     launchRequested
     || normalizedForcedActionType === "capture_browser_window"
+    || normalizedForcedActionType === "browser_autonomy"
     || preferredBrowserId
     || preferredSearchQuery
     || preferredLaunchUrl
@@ -553,7 +611,7 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
     ? (explicitBrowser ?? (browserCatalog.length === 1 ? browserCatalog[0] : null))
     : null;
   const searchRequested = Boolean(
-    (launchRequested || normalizedForcedActionType === "launch_browser_search")
+    (launchRequested || ["launch_browser_search", "browser_autonomy"].includes(normalizedForcedActionType))
     && (detectBrowserSearchIntent(searchText) || preferredSearchQuery || preferredSearchUrl || preferredResultCount || preferredResultType)
   );
   const searchQuery = searchRequested
@@ -568,6 +626,18 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
     : preferredLaunchUrl || null;
   const captureRequested = detectScreenshotIntent(searchText)
     || ["capture_browser_window", "capture_active_window"].includes(normalizedForcedActionType);
+  const browserAutonomyRequested = !boundedLaunchOnly && (
+    normalizedForcedActionType === "browser_autonomy"
+    || detectBrowserAutonomyIntent(missionText, {
+      launchRequested,
+      searchRequested,
+      preferredTargetSite,
+      preferredLaunchUrl,
+      preferredSearchUrl,
+      preferredResultType,
+      preferredResultCount
+    })
+  );
   const clarificationOptions = browserScopedActionRequested && !selectedBrowser && browserCatalog.length > 1
     ? browserCatalog.map(browserChoiceSummary).filter(Boolean)
     : [];
@@ -578,6 +648,7 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
     launchUrl,
     resultType: String(preferredResultType ?? "").trim(),
     captureRequested,
+    browserAutonomyRequested,
     desktopAutonomyRequested,
     forcedActionType: normalizedForcedActionType || null,
     browserCatalog,
@@ -589,6 +660,12 @@ function buildBrowserLaunchState(input = {}, inferred = {}) {
 
 function determineComputerActionType(browserLaunchState = null) {
   const forced = String(browserLaunchState?.forcedActionType ?? "").trim();
+  if (forced === "browser_autonomy") {
+    return forced;
+  }
+  if (browserLaunchState?.browserAutonomyRequested && (!forced || ["launch_browser", "launch_browser_search"].includes(forced))) {
+    return "browser_autonomy";
+  }
   if (["observe_window", "launch_browser", "launch_browser_search", "capture_browser_window", "capture_active_window", "desktop_autonomy"].includes(forced)) {
     return forced;
   }
@@ -618,6 +695,13 @@ function verificationGoalsForMode(mode, browserLaunchState = null) {
         "Verify that the approved browser launch and search step was executed on this machine.",
         "Verify that a visible browser window appears for the selected browser after launch.",
         "Persist visible proof for operator review."
+      ];
+    }
+    if (actionType === "browser_autonomy") {
+      return [
+        "Verify that JON opened a visible browser workspace for the requested web task.",
+        "Verify that JON observed the page state and adjusted the browser plan from evidence.",
+        "Persist page proof and do not mark complete until the requested web outcome is satisfied."
       ];
     }
     if (actionType === "launch_browser") {
@@ -676,6 +760,14 @@ function requestedOutcomesForMode(mode, input = {}, browserLaunchState = null) {
         `Open ${browserLabel} on this machine after approval.`,
         `Search for ${query} inside the browser launch step.`,
         deliverable || "Return visible proof that the browser search step ran."
+      ];
+    }
+    if (actionType === "browser_autonomy") {
+      const query = browserLaunchState.searchQuery || "the requested web task";
+      return [
+        `Open a visible browser workspace for ${query}.`,
+        "Observe the page, act through browser primitives, and adapt when the visible state changes.",
+        deliverable || "Return the requested web result with linked proof."
       ];
     }
     if (actionType === "launch_browser") {
@@ -741,6 +833,14 @@ function runNowPlanForMode(mode, input = {}, browserLaunchState = null) {
         `Request approval before opening ${browserLabel}.`,
         `Launch ${browserLabel} on the requested search page, then verify that a visible browser window appears.`,
         deliverable ? `Return ${deliverable}.` : "Return visible proof that the browser search step was executed."
+      ];
+    }
+    if (actionType === "browser_autonomy") {
+      return [
+        "Open a visible browser workspace for the requested site or search.",
+        "Observe the current page state before deciding the next browser action.",
+        "Navigate, click, type, read the DOM, and capture proof only through governed browser tools.",
+        deliverable ? `Return ${deliverable}.` : "Return the verified web result with proof."
       ];
     }
     if (actionType === "launch_browser") {
@@ -832,6 +932,9 @@ function buildNotCoveredNow({ unsupportedRequests, crossFrameNotice, selectedMod
   }
   if (selectedMode === "computer" && computerActionType === "launch_browser_search") {
     items.push("This run will stop after the bounded browser-search step. It will not silently continue into additional desktop actions.");
+  }
+  if (selectedMode === "computer" && computerActionType === "browser_autonomy") {
+    items.push("This run will use a governed visible browser workspace. It will not bypass login, CAPTCHA, payment, or anti-bot blockers.");
   }
   if (selectedMode === "computer" && browserLaunchState?.captureRequested && ["launch_browser", "launch_browser_search"].includes(computerActionType)) {
     items.push("This run will not capture the screenshot yet. The screenshot needs its own bounded follow-up run.");
@@ -1010,9 +1113,11 @@ function buildClarificationQuestion({ selectedMode, inferred, unsupportedRequest
 }
 
 function buildClarificationState({ inferred, unsupportedRequests, browserLaunchState }) {
+  const boundedBrowserStepIsReady = Boolean(browserLaunchState?.launchRequested && browserLaunchState?.selectedBrowser);
+  const blockingUnsupportedRequests = unsupportedRequests.filter((request) => request !== inferred.crossFrameNotice);
   const requiresClarification = inferred.confidence === "low"
-    || Boolean(inferred.crossFrameNotice && inferred.scoreGap <= 1)
-    || Boolean(unsupportedRequests.length > 0 && inferred.confidence !== "high")
+    || Boolean(inferred.crossFrameNotice && inferred.scoreGap <= 1 && !boundedBrowserStepIsReady)
+    || Boolean(blockingUnsupportedRequests.length > 0 && inferred.confidence !== "high")
     || Boolean(browserLaunchState?.clarificationOptions?.length > 0)
     || Boolean(browserLaunchState?.noSupportedBrowser);
   return {
@@ -1375,15 +1480,67 @@ function validateChoiceRequest(value, label = "choiceRequest") {
   };
 }
 
+const VALID_EXECUTION_FRAMES = new Set(["research", "form_preparation", "computer_observation"]);
+
+function contextComputerActionType(context = {}) {
+  return String(
+    context.missionDraft?.parameters?.computerAction?.type
+      ?? context.missionSpec?.parameters?.computerAction?.type
+      ?? context.parameters?.computerAction?.type
+      ?? context.computerActionType
+      ?? ""
+  ).trim();
+}
+
+function normalizeExecutionFrameAlias(value, output = {}, context = {}) {
+  const raw = String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (VALID_EXECUTION_FRAMES.has(raw)) {
+    return raw;
+  }
+
+  const computerActionType = String(output.computerActionType ?? "").trim();
+  const hasLocalBrowserSignal = [
+    "launch_browser",
+    "launch_browser_search",
+    "capture_browser_window",
+    "capture_active_window",
+    "desktop_autonomy",
+    "browser_autonomy"
+  ].includes(computerActionType)
+    || Boolean(output.selectedBrowser?.id)
+    || Boolean(output.parameters?.browserLaunch?.browserId)
+    || Boolean(context.forceComputerFrame);
+
+  if (/form|field|input/.test(raw)) {
+    return "form_preparation";
+  }
+  if (/(computer|desktop|local|window|screen|app|application|os|workspace)/.test(raw)) {
+    return "computer_observation";
+  }
+  if (/(browser|browse|web|internet|online|search|research|site|page|market|shopping|product|ecommerce|commerce|deal|deals|listing|listings)/.test(raw)) {
+    return hasLocalBrowserSignal ? "computer_observation" : "research";
+  }
+  if (!raw && hasLocalBrowserSignal) {
+    return "computer_observation";
+  }
+  if (!raw && (output.browserSearchQuery || output.browserLaunchUrl)) {
+    return "research";
+  }
+  return "";
+}
+
 function reconcileBrowserLaunchOutput(validated, context = {}) {
   const browserCatalog = normalizeBrowserCatalog(context.availableBrowsers ?? []);
-  if (!["launch_browser", "launch_browser_search", "capture_browser_window"].includes(validated.computerActionType)) {
-    return {
-      ...validated,
-      selectedBrowser: null,
-      clarificationOptions: [],
-      choiceRequest: null
-    };
+  if (!["launch_browser", "launch_browser_search", "capture_browser_window", "browser_autonomy"].includes(validated.computerActionType)) {
+    const hasBrowserSignal = Boolean(validated.browserSearchQuery || validated.browserLaunchUrl);
+    if (!(validated.requiresClarification && hasBrowserSignal && browserCatalog.length > 1)) {
+      return {
+        ...validated,
+        selectedBrowser: null,
+        clarificationOptions: [],
+        choiceRequest: null
+      };
+    }
   }
 
   let selectedBrowser = validated.selectedBrowser
@@ -1436,9 +1593,34 @@ export function validateMissionUnderstandingOutput(output, context = {}) {
       category: "malformed_output"
     });
   }
+  const contextualComputerActionType = contextComputerActionType(context);
   const missionSummary = String(output.missionSummary ?? "").trim();
   const clarifiedObjective = String(output.clarifiedObjective ?? "").trim();
-  const chosenExecutionFrame = String(output.chosenExecutionFrame ?? "").trim();
+  const routing = output.routing && typeof output.routing === "object" && !Array.isArray(output.routing) ? output.routing : {};
+  const execution = output.execution && typeof output.execution === "object" && !Array.isArray(output.execution) ? output.execution : {};
+  const classification = output.classification && typeof output.classification === "object" && !Array.isArray(output.classification) ? output.classification : {};
+  const chosenExecutionFrame = normalizeExecutionFrameAlias(
+    output.chosenExecutionFrame
+      ?? output.selectedExecutionFrame
+      ?? output.executionFrame
+      ?? output.execution_frame
+      ?? output.frameId
+      ?? output.frame
+      ?? output.mode
+      ?? output.scenarioType
+      ?? routing.chosenExecutionFrame
+      ?? routing.executionFrame
+      ?? routing.frame
+      ?? execution.chosenExecutionFrame
+      ?? execution.frame
+      ?? classification.executionFrame
+      ?? classification.frame,
+    output,
+    {
+      ...context,
+      forceComputerFrame: context.forceComputerFrame || contextualComputerActionType === "browser_autonomy"
+    }
+  );
   const routingConfidence = String(output.routingConfidence ?? "").trim().toLowerCase();
   const whyThisFrame = String(output.whyThisFrame ?? "").trim();
   const operatorBoundary = String(output.operatorBoundary ?? "").trim();
@@ -1448,7 +1630,10 @@ export function validateMissionUnderstandingOutput(output, context = {}) {
   const maybeLaterSuggestion = String(output.maybeLaterSuggestion ?? "").trim();
   const nextRunRecommendation = validateRecommendationObject(output.nextRunRecommendation ?? null, "nextRunRecommendation");
   const maybeLaterRecommendation = validateRecommendationObject(output.maybeLaterRecommendation ?? null, "maybeLaterRecommendation");
-  const computerActionType = output.computerActionType == null ? null : String(output.computerActionType).trim();
+  let computerActionType = output.computerActionType == null ? null : String(output.computerActionType).trim();
+  if (contextualComputerActionType === "browser_autonomy" && (!computerActionType || ["launch_browser", "launch_browser_search"].includes(computerActionType))) {
+    computerActionType = "browser_autonomy";
+  }
   const browserSearchQuery = String(output.browserSearchQuery ?? "").trim();
   const browserLaunchUrl = output.browserLaunchUrl == null ? null : String(output.browserLaunchUrl).trim();
   const selectedBrowser = validateBrowserChoice(output.selectedBrowser ?? null, "selectedBrowser");
@@ -1462,7 +1647,7 @@ export function validateMissionUnderstandingOutput(output, context = {}) {
       category: "malformed_output"
     });
   }
-  if (!["research", "form_preparation", "computer_observation"].includes(chosenExecutionFrame)) {
+  if (!VALID_EXECUTION_FRAMES.has(chosenExecutionFrame)) {
     throw Object.assign(new Error("Mission understanding output must select a valid execution frame."), {
       category: "malformed_output"
     });
@@ -1477,7 +1662,7 @@ export function validateMissionUnderstandingOutput(output, context = {}) {
       category: "malformed_output"
     });
   }
-  if (computerActionType != null && !["observe_window", "launch_browser", "launch_browser_search", "capture_browser_window", "capture_active_window", "desktop_autonomy"].includes(computerActionType)) {
+  if (computerActionType != null && !["observe_window", "launch_browser", "launch_browser_search", "capture_browser_window", "capture_active_window", "desktop_autonomy", "browser_autonomy"].includes(computerActionType)) {
     throw Object.assign(new Error("Mission understanding output must contain a valid computerActionType."), {
       category: "malformed_output"
     });

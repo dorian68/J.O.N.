@@ -151,9 +151,13 @@ export class MissionProgressTracker {
 
   // ── Final status ─────────────────────────────────────────────────────────────
 
-  complete({ verifiedByOutcomes = false } = {}) {
-    this.finalStatus = "completed";
-    this.verifiedByOutcomes = verifiedByOutcomes;
+  complete({ verifiedByOutcomes = false, failureReason = null } = {}) {
+    if (this.finalStatus !== null) return; // idempotent — terminal status is immutable
+    this.verifiedByOutcomes = Boolean(verifiedByOutcomes);
+    this.finalStatus = this.verifiedByOutcomes ? "completed" : "failed";
+    if (!this.verifiedByOutcomes) {
+      this.stoppedReason = failureReason ?? "Completion blocked because semantic verification did not pass.";
+    }
     this.updatedAt = nowIso();
   }
 
@@ -198,18 +202,21 @@ export class MissionProgressTracker {
   }
 
   fail(reason) {
+    if (this.finalStatus !== null) return; // idempotent
     this.finalStatus = "failed";
     this.stoppedReason = reason;
     this.updatedAt = nowIso();
   }
 
   stop(reason) {
+    if (this.finalStatus !== null) return; // idempotent
     this.finalStatus = "stopped";
     this.stoppedReason = reason;
     this.updatedAt = nowIso();
   }
 
   pause(reason) {
+    if (this.finalStatus !== null) return; // idempotent
     this.finalStatus = "paused";
     this.stoppedReason = reason;
     this.updatedAt = nowIso();
@@ -254,6 +261,8 @@ export class MissionProgressTracker {
   }
 
   whatIsNext() {
+    if (this.finalVerification?.nextBestAction) return this.finalVerification.nextBestAction;
+    if (this.pendingApprovalId) return "Resolve the pending user approval.";
     const nextPending = this.pendingOutcomes[0] ?? null;
     if (nextPending) return `Next outcome to achieve: ${nextPending}`;
     return this.finalStatus ? `Mission ${this.finalStatus}` : "Executing next planned step";
@@ -290,7 +299,9 @@ export class MissionProgressTracker {
       proof: {
         evidenceIds: this.evidenceIds,
         artifactIds: this.artifactIds,
-        screenshotPaths: this.screenshotPaths
+        screenshotPaths: this.screenshotPaths,
+        missingEvidence: this.finalVerification?.missingEvidence ?? [],
+        evidenceUsedInVerification: this.finalVerification?.evidenceUsed ?? []
       },
       userInteraction: {
         waitingForUser: Boolean(this.pendingApprovalId),
@@ -309,7 +320,9 @@ export class MissionProgressTracker {
         failureReason: this.finalVerification?.failureReason ?? null,
         confidence: this.finalVerification?.confidence ?? null,
         nextBestAction: this.finalVerification?.nextBestAction ?? null,
-        requiresUserInput: this.finalVerification?.requiresUserInput ?? false
+        requiresUserInput: this.finalVerification?.requiresUserInput ?? false,
+        missingEvidence: this.finalVerification?.missingEvidence ?? [],
+        criticalBlockers: this.finalVerification?.criticalBlockers ?? []
       }
     };
   }

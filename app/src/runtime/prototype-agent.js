@@ -35,6 +35,13 @@ import { reconcileRunHandoffDecision, validateRunHandoffDecisionOutput } from ".
 import { prepareRuntimeReasoningPayload, selectPreferredModelAlias } from "../llm/token-governance.js";
 import { normalizePlanOutput } from "../llm/structured-output-normalizers.js";
 import { createEvent } from "./events.js";
+import {
+  browserToolNameForAction,
+  createToolCall,
+  createToolCallLifecycleEvent,
+  desktopToolNameForPrimitive,
+  TOOL_CALL_STATUS
+} from "./tool-call-lifecycle.js";
 import { createId, nowIso } from "../utils/ids.js";
 import { sanitizeFilename, writeText } from "../utils/files.js";
 import { buildDeterministicAmbiguityOutput, buildDeterministicEvaluationOutput } from "../reasoning/evaluator.js";
@@ -72,6 +79,12 @@ import {
   updateUserMemoryFromRun
 } from "../memory/user-memory.js";
 import {
+  USER_PREFERENCES_SETTING_KEY,
+  defaultUserPreferences,
+  normalizeUserPreferences,
+  summarizeUserPreferences
+} from "../preferences/user-preferences.js";
+import {
   buildDesktopReplanContext,
   selectDesktopReplanContinuation
 } from "../computer/desktop-replanner.js";
@@ -101,6 +114,44 @@ const PRIMARY_REASONING_PROMPT = Object.freeze({
 });
 const RUN_HANDOFF_DECISION_TIMEOUT_MS = 4_000;
 const MAX_DYNAMIC_DESKTOP_REPLANS = 2;
+
+function activeBrowserTarget(browserState = null) {
+  if (!browserState) {
+    return null;
+  }
+  const targets = Array.isArray(browserState.targets) ? browserState.targets : [];
+  return targets.find((target) => target.id === browserState.activeTargetId)
+    ?? targets.find((target) => target.active)
+    ?? targets.at(-1)
+    ?? null;
+}
+
+function browserManualHandoffFromResult(result = {}) {
+  const blockers = Array.isArray(result.blockers) ? result.blockers : [];
+  const blocker = blockers.find((entry) => entry?.requiresUserAction)
+    ?? blockers.find((entry) => entry?.blocked)
+    ?? null;
+  if (!blocker) {
+    return null;
+  }
+  const activeTarget = activeBrowserTarget(result.browserState);
+  const observedUrl = blocker.observedUrl ?? activeTarget?.url ?? null;
+  const observedTitle = blocker.observedTitle ?? activeTarget?.title ?? null;
+  const type = blocker.type ?? "browser_blocker";
+  const reason = blocker.reason ?? "Le navigateur attend une action manuelle.";
+  const userAction = blocker.userAction
+    ?? "Effectue l'action demandée dans le navigateur, puis reviens dire que c'est fait.";
+  return {
+    awaitingUser: true,
+    type,
+    reason,
+    userAction,
+    observedUrl,
+    observedTitle,
+    detectedAt: nowIso(),
+    retryableAfterUserAction: blocker.retryableAfterUserAction !== false
+  };
+}
 
 function semanticSelectorForDesktopStep(step = {}) {
   const query = String(step.target?.semanticTarget ?? step.input?.semanticTarget ?? "").trim();
@@ -236,6 +287,11 @@ function shouldUseDeterministicFallback(error) {
   ].includes(error?.category);
 }
 
+function shouldUseRuntimeFallback(error, gatewayStatus = {}) {
+  return shouldUseDeterministicFallback(error)
+    && (gatewayStatus.deterministicFallback || error?.category === "malformed_output");
+}
+
 function createStageTimeoutError(stage, timeoutMs) {
   return Object.assign(new Error(`Timed out while waiting for ${stage} after ${timeoutMs}ms.`), {
     category: "timeout"
@@ -311,6 +367,38 @@ function verificationCheck(label, passed, details = {}) {
     label,
     status: passed ? "pass" : "fail",
     details
+  };
+}
+
+export function guardCompletedRunPatch({ currentRun = null, patch = {}, now = nowIso } = {}) {
+  if (patch?.status !== RUN_STATUS.COMPLETED) {
+    return patch;
+  }
+
+  const metadata = {
+    ...(currentRun?.metadata ?? {}),
+    ...(patch.metadata ?? {})
+  };
+  if (metadata?.semanticVerification?.verifiedByOutcomes === true) {
+    return patch;
+  }
+
+  const guardedAt = now();
+  return {
+    ...patch,
+    status: RUN_STATUS.FAILED,
+    lifecycleStage: "failed_false_completion_guard",
+    summary: patch.summary
+      ? `False completion blocked: ${patch.summary}`
+      : "False completion blocked because the user objective was not semantically verified.",
+    metadata: {
+      ...metadata,
+      falseCompletionGuard: {
+        blockedAt: guardedAt,
+        requestedStatus: RUN_STATUS.COMPLETED,
+        reason: "completed requires semanticVerification.verifiedByOutcomes === true"
+      }
+    }
   };
 }
 
@@ -500,6 +588,18 @@ export class PrototypeAgent {
     return summarizeUserMemory(this.#getUserMemory());
   }
 
+  #getUserPreferences() {
+    const setting = this.database.getAppSetting?.(
+      USER_PREFERENCES_SETTING_KEY,
+      defaultUserPreferences()
+    );
+    return normalizeUserPreferences(setting?.value ?? defaultUserPreferences());
+  }
+
+  #getUserPreferencesSummary() {
+    return summarizeUserPreferences(this.#getUserPreferences());
+  }
+
   #saveUserMemory(memory) {
     this.database.upsertAppSetting?.(
       USER_MEMORY_SETTING_KEY,
@@ -608,7 +708,7 @@ export class PrototypeAgent {
         })
       ]);
     } catch (error) {
-      if (!shouldUseDeterministicFallback(error) || !this.getLlmGatewayStatus().deterministicFallback) {
+      if (!shouldUseRuntimeFallback(error, this.getLlmGatewayStatus())) {
         throw error;
       }
       const degradedSnapshot = error.reasoningSnapshot ?? await this.#createReasoningSnapshot({
@@ -698,17 +798,20 @@ export class PrototypeAgent {
   async previewMissionPreflight({
     projectId,
     missionDraft,
-    preferredScenarioType = null
+    preferredScenarioType = null,
+    userPreferences = null
   }) {
     const project = this.#requireProject(projectId);
     const availableBrowsers = await this.#listAvailableBrowsers();
+    const runtimePreferences = userPreferences ?? this.#getUserPreferencesSummary();
     const previewRun = this.#buildMissionPreviewRun(project, missionDraft, preferredScenarioType);
     const understanding = await this.#previewMissionUnderstanding({
       run: previewRun,
       project,
       scenarioType: preferredScenarioType,
       missionDraft,
-      availableBrowsers
+      availableBrowsers,
+      userPreferences: runtimePreferences
     });
 
     return {
@@ -1185,6 +1288,53 @@ export class PrototypeAgent {
         throw new Error("Research verification failed after execution.");
       }
 
+      const researchEvidenceForVerifier = sourceReferences.map((source, index) => ({
+        id: evidenceIds[index] ?? null,
+        type: EVIDENCE_TYPE.PAGE_SCREENSHOT,
+        label: `${source.title} evidence`,
+        url: source.canonicalRef,
+        linkedSurface: source.canonicalRef,
+        metadata: {
+          url: source.canonicalRef,
+          title: source.metadata?.title ?? source.title
+        }
+      })).filter((entry) => entry.id);
+      const researchSemanticVerification = new SemanticOutcomeVerifier().verify({
+        mission: run.mission,
+        planOutcomes: planDraft.plan.missionUnderstanding?.verificationGoals ?? [],
+        actionLog: [
+          { status: "completed", primitive: "navigate", label: "Open research sources" },
+          { status: "completed", primitive: "extract_structured_rows", label: "Extract source records", result: { rows: records } },
+          { status: "completed", primitive: "create_artifact", label: "Persist research artifacts" }
+        ],
+        evidence: researchEvidenceForVerifier,
+        artifacts: [
+          { id: collectionArtifact.id, title: collectionArtifact.title, artifactType: collectionArtifact.artifactType, storagePath: collectionArtifact.storagePath },
+          { id: decisionArtifact.id, title: decisionArtifact.title, artifactType: decisionArtifact.artifactType, storagePath: decisionArtifact.storagePath }
+        ],
+        browserResult: {
+          status: "completed",
+          stepResults: [
+            { action: "navigate", status: "pass" },
+            { action: "extract_structured_rows", status: "pass" }
+          ],
+          evidence: researchEvidenceForVerifier,
+          extracted: { results: records },
+          blockers: [],
+          errors: [],
+          browserState: {
+            url: sourceReferences.at(-1)?.canonicalRef ?? null,
+            title: sourceReferences.at(-1)?.metadata?.title ?? sourceReferences.at(-1)?.title ?? null
+          }
+        }
+      });
+      await this.#mergeRunMetadata(run.id, {
+        semanticVerification: this.#compactSemanticVerification(researchSemanticVerification)
+      });
+      if (!researchSemanticVerification.verifiedByOutcomes) {
+        throw new Error(`Research semantic verification failed: ${researchSemanticVerification.failureReason ?? researchSemanticVerification.verificationVerdict}`);
+      }
+
       await this.#updateRun(run.id, {
         status: RUN_STATUS.COMPLETED,
         lifecycleStage: "completed",
@@ -1401,6 +1551,55 @@ export class PrototypeAgent {
         throw new Error("Form-preparation verification failed after execution.");
       }
 
+      const formEvidenceForVerifier = [{
+        id: evidence.evidenceId,
+        type: EVIDENCE_TYPE.PAGE_SCREENSHOT,
+        label: "Form preparation evidence",
+        url: formUrl,
+        linkedSurface: formUrl,
+        storagePath: evidence.summaryPath,
+        metadata: {
+          screenshotPath: evidence.screenshotPath,
+          url: formUrl,
+          title: evidence.browserState?.title ?? "Form preparation"
+        }
+      }];
+      const formSemanticVerification = new SemanticOutcomeVerifier().verify({
+        mission: run.mission,
+        planOutcomes: planDraft.plan.missionUnderstanding?.verificationGoals ?? [],
+        actionLog: [
+          { status: "completed", primitive: "navigate", label: "Open form", result: { url: formUrl } },
+          { status: "completed", primitive: "type_text", label: "Fill candidate name", result: { text: values.name } },
+          { status: "completed", primitive: "select_option", label: "Select role", result: { text: values.role } },
+          ...(checkboxResult ? [{ status: "completed", primitive: "toggle_checkbox", label: "Set newsletter checkbox", result: { checked: values.subscribe } }] : []),
+          { status: "completed", primitive: "capture_window", label: "Capture prepared form", result: { outputPath: evidence.screenshotPath } }
+        ],
+        evidence: formEvidenceForVerifier,
+        artifacts: [],
+        browserResult: {
+          status: "completed",
+          stepResults: [
+            { action: "navigate", status: "pass" },
+            { action: "type", status: "pass" },
+            { action: "verify_outcome", status: statusOutcome.validated ? "pass" : "fail" },
+            { action: "capture_evidence", status: "pass" }
+          ],
+          evidence: formEvidenceForVerifier,
+          blockers: [],
+          errors: [],
+          browserState: {
+            url: formUrl,
+            title: evidence.browserState?.title ?? "Form preparation"
+          }
+        }
+      });
+      await this.#mergeRunMetadata(run.id, {
+        semanticVerification: this.#compactSemanticVerification(formSemanticVerification)
+      });
+      if (!formSemanticVerification.verifiedByOutcomes) {
+        throw new Error(`Form-preparation semantic verification failed: ${formSemanticVerification.failureReason ?? formSemanticVerification.verificationVerdict}`);
+      }
+
       await this.#updateRun(run.id, {
         status: RUN_STATUS.COMPLETED,
         lifecycleStage: "completed",
@@ -1515,7 +1714,7 @@ export class PrototypeAgent {
         })
       });
     } catch (error) {
-      if (!shouldUseDeterministicFallback(error) || !this.getLlmGatewayStatus().deterministicFallback) {
+      if (!shouldUseRuntimeFallback(error, this.getLlmGatewayStatus())) {
         throw error;
       }
       const degradedSnapshot = error.reasoningSnapshot ?? await this.#createReasoningSnapshot({
@@ -1806,6 +2005,7 @@ export class PrototypeAgent {
     surfaceClassification = "real_local_browser",
     evidenceSensitivity = "real_local_browser"
   }) {
+    let browserAutonomyToolCall = null;
     try {
       await this.#stageRun(run.id, {
         status: RUN_STATUS.RUNNING,
@@ -1818,11 +2018,94 @@ export class PrototypeAgent {
         ? desktopAction.allowlistedHosts
         : (project?.allowlistedDomains ?? []);
       const startUrl = desktopAction?.startUrl ?? null;
+      browserAutonomyToolCall = createToolCall({
+        runId: run.id,
+        stepId: "browser_autonomy",
+        toolName: "browser.autonomyLoop",
+        surface: "browser",
+        reason: "Open a visible browser workspace, observe the page, act step by step, and verify the requested outcome.",
+        inputSummary: [
+          startUrl ? `start:${startUrl}` : "",
+          allowlistedHosts.length ? `hosts:${allowlistedHosts.slice(0, 6).join(",")}` : "",
+          desktopAction?.targetSite ? `site:${desktopAction.targetSite}` : "",
+          desktopAction?.searchQuery ? `query:${desktopAction.searchQuery}` : ""
+        ].filter(Boolean).join(" ")
+      });
+      browserAutonomyToolCall = this.#recordToolCall(run.id, browserAutonomyToolCall, TOOL_CALL_STATUS.PLANNED, {
+        actor: EVENT_ACTOR.BROWSER,
+        primitive: "browser_autonomy",
+        summary: "Visible browser autonomy loop planned."
+      });
       const projectMemory = this.#getProjectMemorySummary(project?.id);
       const userMemory = this.#getUserMemorySummary();
       const browserVisionPolicy = this.#getBrowserVisionPolicy();
+      const browserStepToolCalls = new Map();
+      const recordBrowserStepToolCall = (event, status) => {
+        const step = event.payload?.step ?? {};
+        const stepId = step.id ?? `browser_step_${event.payload?.index ?? browserStepToolCalls.size + 1}`;
+        const toolName = browserToolNameForAction(step.action);
+        const surface = toolName.startsWith("verifier.")
+          ? "verifier"
+          : toolName.startsWith("approval.")
+          ? "approval"
+          : "browser";
+        let toolCall = browserStepToolCalls.get(stepId);
+        if (!toolCall) {
+          toolCall = createToolCall({
+            runId: run.id,
+            stepId,
+            toolName,
+            surface,
+            reason: step.label ?? step.action ?? "Browser step",
+            inputSummary: [
+              step.action,
+              step.target?.url ? `url:${step.target.url}` : "",
+              step.selector ? `selector:${JSON.stringify(step.selector).slice(0, 120)}` : "",
+              step.expectation?.type ? `expect:${step.expectation.type}` : ""
+            ].filter(Boolean).join(" ")
+          });
+        }
+        toolCall = this.#recordToolCall(run.id, toolCall, status, {
+          actor: EVENT_ACTOR.BROWSER,
+          primitive: step.action ?? null,
+          summary: event.payload?.outputSummary
+            ?? `Browser step ${status}: ${step.label ?? step.action ?? stepId}.`,
+          payload: {
+            outputSummary: event.payload?.outputSummary ?? null,
+            evidenceId: event.payload?.evidenceId ?? null,
+            evidenceIds: event.payload?.evidenceIds ?? [],
+            error: event.payload?.error ?? null
+          }
+        });
+        browserStepToolCalls.set(stepId, toolCall);
+      };
 
-      const browserController = new BrowserController({ headless: false });
+      let browserHandle = null;
+      let browserController = null;
+      if (typeof this.browserLauncher === "function" && desktopAction?.persistentSession !== false) {
+        try {
+          browserHandle = await this.browserLauncher(project.id, {
+            runId: run.id,
+            allowlistedHosts,
+            headless: false,
+            persistent: true,
+            returnController: true
+          });
+          browserController = browserHandle?.controller ?? null;
+          this.#recordEvent(run.id, createEvent("workspace.browser.session_attached", EVENT_ACTOR.BROWSER, "Browser autonomy attached to the persistent JON browser session.", {
+            sessionId: browserHandle?.session?.id ?? null,
+            persistent: browserHandle?.persistent === true,
+            targetId: browserHandle?.targetId ?? null
+          }));
+        } catch (error) {
+          this.#recordEvent(run.id, createEvent("workspace.browser.session_attach_failed", EVENT_ACTOR.BROWSER, "Browser autonomy could not attach to the persistent JON browser session; falling back to a local controller.", {
+            error: error.message
+          }));
+        }
+      }
+      if (!browserController) {
+        browserController = new BrowserController({ headless: false });
+      }
       const browserOperator = new BrowserOperator({
         browserController,
         llmGateway: this.llmGateway,
@@ -1865,6 +2148,30 @@ export class PrototypeAgent {
               generationMode: event.payload?.generationMode ?? null,
               newStepCount: event.payload?.newStepCount ?? 0
             }));
+          } else if (event.type === "browser.plan_generated") {
+            this.#recordEvent(run.id, createEvent("run.browser_plan_generated", EVENT_ACTOR.BROWSER, "Browser operator plan generated.", {
+              generationMode: event.payload?.generationMode ?? null,
+              fallbackReason: event.payload?.fallbackReason ?? null,
+              stepCount: event.payload?.stepCount ?? 0,
+              steps: event.payload?.steps ?? []
+            }));
+            await this.#mergeRunMetadata(run.id, {
+              browserPlan: {
+                generationMode: event.payload?.generationMode ?? null,
+                fallbackReason: event.payload?.fallbackReason ?? null,
+                steps: event.payload?.steps ?? []
+              }
+            }).catch(() => {});
+          } else if (event.type === "browser.step_planned") {
+            recordBrowserStepToolCall(event, TOOL_CALL_STATUS.PLANNED);
+          } else if (event.type === "browser.step_running") {
+            recordBrowserStepToolCall(event, TOOL_CALL_STATUS.RUNNING);
+          } else if (event.type === "browser.step_succeeded") {
+            recordBrowserStepToolCall(event, TOOL_CALL_STATUS.SUCCEEDED);
+          } else if (event.type === "browser.step_failed") {
+            recordBrowserStepToolCall(event, TOOL_CALL_STATUS.FAILED);
+          } else if (event.type === "browser.step_blocked") {
+            recordBrowserStepToolCall(event, TOOL_CALL_STATUS.BLOCKED);
           }
         }
       });
@@ -1872,13 +2179,21 @@ export class PrototypeAgent {
       this.#recordEvent(run.id, createEvent("tool.executed", EVENT_ACTOR.BROWSER, "Browser autonomy operator launched.", {
         tool: "browser_autonomy",
         startUrl,
-        allowlistedHosts
+        allowlistedHosts,
+        sessionId: browserHandle?.session?.id ?? null,
+        persistent: browserHandle?.persistent === true
       }));
+      browserAutonomyToolCall = this.#recordToolCall(run.id, browserAutonomyToolCall, TOOL_CALL_STATUS.RUNNING, {
+        actor: EVENT_ACTOR.BROWSER,
+        primitive: "browser_autonomy",
+        summary: "Visible browser autonomy loop running."
+      });
 
       const result = await browserOperator.runMission({
         mission: run.mission,
         startUrl,
         allowlistedHosts,
+        headless: false,
         projectMemory: {
           project: projectMemory,
           user: userMemory
@@ -1887,7 +2202,7 @@ export class PrototypeAgent {
         browserWatchScreenshotWidth: browserVisionPolicy.screenshotWidth,
         maxMultimodalVisionFrames: desktopAction?.maxMultimodalVisionFrames ?? browserVisionPolicy.maxFramesPerRun,
         browserVisionPolicy,
-        closeBrowser: true
+        closeBrowser: browserHandle?.persistent ? false : desktopAction?.closeBrowser ?? false
       });
 
       for (const evidenceRecord of result.evidence ?? []) {
@@ -1925,11 +2240,18 @@ export class PrototypeAgent {
         browserResult: result
       });
 
-      const finalStatus = browserSemanticVerification.verifiedByOutcomes
+      const manualHandoff = browserManualHandoffFromResult(result);
+      const finalStatus = manualHandoff
+        ? RUN_STATUS.PAUSED
+        : browserSemanticVerification.verifiedByOutcomes
         ? RUN_STATUS.COMPLETED
         : RUN_STATUS.FAILED;
 
-      const summary = result.status === "completed" && browserSemanticVerification.verifiedByOutcomes
+      const activeTarget = activeBrowserTarget(result.browserState);
+      const finalUrl = activeTarget?.url ?? manualHandoff?.observedUrl ?? null;
+      const summary = manualHandoff
+        ? `JON attend ton intervention dans le navigateur : ${manualHandoff.reason} ${manualHandoff.userAction}`
+        : result.status === "completed" && browserSemanticVerification.verifiedByOutcomes
         ? `Browser mission completed — ${stepCount} steps executed${replanSuffix}.`
         : result.status === "partial" || !browserSemanticVerification.verifiedByOutcomes
         ? `Browser mission partially completed — ${stepCount} steps, ${errorCount} errors${replanSuffix}. Verification: ${browserSemanticVerification.verificationVerdict}.`
@@ -1937,7 +2259,9 @@ export class PrototypeAgent {
 
       await this.#stageRun(run.id, {
         status: finalStatus,
-        lifecycleStage: browserSemanticVerification.verifiedByOutcomes ? "completed" : "failed",
+        lifecycleStage: manualHandoff
+          ? "awaiting_manual_browser_handoff"
+          : browserSemanticVerification.verifiedByOutcomes ? "completed" : "failed",
         summary,
         output: {
           browserStatus: result.status,
@@ -1948,21 +2272,21 @@ export class PrototypeAgent {
           multimodalFrameCount,
           replanCount,
           extracted: result.extracted ?? {},
-          finalUrl: result.browserState?.url ?? null
+          finalUrl
         },
         metadata: {
           ...(this.database.getRun(run.id)?.metadata ?? {}),
-          finalUrl: result.browserState?.url ?? null,
-          semanticVerification: {
-            verifiedByOutcomes: browserSemanticVerification.verifiedByOutcomes,
-            verificationVerdict: browserSemanticVerification.verificationVerdict,
-            objectiveSatisfied: browserSemanticVerification.objectiveSatisfied,
-            confidence: browserSemanticVerification.confidence,
-            failureReason: browserSemanticVerification.failureReason,
-            nextBestAction: browserSemanticVerification.nextBestAction,
-            unsatisfiedOutcomes: browserSemanticVerification.unsatisfiedOutcomes,
-            satisfiedOutcomes: browserSemanticVerification.satisfiedOutcomes
-          },
+          finalUrl,
+          browserSession: browserHandle?.session
+            ? {
+              id: browserHandle.session.id,
+              mode: browserHandle.session.mode,
+              persistent: browserHandle.persistent === true,
+              reusedForRun: true
+            }
+            : null,
+          ...(manualHandoff ? { manualBrowserHandoff: manualHandoff } : {}),
+          semanticVerification: this.#compactSemanticVerification(browserSemanticVerification),
           browserObservationSummary: {
             watchChangeCount,
             multimodalFrameCount,
@@ -1988,7 +2312,41 @@ export class PrototypeAgent {
             }))
           }
         }
-      }, browserSemanticVerification.verifiedByOutcomes ? "run.completed" : "run.failed", summary);
+      }, manualHandoff ? "run.paused" : browserSemanticVerification.verifiedByOutcomes ? "run.completed" : "run.failed", summary);
+
+      if (manualHandoff) {
+        this.#recordEvent(run.id, createEvent("jon.needs_user", EVENT_ACTOR.AGENT, summary, {
+          kind: "manual_browser_handoff",
+          blockerType: manualHandoff.type,
+          reason: manualHandoff.reason,
+          userAction: manualHandoff.userAction,
+          observedUrl: manualHandoff.observedUrl,
+          observedTitle: manualHandoff.observedTitle,
+          retryableAfterUserAction: manualHandoff.retryableAfterUserAction
+        }));
+      }
+
+      browserAutonomyToolCall = this.#recordToolCall(
+        run.id,
+        browserAutonomyToolCall,
+        manualHandoff
+          ? TOOL_CALL_STATUS.BLOCKED
+          : browserSemanticVerification.verifiedByOutcomes ? TOOL_CALL_STATUS.SUCCEEDED : TOOL_CALL_STATUS.FAILED,
+        {
+          actor: EVENT_ACTOR.BROWSER,
+          primitive: "browser_autonomy",
+          summary: manualHandoff
+            ? "Visible browser autonomy loop paused for manual browser handoff."
+            : browserSemanticVerification.verifiedByOutcomes
+            ? "Visible browser autonomy loop verified the requested outcome."
+            : "Visible browser autonomy loop stopped without satisfying the requested outcome.",
+          payload: {
+            outputSummary: summary,
+            evidenceIds: (result.evidence ?? []).map((evidenceRecord) => evidenceRecord?.id).filter(Boolean),
+            error: manualHandoff ? manualHandoff.reason : browserSemanticVerification.verifiedByOutcomes ? null : browserSemanticVerification.verificationVerdict
+          }
+        }
+      );
 
       auditBrowserMission({
         projectId: project.id,
@@ -2007,6 +2365,17 @@ export class PrototypeAgent {
         browserResult: null
       });
       const failSummary = `Browser autonomy failed: ${error.message}`;
+      if (browserAutonomyToolCall) {
+        browserAutonomyToolCall = this.#recordToolCall(run.id, browserAutonomyToolCall, TOOL_CALL_STATUS.FAILED, {
+          actor: EVENT_ACTOR.BROWSER,
+          primitive: "browser_autonomy",
+          summary: failSummary,
+          payload: {
+            outputSummary: failSummary,
+            error: error.message
+          }
+        });
+      }
       await this.#stageRun(run.id, {
         status: RUN_STATUS.FAILED,
         lifecycleStage: "failed",
@@ -2049,6 +2418,18 @@ export class PrototypeAgent {
         lifecycleStage: "executing",
         summary: "Governed desktop autonomy running."
       }, "run.started", "Governed desktop autonomy scenario started.");
+
+      const runMeta = this.database.getRun(run.id)?.metadata ?? {};
+      this.#recordEvent(run.id, createEvent("mission.desktop_config", EVENT_ACTOR.SYSTEM, "Desktop autonomy configuration snapshot.", {
+        objective: String(run.mission ?? "").slice(0, 200),
+        actionType: desktopAction?.type ?? "desktop_autonomy",
+        surfaceClassification,
+        providerName: runMeta.computerProvider?.providerName ?? "unknown",
+        providerMode: runMeta.computerProvider?.providerMode ?? "unknown",
+        isRealDesktopControl: runMeta.computerProvider?.isRealDesktopControl ?? null,
+        selectedSurface: runMeta.computerProvider?.selectedSurface ?? null,
+        routingReason: runMeta.computerProvider?.routingReason ?? null
+      }));
 
       const visibleWindowsBefore = await this.computer.listVisibleWindows();
       const activeWindowBefore = await this.computer.detectActiveWindow();
@@ -2173,6 +2554,23 @@ export class PrototypeAgent {
       missionTracker.setActiveSurface("desktop", { app: desktopPlan.output.selectedApplication?.id ?? null });
       for (let stepIndex = 0; stepIndex < executableSteps.length; stepIndex++) {
         const step = executableSteps[stepIndex];
+        let toolCall = createToolCall({
+          runId: run.id,
+          stepId: step.id,
+          toolName: desktopToolNameForPrimitive(step.primitive),
+          surface: "desktop",
+          reason: step.label ?? step.primitive,
+          inputSummary: [
+            step.primitive,
+            step.target?.label ?? step.target?.appId ?? step.target?.path ?? "",
+            step.input?.text ? `text:${String(step.input.text).slice(0, 80)}` : "",
+            step.input?.keys ? `keys:${step.input.keys}` : ""
+          ].filter(Boolean).join(" ")
+        });
+        toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.PLANNED, {
+          summary: `Desktop tool planned: ${toolCall.toolName}.`,
+          primitive: step.primitive
+        });
         const watchedChanges = await this.#consumeDesktopWatcherChanges({
           run,
           desktopWatcher,
@@ -2213,6 +2611,11 @@ export class PrototypeAgent {
           }
         }
         if (step.primitive === "stop") {
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.SKIPPED, {
+            summary: "Desktop plan reached an intentional stop step.",
+            primitive: step.primitive,
+            payload: { outputSummary: "Intentional stop step." }
+          });
           actionLog.push({ step, status: "stopped", result: null });
           break;
         }
@@ -2231,8 +2634,22 @@ export class PrototypeAgent {
             metadata: { primitive: "await_manual_action", stepId: step.id }
           });
           if (!authorization.allowed) {
+            toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.BLOCKED, {
+              summary: "Manual action was not authorized.",
+              actor: EVENT_ACTOR.POLICY,
+              primitive: step.primitive,
+              payload: {
+                outputSummary: authorization.approvalRecord?.actionLabel ?? "Manual action blocked.",
+                error: authorization.approvalRecord?.decision ?? "approval_denied"
+              }
+            });
             return this.#stopRunFromApproval(run.id, authorization.approvalRecord, actionDescription);
           }
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.SUCCEEDED, {
+            summary: "Manual action was confirmed.",
+            primitive: step.primitive,
+            payload: { outputSummary: "Manual action confirmed by policy gate." }
+          });
           currentWindow = await this.computer.detectActiveWindow().catch(() => currentWindow);
           actionLog.push({ step, status: "completed", result: { manualActionConfirmed: true } });
           appendDesktopObservation(observationTimeline, {
@@ -2246,6 +2663,10 @@ export class PrototypeAgent {
           continue;
         }
         if (step.primitive === "observe_windows") {
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.RUNNING, {
+            summary: "Inspecting visible desktop windows.",
+            primitive: step.primitive
+          });
           const observed = await this.computer.listVisibleWindows();
           const observeCheckpoint = checkpointRecord({
             step,
@@ -2264,10 +2685,21 @@ export class PrototypeAgent {
             result: { visibleWindowCount: observed.length }
           });
           await this.#markDesktopWatcherBaseline(desktopWatcher);
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.SUCCEEDED, {
+            summary: "Visible desktop windows inspected.",
+            primitive: step.primitive,
+            payload: {
+              outputSummary: `${observed.length} visible window(s) observed.`
+            }
+          });
           consecutiveFailures = 0;
           continue;
         }
         if (step.primitive === "launch_workspace_cli") {
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.RUNNING, {
+            summary: "Launching workspace CLI tool.",
+            primitive: step.primitive
+          });
           let cliResult = null;
           let cliStatus = "completed";
           if (typeof this.workspaceLauncher === "function") {
@@ -2278,7 +2710,7 @@ export class PrototypeAgent {
                 label: String(step.input?.label ?? step.label ?? "").trim(),
                 cwd: step.input?.cwd ?? undefined,
                 autonomyMode: "assisted",
-                conversationId: run.conversationId ?? null,
+                conversationId: run.conversationId ?? this.database.getRun(run.id)?.metadata?.conversationId ?? null,
                 authorized: true
               }));
               const launchTimeout = new Promise((_, reject) =>
@@ -2322,11 +2754,23 @@ export class PrototypeAgent {
             launched: cliResult?.launched ?? false,
             terminalId: cliResult?.terminalId ?? null
           }));
+          toolCall = this.#recordToolCall(run.id, toolCall, cliStatus === "completed" ? TOOL_CALL_STATUS.SUCCEEDED : TOOL_CALL_STATUS.FAILED, {
+            summary: cliStatus === "completed" ? "Workspace CLI tool launched." : "Workspace CLI launch failed.",
+            primitive: step.primitive,
+            payload: {
+              outputSummary: cliResult?.launched ? `Terminal ${cliResult.terminalId ?? ""} launched.` : cliResult?.error ?? "Launch failed.",
+              error: cliStatus === "failed" ? cliResult?.error ?? "workspace_cli_failed" : null
+            }
+          });
           actionLog.push({ step, status: cliStatus, result: cliResult });
           if (cliStatus === "completed") consecutiveFailures = 0;
           continue;
         }
         if (step.primitive === "open_workspace_browser") {
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.RUNNING, {
+            summary: "Opening workspace browser.",
+            primitive: step.primitive
+          });
           let browserResult = null;
           let browserStatus = "completed";
           if (typeof this.browserLauncher === "function") {
@@ -2352,6 +2796,14 @@ export class PrototypeAgent {
             opened: browserResult?.opened ?? false,
             sessionId: browserResult?.sessionId ?? null
           }));
+          toolCall = this.#recordToolCall(run.id, toolCall, browserStatus === "completed" ? TOOL_CALL_STATUS.SUCCEEDED : TOOL_CALL_STATUS.FAILED, {
+            summary: browserStatus === "completed" ? "Workspace browser opened." : "Workspace browser open failed.",
+            primitive: step.primitive,
+            payload: {
+              outputSummary: browserResult?.opened ? `Session ${browserResult.sessionId ?? ""} opened.` : browserResult?.error ?? "Open failed.",
+              error: browserStatus === "failed" ? browserResult?.error ?? "workspace_browser_failed" : null
+            }
+          });
           actionLog.push({ step, status: browserStatus, result: browserResult });
           if (browserStatus === "completed") consecutiveFailures = 0;
           continue;
@@ -2406,6 +2858,15 @@ export class PrototypeAgent {
             consecutiveFailures: consecutiveFailures + 1
           });
           missionTracker.recordStepResult({ stepId: step.id, primitive: step.primitive, label: step.label, status: "blocked" });
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.BLOCKED, {
+            summary: `Desktop primitive blocked: ${step.primitive}.`,
+            actor: EVENT_ACTOR.POLICY,
+            primitive: step.primitive,
+            payload: {
+              outputSummary: safety.reason,
+              error: safety.reason
+            }
+          });
           this.#recordEvent(run.id, createEvent("tool.blocked", EVENT_ACTOR.POLICY, `Desktop primitive blocked: ${step.primitive}.`, {
             primitive: step.primitive,
             stepId: step.id,
@@ -2476,8 +2937,26 @@ export class PrototypeAgent {
             });
             if (!authorization.allowed) {
               if (authorization.approvalRecord?.decision === APPROVAL_DECISION.STOP_RUN) {
+                toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.BLOCKED, {
+                  summary: `Desktop primitive stopped after approval refusal: ${step.primitive}.`,
+                  actor: EVENT_ACTOR.POLICY,
+                  primitive: step.primitive,
+                  payload: {
+                    outputSummary: "Operator stopped the run at approval gate.",
+                    error: "approval_stop_run"
+                  }
+                });
                 return this.#stopRunFromApproval(run.id, authorization.approvalRecord, step.label);
               }
+              toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.SKIPPED, {
+                summary: `Desktop primitive skipped after approval denial: ${step.primitive}.`,
+                actor: EVENT_ACTOR.POLICY,
+                primitive: step.primitive,
+                payload: {
+                  outputSummary: authorization.approvalRecord?.metadata?.operatorRationale ?? "Approval denied.",
+                  error: authorization.approvalRecord?.decision ?? "approval_denied"
+                }
+              });
               this.#recordEvent(run.id, createEvent("tool.blocked", EVENT_ACTOR.POLICY, `Step skipped after approval denial: ${step.label}.`, {
                 primitive: step.primitive,
                 stepId: step.id,
@@ -2524,6 +3003,10 @@ export class PrototypeAgent {
 
         let result = null;
         try {
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.RUNNING, {
+            summary: `Desktop primitive running: ${step.primitive}.`,
+            primitive: step.primitive
+          });
           switch (step.primitive) {
           case "launch_application": {
             const appId = step.target?.appId ?? desktopPlan.output.selectedApplication?.id;
@@ -2801,6 +3284,13 @@ export class PrototypeAgent {
               safety,
               checkpoint: recoveredStep.checkpoint
             });
+            toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.SUCCEEDED, {
+              summary: `Desktop primitive recovered and completed: ${step.primitive}.`,
+              primitive: step.primitive,
+              payload: {
+                outputSummary: `Recovered via ${recoveredStep.recovery?.selectedStrategy ?? "retry"}.`
+              }
+            });
             this.#recordEvent(run.id, createEvent("tool.recovery_succeeded", EVENT_ACTOR.COMPUTER, `Desktop recovery succeeded after ${step.primitive} failed.`, {
               primitive: step.primitive,
               stepId: step.id,
@@ -2878,6 +3368,15 @@ export class PrototypeAgent {
             status: "failed", errorMessage: error.message,
             screenshotPath: failureCapture?.outputPath ?? null,
             recoveryAttempted: Boolean(recovery)
+          });
+          toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.FAILED, {
+            summary: `Desktop primitive failed: ${step.primitive}.`,
+            primitive: step.primitive,
+            payload: {
+              outputSummary: error.message,
+              error: error.message,
+              evidenceId: failureCapture?.outputPath ? null : undefined
+            }
           });
           appendDesktopObservation(observationTimeline, {
             phase: "step_failed",
@@ -2982,6 +3481,17 @@ export class PrototypeAgent {
             reason: error.message
           }))
           : null;
+        toolCall = this.#recordToolCall(run.id, toolCall, TOOL_CALL_STATUS.SUCCEEDED, {
+          summary: `Desktop primitive succeeded: ${step.primitive}.`,
+          primitive: step.primitive,
+          payload: {
+            outputSummary: step.primitive === "capture_window" && result?.outputPath
+              ? `Screenshot captured at ${result.outputPath}.`
+              : perceptionAfter
+                ? "Post-action desktop perception captured."
+                : "Primitive returned successfully."
+          }
+        });
         this.#recordEvent(run.id, createEvent("tool.executed", EVENT_ACTOR.COMPUTER, `Desktop primitive executed: ${step.primitive}.`, {
           primitive: step.primitive,
           stepId: step.id,
@@ -3193,34 +3703,48 @@ export class PrototypeAgent {
       });
       this.#saveDesktopAutonomyMemory(updatedDesktopMemory);
       // Semantic outcome verification — validates user objective, not just procedural steps
+      if (evidence.evidenceId) {
+        missionTracker.recordEvidence(evidence.evidenceId);
+      }
+      const desktopEvidenceForVerifier = evidence.evidenceId ? [{
+        id: evidence.evidenceId,
+        type: EVIDENCE_TYPE.WINDOW_CAPTURE,
+        label: "Desktop autonomy proof",
+        linkedSurface: activeWindowAfter?.title
+          ?? currentWindow?.title
+          ?? desktopPlan.output.selectedApplication?.label
+          ?? desktopPlan.output.selectedApplication?.id
+          ?? "desktop",
+        storagePath: evidence.outputPath,
+        metadata: {
+          screenshotPath: finalVisionSnapshot?.screenshot?.outputPath ?? finalCapture?.outputPath ?? null,
+          targetWindowTitle: activeWindowAfter?.title ?? currentWindow?.title ?? null,
+          targetWindowLabel: desktopPlan.output.selectedApplication?.label ?? null,
+          selectedApplicationId: desktopPlan.output.selectedApplication?.id ?? null
+        }
+      }] : [];
       const desktopSemanticVerification = new SemanticOutcomeVerifier().verify({
         mission: run.mission,
         planOutcomes: desktopPlan.output.verificationGoals ?? [],
         actionLog,
-        evidence: evidence.evidenceId ? [{ id: evidence.evidenceId }] : [],
+        evidence: desktopEvidenceForVerifier,
         artifacts: [],
         browserResult: null,
-        desktopState: { activeWindow: activeAccessibilityAfter ?? null },
+        desktopState: { activeWindow: activeWindowAfter ?? currentWindow ?? null },
         trackerSnapshot: missionTracker.toSnapshot()
       });
       missionTracker.setFinalVerification(desktopSemanticVerification);
-      missionTracker.complete({ verifiedByOutcomes: desktopSemanticVerification.verifiedByOutcomes });
+      missionTracker.complete({
+        verifiedByOutcomes: desktopSemanticVerification.verifiedByOutcomes,
+        failureReason: desktopSemanticVerification.failureReason
+      });
       await this.#mergeRunMetadata(run.id, {
         desktopObservationSummary: observationSummary,
         desktopMemorySummary: summarizeDesktopAutonomyMemory(updatedDesktopMemory),
         selectedApplication: desktopPlan.output.selectedApplication ?? null,
         selectedApplicationId: desktopPlan.output.selectedApplication?.id ?? null,
         missionProgress: missionTracker.toSnapshot(),
-        semanticVerification: {
-          verifiedByOutcomes: desktopSemanticVerification.verifiedByOutcomes,
-          verificationVerdict: desktopSemanticVerification.verificationVerdict,
-          objectiveSatisfied: desktopSemanticVerification.objectiveSatisfied,
-          confidence: desktopSemanticVerification.confidence,
-          failureReason: desktopSemanticVerification.failureReason,
-          nextBestAction: desktopSemanticVerification.nextBestAction,
-          unsatisfiedOutcomes: desktopSemanticVerification.unsatisfiedOutcomes,
-          satisfiedOutcomes: desktopSemanticVerification.satisfiedOutcomes
-        }
+        semanticVerification: this.#compactSemanticVerification(desktopSemanticVerification)
       });
       await this.#recordVerificationSummary(run.id, desktopVerification);
       this.#recordCapabilityFeedbackForDesktopPlan({
@@ -3311,6 +3835,7 @@ export class PrototypeAgent {
     surfaceClassification,
     evidenceSensitivity
   }) {
+    let browserToolCall = null;
     try {
       const planDraft = await this.#generatePlan({
         run,
@@ -3335,6 +3860,24 @@ export class PrototypeAgent {
         ? "Desktop browser search scenario started."
         : "Desktop browser launch scenario started.");
 
+      browserToolCall = createToolCall({
+        runId: run.id,
+        stepId: desktopAction.type,
+        toolName: browserToolNameForAction(desktopAction.type),
+        surface: "browser",
+        reason: desktopAction.type === "launch_browser_search"
+          ? "Open a local browser and navigate to the requested search page."
+          : "Open a local browser on the desktop.",
+        inputSummary: [
+          desktopAction.browser?.label ?? desktopAction.browser?.id ?? "browser",
+          desktopAction.searchQuery ? `query:${desktopAction.searchQuery}` : "",
+          desktopAction.url ? `url:${desktopAction.url}` : ""
+        ].filter(Boolean).join(" ")
+      });
+      browserToolCall = this.#recordToolCall(run.id, browserToolCall, TOOL_CALL_STATUS.PLANNED, {
+        summary: `Browser tool planned: ${browserToolCall.toolName}.`,
+        primitive: desktopAction.type
+      });
       const availableBrowsers = await this.computer.listInstalledBrowsers();
       const beforeWindow = await this.computer.detectActiveWindow();
       const visibleWindowsBefore = await this.computer.listVisibleWindows();
@@ -3388,6 +3931,7 @@ export class PrototypeAgent {
           consequenceOfRefusal: "The run cannot continue with the requested desktop-visible browser step.",
           evidenceId: approvalContextEvidence.evidenceId,
           metadata: {
+            primitive: desktopAction.type,
             browserId: desktopAction.browser?.id ?? null,
             browserLabel: desktopAction.browser?.label ?? null,
             browserExecutablePath: desktopAction.browser?.executablePath ?? null,
@@ -3396,10 +3940,25 @@ export class PrototypeAgent {
           }
         });
         if (!authorization.allowed) {
+          browserToolCall = this.#recordToolCall(run.id, browserToolCall, TOOL_CALL_STATUS.BLOCKED, {
+            summary: `Browser launch blocked by approval policy: ${desktopAction.browser?.label ?? "browser"}.`,
+            actor: EVENT_ACTOR.POLICY,
+            primitive: desktopAction.type,
+            payload: {
+              outputSummary: authorization.approvalRecord?.metadata?.operatorRationale ?? "Approval denied.",
+              error: authorization.approvalRecord?.decision ?? "approval_denied"
+            }
+          });
           return this.#stopRunFromApproval(run.id, authorization.approvalRecord, `Open ${desktopAction.browser?.label ?? "browser"}`);
         }
       }
 
+      browserToolCall = this.#recordToolCall(run.id, browserToolCall, TOOL_CALL_STATUS.RUNNING, {
+        summary: desktopAction.type === "launch_browser_search"
+          ? `Opening ${desktopAction.browser?.label ?? "browser"} on the requested search URL.`
+          : `Opening ${desktopAction.browser?.label ?? "browser"}.`,
+        primitive: desktopAction.type
+      });
       const launchResult = await this.computer.launchBrowser(desktopAction.browser.id, {
         url: desktopAction.url ?? null
       });
@@ -3470,7 +4029,9 @@ export class PrototypeAgent {
         linkedSourceId: null,
         sensitivity: evidenceSensitivity,
         metadata: {
-          screenshotPath: windowCapture?.outputPath ?? null,
+          screenshotPath: null,
+          windowCapturePath: windowCapture?.outputPath ?? null,
+          captureKind: windowCapture?.outputPath ? "window_state_summary" : null,
           browserId: desktopAction.browser?.id ?? null,
           browserLabel: desktopAction.browser?.label ?? null,
           surfaceClassification
@@ -3515,7 +4076,9 @@ export class PrototypeAgent {
           }),
           verificationCheck("Desktop launch proof was persisted.", Boolean(evidence.evidenceId), {
             evidenceId: evidence.evidenceId,
-            screenshotCaptured: Boolean(windowCapture?.outputPath)
+            screenshotCaptured: false,
+            windowCapturePersisted: Boolean(windowCapture?.outputPath),
+            captureKind: windowCapture?.outputPath ? "window_state_summary" : null
           }),
           ...(expectedLaunchUrl
             ? [verificationCheck("The requested browser launch URL was used.", launchUrlWasUsed, {
@@ -3543,6 +4106,15 @@ export class PrototypeAgent {
           .every((check) => check.status === "pass");
         if (incompleteDeliverable && browserLaunchPrimitivePassed) {
           const summary = `Browser was opened, but the requested ${requestedResultCount} results were not extracted.`;
+          browserToolCall = this.#recordToolCall(run.id, browserToolCall, TOOL_CALL_STATUS.FAILED, {
+            summary,
+            primitive: desktopAction.type,
+            payload: {
+              outputSummary: summary,
+              error: "incomplete_deliverable",
+              evidenceId: evidence.evidenceId
+            }
+          });
           await this.#updateRun(run.id, {
             status: RUN_STATUS.FAILED,
             lifecycleStage: "failed_incomplete_deliverable",
@@ -3560,9 +4132,92 @@ export class PrototypeAgent {
             verification
           };
         }
+        browserToolCall = this.#recordToolCall(run.id, browserToolCall, TOOL_CALL_STATUS.FAILED, {
+          summary: "Desktop browser launch verification failed after execution.",
+          primitive: desktopAction.type,
+          payload: {
+            outputSummary: "Browser launch verification failed.",
+            error: "browser_launch_verification_failed",
+            evidenceId: evidence.evidenceId
+          }
+        });
         throw new Error("Desktop browser launch verification failed after execution.");
       }
 
+      const browserLaunchEvidenceForVerifier = [{
+        id: evidence.evidenceId,
+        type: EVIDENCE_TYPE.WINDOW_CAPTURE,
+        label: "Desktop browser launch evidence",
+        linkedSurface: desktopAction.browser?.label ?? "browser",
+        storagePath: evidence.outputPath,
+        metadata: {
+          screenshotPath: null,
+          windowCapturePath: windowCapture?.outputPath ?? null,
+          captureKind: windowCapture?.outputPath ? "window_state_summary" : null,
+          browserId: desktopAction.browser?.id ?? null,
+          browserLabel: desktopAction.browser?.label ?? null,
+          targetWindowTitle: launchedWindow?.title ?? afterWindow?.title ?? null,
+          url: launchResult?.url ?? expectedLaunchUrl ?? null
+        }
+      }];
+      const browserLaunchSemanticVerification = new SemanticOutcomeVerifier().verify({
+        mission: run.mission,
+        planOutcomes: planDraft.plan.missionUnderstanding?.verificationGoals ?? [],
+        actionLog: [],
+        evidence: browserLaunchEvidenceForVerifier,
+        artifacts: [],
+        browserResult: {
+          status: "completed",
+          stepResults: [{ action: "navigate", status: "pass", label: desktopAction.type }],
+          evidence: browserLaunchEvidenceForVerifier,
+          blockers: [],
+          errors: [],
+          browserState: {
+            url: launchResult?.url ?? expectedLaunchUrl ?? null,
+            title: launchedWindow?.title ?? afterWindow?.title ?? null
+          }
+        }
+      });
+      await this.#mergeRunMetadata(run.id, {
+        semanticVerification: this.#compactSemanticVerification(browserLaunchSemanticVerification)
+      });
+      if (!browserLaunchSemanticVerification.verifiedByOutcomes) {
+        browserToolCall = this.#recordToolCall(run.id, browserToolCall, TOOL_CALL_STATUS.FAILED, {
+          summary: "Desktop browser launch/search failed semantic verification.",
+          primitive: desktopAction.type,
+          payload: {
+            outputSummary: browserLaunchSemanticVerification.failureReason ?? browserLaunchSemanticVerification.verificationVerdict,
+            error: browserLaunchSemanticVerification.failureReason ?? browserLaunchSemanticVerification.verificationVerdict,
+            evidenceId: evidence.evidenceId
+          }
+        });
+        await this.#updateRun(run.id, {
+          status: RUN_STATUS.FAILED,
+          lifecycleStage: "failed_semantic_verification",
+          summary: `Browser launch/search did not satisfy the user objective: ${browserLaunchSemanticVerification.failureReason ?? browserLaunchSemanticVerification.verificationVerdict}`
+        });
+        this.#recordEvent(run.id, createEvent("run.failed", EVENT_ACTOR.AGENT, "Desktop browser launch/search failed semantic verification.", {
+          browserId: desktopAction.browser.id,
+          browserLabel: desktopAction.browser.label,
+          verificationVerdict: browserLaunchSemanticVerification.verificationVerdict,
+          criticalBlockers: browserLaunchSemanticVerification.criticalBlockers
+        }));
+        return {
+          ...(await this.getRunBundle(run.id)),
+          verification
+        };
+      }
+
+      browserToolCall = this.#recordToolCall(run.id, browserToolCall, TOOL_CALL_STATUS.SUCCEEDED, {
+        summary: desktopAction.type === "launch_browser_search"
+          ? "Browser search launched, evidenced, and verified."
+          : "Browser launch evidenced and verified.",
+        primitive: desktopAction.type,
+        payload: {
+          outputSummary: launchResult?.url ?? launchedWindow?.title ?? "Browser visible and verified.",
+          evidenceId: evidence.evidenceId
+        }
+      });
       await this.#updateRun(run.id, {
         status: RUN_STATUS.COMPLETED,
         lifecycleStage: "completed",
@@ -3582,6 +4237,16 @@ export class PrototypeAgent {
         verification
       };
     } catch (error) {
+      if (browserToolCall && !["succeeded", "failed", "blocked", "skipped"].includes(browserToolCall.status)) {
+        browserToolCall = this.#recordToolCall(run.id, browserToolCall, TOOL_CALL_STATUS.FAILED, {
+          summary: "Browser launch/search failed before completion.",
+          primitive: desktopAction.type,
+          payload: {
+            outputSummary: error.message,
+            error: error.message
+          }
+        });
+      }
       await this.#failRun(run.id, error);
       throw error;
     }
@@ -3757,6 +4422,50 @@ export class PrototypeAgent {
       await this.#recordVerificationSummary(run.id, computerVerification);
       if (computerVerification.overallStatus !== "pass") {
         throw new Error("Computer-observation verification failed after execution.");
+      }
+
+      const observationEvidenceForVerifier = [{
+        id: evidence.evidenceId,
+        type: EVIDENCE_TYPE.WINDOW_CAPTURE,
+        label: "Computer control observation evidence",
+        linkedSurface: focusedWindow.title,
+        storagePath: evidence.outputPath,
+        metadata: {
+          beforeCapturePath: beforeCapture.outputPath ?? null,
+          afterCapturePath: afterCapture.outputPath ?? null,
+          targetWindowTitle: focusedWindow.title,
+          targetWindowLabel: targetWindowLabel ?? focusedWindow.title
+        }
+      }];
+      const observationSemanticVerification = new SemanticOutcomeVerifier().verify({
+        mission: run.mission,
+        planOutcomes: planDraft.plan.missionUnderstanding?.verificationGoals ?? [],
+        actionLog: [
+          { status: "completed", primitive: "observe_windows", label: "Observe target window" },
+          { status: "completed", primitive: "capture_window", label: "Capture target window", result: afterCapture }
+        ],
+        evidence: observationEvidenceForVerifier,
+        artifacts: [],
+        desktopState: { activeWindow: focusedWindow }
+      });
+      await this.#mergeRunMetadata(run.id, {
+        semanticVerification: this.#compactSemanticVerification(observationSemanticVerification)
+      });
+      if (!observationSemanticVerification.verifiedByOutcomes) {
+        await this.#updateRun(run.id, {
+          status: RUN_STATUS.FAILED,
+          lifecycleStage: "failed_semantic_verification",
+          summary: `Computer observation did not satisfy the user objective: ${observationSemanticVerification.failureReason ?? observationSemanticVerification.verificationVerdict}`
+        });
+        this.#recordEvent(run.id, createEvent("run.failed", EVENT_ACTOR.AGENT, "Computer observation failed semantic verification.", {
+          targetWindowId: focusedWindow.id,
+          verificationVerdict: observationSemanticVerification.verificationVerdict,
+          criticalBlockers: observationSemanticVerification.criticalBlockers
+        }));
+        return {
+          ...(await this.getRunBundle(run.id)),
+          verification
+        };
       }
 
       await this.#updateRun(run.id, {
@@ -3955,6 +4664,65 @@ export class PrototypeAgent {
         throw new Error("Desktop window capture verification failed after execution.");
       }
 
+      const captureEvidenceForVerifier = [{
+        id: evidence.evidenceId,
+        type: EVIDENCE_TYPE.WINDOW_CAPTURE,
+        label: wantsBrowserCapture ? "Desktop browser capture evidence" : "Desktop active-window capture evidence",
+        linkedSurface: captureTarget.title,
+        storagePath: evidence.outputPath,
+        metadata: {
+          screenshotPath: capture.outputPath ?? null,
+          targetWindowId: captureTarget.id,
+          targetWindowTitle: captureTarget.title,
+          browserId: desktopAction?.browser?.id ?? null,
+          browserLabel: desktopAction?.browser?.label ?? null
+        }
+      }];
+      const captureVerificationMission = wantsBrowserCapture
+        ? `Capture the visible ${desktopAction?.browser?.label ?? "browser"} window screenshot and show proof.`
+        : run.mission;
+      const captureSemanticVerification = new SemanticOutcomeVerifier().verify({
+        mission: captureVerificationMission,
+        planOutcomes: planDraft.plan.missionUnderstanding?.verificationGoals ?? [],
+        actionLog: [
+          {
+            status: "completed",
+            primitive: "capture_window",
+            label: wantsBrowserCapture ? "Capture browser window" : "Capture active window",
+            result: capture
+          }
+        ],
+        evidence: captureEvidenceForVerifier,
+        artifacts: [],
+        browserResult: null,
+        desktopState: {
+          activeWindow: captureTarget
+        }
+      });
+      await this.#mergeRunMetadata(run.id, {
+        semanticVerification: this.#compactSemanticVerification(captureSemanticVerification)
+      });
+      if (!captureSemanticVerification.verifiedByOutcomes) {
+        await this.#updateRun(run.id, {
+          status: RUN_STATUS.FAILED,
+          lifecycleStage: "failed_semantic_verification",
+          summary: `Desktop capture did not satisfy the user objective: ${captureSemanticVerification.failureReason ?? captureSemanticVerification.verificationVerdict}`
+        });
+        this.#recordEvent(run.id, createEvent("run.failed", EVENT_ACTOR.AGENT, "Desktop capture failed semantic verification.", {
+          targetWindowId: captureTarget.id,
+          verificationVerdict: captureSemanticVerification.verificationVerdict,
+          criticalBlockers: captureSemanticVerification.criticalBlockers
+        }));
+        return {
+          ...(await this.getRunBundle(run.id)),
+          verification: {
+            validated: false,
+            ambiguous: true,
+            observed: { targetWindow, capture }
+          }
+        };
+      }
+
       await this.#updateRun(run.id, {
         status: RUN_STATUS.COMPLETED,
         lifecycleStage: "completed",
@@ -4066,9 +4834,10 @@ export class PrototypeAgent {
     return lines.join("\n");
   }
 
-  #createPreviewReasoningSnapshot({ run, project, scenarioType, missionDraft, availableBrowsers }) {
+  #createPreviewReasoningSnapshot({ run, project, scenarioType, missionDraft, availableBrowsers, userPreferences = null }) {
     const projectMemory = this.#getProjectMemorySummary(project?.id);
     const userMemory = this.#getUserMemorySummary();
+    const runtimePreferences = userPreferences ?? this.#getUserPreferencesSummary();
     return this.reasoning.createSnapshot({
       stage: REASONING_STAGE.MISSION_UNDERSTANDING,
       run,
@@ -4092,21 +4861,24 @@ export class PrototypeAgent {
         allowlistedDomains: project?.allowlistedDomains ?? [],
         availableBrowsers,
         projectMemory,
-        userMemory
+        userMemory,
+        userPreferences: runtimePreferences
       },
       priorSnapshots: []
     });
   }
 
-  async #previewMissionUnderstanding({ run, project, scenarioType, missionDraft, availableBrowsers }) {
+  async #previewMissionUnderstanding({ run, project, scenarioType, missionDraft, availableBrowsers, userPreferences = null }) {
     const projectMemory = this.#getProjectMemorySummary(project?.id);
     const userMemory = this.#getUserMemorySummary();
+    const runtimePreferences = userPreferences ?? this.#getUserPreferencesSummary();
     const reasoningSnapshot = this.#createPreviewReasoningSnapshot({
       run,
       project,
       scenarioType,
       missionDraft,
-      availableBrowsers
+      availableBrowsers,
+      userPreferences: runtimePreferences
     });
     const input = {
       mission: run.mission,
@@ -4115,7 +4887,8 @@ export class PrototypeAgent {
       allowlistedDomains: project?.allowlistedDomains ?? [],
       availableBrowsers,
       projectMemory,
-      userMemory
+      userMemory,
+      userPreferences: runtimePreferences
     };
     const bindings = {
       mission: run.mission,
@@ -4124,7 +4897,8 @@ export class PrototypeAgent {
       allowlistedDomains: JSON.stringify(project?.allowlistedDomains ?? []),
       availableBrowsers: JSON.stringify(availableBrowsers ?? []),
       projectMemory: JSON.stringify(projectMemory ?? null),
-      userMemory: JSON.stringify(userMemory ?? null)
+      userMemory: JSON.stringify(userMemory ?? null),
+      userPreferences: JSON.stringify(runtimePreferences ?? null)
     };
     const preparedPayload = prepareRuntimeReasoningPayload({
       reasoningStage: REASONING_STAGE.MISSION_UNDERSTANDING,
@@ -4156,7 +4930,8 @@ export class PrototypeAgent {
           requestedModelAlias: modelAlias
         }),
         validateOutput: (output) => validateMissionUnderstandingOutput(output, {
-          availableBrowsers
+          availableBrowsers,
+          missionDraft
         })
       });
       return {
@@ -4166,7 +4941,7 @@ export class PrototypeAgent {
         generationMode: "llm"
       };
     } catch (error) {
-      if (!shouldUseDeterministicFallback(error) || !this.getLlmGatewayStatus().deterministicFallback) {
+      if (!shouldUseRuntimeFallback(error, this.getLlmGatewayStatus())) {
         throw error;
       }
       return {
@@ -4266,6 +5041,7 @@ export class PrototypeAgent {
     const availableBrowsers = await this.#listAvailableBrowsers();
     const projectMemory = this.#getProjectMemorySummary(project?.id);
     const userMemory = this.#getUserMemorySummary();
+    const userPreferences = this.#getUserPreferencesSummary();
     const selectedCapabilityForPlan = selectEnabledCapabilityForMission(
       this.database,
       run.mission,
@@ -4279,6 +5055,7 @@ export class PrototypeAgent {
       availableBrowsers,
       projectMemory,
       userMemory,
+      userPreferences,
       selectedCapability: selectedCapabilityForPlan ? {
         id: selectedCapabilityForPlan.id,
         title: selectedCapabilityForPlan.title,
@@ -4315,6 +5092,7 @@ export class PrototypeAgent {
           availableBrowsers: JSON.stringify(availableBrowsers ?? []),
           projectMemory: JSON.stringify(projectMemory ?? null),
           userMemory: JSON.stringify(userMemory ?? null),
+          userPreferences: JSON.stringify(userPreferences ?? null),
           selectedCapability: JSON.stringify(input.selectedCapability ?? null)
         },
         input: {
@@ -4326,7 +5104,7 @@ export class PrototypeAgent {
         priorSnapshots: [missionUnderstanding.reasoningSnapshot]
       });
     } catch (error) {
-      if (!shouldUseDeterministicFallback(error) || !this.getLlmGatewayStatus().deterministicFallback) {
+      if (!shouldUseRuntimeFallback(error, this.getLlmGatewayStatus())) {
         throw error;
       }
       const degradedOutput = buildDeterministicPlanOutput(input);
@@ -4336,6 +5114,7 @@ export class PrototypeAgent {
         failedLlmCallId: error.callRecord?.id ?? null,
         errorCategory: error.category ?? "provider_unavailable",
         strategy: "deterministic_plan_fallback",
+        forcedByOutputRecovery: error.category === "malformed_output",
         contextSnapshotId: degradedSnapshot.id
       }));
       llmResult = {
@@ -4407,7 +5186,8 @@ export class PrototypeAgent {
     const confirmedPreflight = run.metadata?.preflight?.understanding ?? null;
     if (confirmedPreflight) {
       const output = validateMissionUnderstandingOutput(confirmedPreflight, {
-        availableBrowsers: input.availableBrowsers ?? []
+        availableBrowsers: input.availableBrowsers ?? [],
+        missionSpec: run.metadata?.missionSpec ?? null
       });
       const reasoningSnapshot = await this.#createReasoningSnapshot({
         run,
@@ -4446,16 +5226,18 @@ export class PrototypeAgent {
           allowlistedDomains: JSON.stringify(project?.allowlistedDomains ?? []),
           availableBrowsers: JSON.stringify(input.availableBrowsers ?? []),
           projectMemory: JSON.stringify(input.projectMemory ?? null),
-          userMemory: JSON.stringify(input.userMemory ?? null)
+          userMemory: JSON.stringify(input.userMemory ?? null),
+          userPreferences: JSON.stringify(input.userPreferences ?? null)
         },
         input,
         metadata,
         validateOutput: (output) => validateMissionUnderstandingOutput(output, {
-          availableBrowsers: input.availableBrowsers ?? []
+          availableBrowsers: input.availableBrowsers ?? [],
+          missionSpec: run.metadata?.missionSpec ?? null
         })
       });
     } catch (error) {
-      if (!shouldUseDeterministicFallback(error) || !this.getLlmGatewayStatus().deterministicFallback) {
+      if (!shouldUseRuntimeFallback(error, this.getLlmGatewayStatus())) {
         throw error;
       }
       const degradedOutput = buildDeterministicMissionUnderstandingOutput(input);
@@ -4470,8 +5252,16 @@ export class PrototypeAgent {
         failedLlmCallId: error.callRecord?.id ?? null,
         errorCategory: error.category ?? "provider_unavailable",
         strategy: "deterministic_mission_understanding_fallback",
+        forcedByOutputRecovery: error.category === "malformed_output",
         contextSnapshotId: degradedSnapshot.id
       }));
+      if (error.category === "malformed_output") {
+        this.#recordEvent(run.id, createEvent("llm.output_recovery.fallback_used", EVENT_ACTOR.SYSTEM, "Malformed mission understanding output recovered with deterministic fallback.", {
+          callType: LLM_CALL_TYPE.MISSION_UNDERSTANDING,
+          failedLlmCallId: error.callRecord?.id ?? null,
+          contextSnapshotId: degradedSnapshot.id
+        }));
+      }
       llmResult = {
         output: degradedOutput,
         callRecord: null,
@@ -4838,8 +5628,15 @@ export class PrototypeAgent {
   }
 
   async #stageRun(runId, patch, eventType, summary) {
-    await this.#updateRun(runId, patch);
-    this.#recordEvent(runId, createEvent(eventType, EVENT_ACTOR.AGENT, summary));
+    const appliedPatch = await this.#updateRun(runId, patch);
+    const guarded = appliedPatch?.metadata?.falseCompletionGuard
+      && patch?.status === RUN_STATUS.COMPLETED
+      && appliedPatch.status === RUN_STATUS.FAILED;
+    this.#recordEvent(runId, createEvent(
+      guarded ? "run.failed" : eventType,
+      guarded ? EVENT_ACTOR.SYSTEM : EVENT_ACTOR.AGENT,
+      guarded ? appliedPatch.summary : summary
+    ));
   }
 
   async #mergeRunMetadata(runId, metadataPatch) {
@@ -4866,12 +5663,33 @@ export class PrototypeAgent {
     }));
   }
 
+  #compactSemanticVerification(verification) {
+    if (!verification) {
+      return null;
+    }
+    return {
+      verifiedByOutcomes: verification.verifiedByOutcomes,
+      verificationVerdict: verification.verificationVerdict,
+      objectiveSatisfied: verification.objectiveSatisfied,
+      confidence: verification.confidence,
+      failureReason: verification.failureReason,
+      nextBestAction: verification.nextBestAction,
+      missingEvidence: verification.missingEvidence ?? [],
+      criticalBlockers: verification.criticalBlockers ?? [],
+      unsatisfiedOutcomes: verification.unsatisfiedOutcomes ?? [],
+      satisfiedOutcomes: verification.satisfiedOutcomes ?? [],
+      evidenceUsed: verification.evidenceUsed ?? []
+    };
+  }
+
   async #updateRun(runId, patch) {
+    const currentRun = this.database.getRun(runId);
+    const guardedPatch = guardCompletedRunPatch({ currentRun, patch });
     this.database.updateRun(runId, {
-      ...patch,
+      ...guardedPatch,
       updatedAt: nowIso()
     });
-    if (["completed", "failed", "stopped"].includes(String(patch.status ?? "").toLowerCase())) {
+    if (["completed", "failed", "stopped"].includes(String(guardedPatch.status ?? "").toLowerCase())) {
       const run = this.database.getRun(runId);
       this.#recordProjectMemoryFromRun(run);
       this.#recordUserMemoryFromRun(run);
@@ -4879,11 +5697,22 @@ export class PrototypeAgent {
         runId,
         projectId: run?.projectId ?? null,
         mission: run?.mission ?? null,
-        toStatus: patch.status,
-        lifecycleStage: patch.lifecycleStage ?? null,
-        reason: patch.summary ?? null
+        toStatus: guardedPatch.status,
+        lifecycleStage: guardedPatch.lifecycleStage ?? null,
+        reason: guardedPatch.summary ?? null
       });
     }
+    if (
+      patch?.status === RUN_STATUS.COMPLETED
+      && guardedPatch.status === RUN_STATUS.FAILED
+      && guardedPatch.lifecycleStage === "failed_false_completion_guard"
+    ) {
+      this.#recordEvent(runId, createEvent("run.false_completion_blocked", EVENT_ACTOR.SYSTEM, "Completion blocked because semantic verification did not pass.", {
+        requestedSummary: patch.summary ?? null,
+        reason: guardedPatch.metadata?.falseCompletionGuard?.reason ?? null
+      }));
+    }
+    return guardedPatch;
   }
 
   async #failRun(runId, error) {
@@ -5401,6 +6230,17 @@ export class PrototypeAgent {
         createdAt: nowIso()
       });
     }
+  }
+
+  #recordToolCall(runId, toolCall, status, { summary = "", actor = EVENT_ACTOR.COMPUTER, primitive = null, payload = {} } = {}) {
+    const transition = createToolCallLifecycleEvent(toolCall, status, {
+      actor,
+      summary,
+      primitive,
+      payload
+    });
+    this.#recordEvent(runId, transition.event);
+    return transition.toolCall;
   }
 
   #recordEvent(runId, event) {

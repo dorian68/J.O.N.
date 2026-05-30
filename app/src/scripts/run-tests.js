@@ -1,11 +1,14 @@
 import path from "node:path";
-import { RELEASE_ROOT } from "../config.js";
-import { ensureDir, writeJson } from "../utils/files.js";
+import os from "node:os";
 
 const suites = [
   {
     name: "policy",
     modulePath: "../../tests/policy.test.js"
+  },
+  {
+    name: "approval-resolution-policy",
+    modulePath: "../../tests/approval-resolution-policy.test.js"
   },
   {
     name: "storage",
@@ -60,6 +63,10 @@ const suites = [
     modulePath: "../../tests/user-memory.test.js"
   },
   {
+    name: "user-preferences",
+    modulePath: "../../tests/user-preferences.test.js"
+  },
+  {
     name: "file-primitives",
     modulePath: "../../tests/file-primitives.test.js"
   },
@@ -104,8 +111,16 @@ const suites = [
     modulePath: "../../tests/operator-service.test.js"
   },
   {
+    name: "external-terminal",
+    modulePath: "../../tests/external-terminal.test.js"
+  },
+  {
     name: "mission-entry",
     modulePath: "../../tests/mission-entry.test.js"
+  },
+  {
+    name: "inline-llm-directives",
+    modulePath: "../../tests/inline-llm-directives.test.js"
   },
   {
     name: "mission-understanding",
@@ -114,6 +129,18 @@ const suites = [
   {
     name: "conversation-turn",
     modulePath: "../../tests/conversation-turn.test.js"
+  },
+  {
+    name: "conversation-response-planner",
+    modulePath: "../../tests/conversation-response-planner.test.js"
+  },
+  {
+    name: "surface-router",
+    modulePath: "../../tests/surface-router.test.js"
+  },
+  {
+    name: "tool-call-lifecycle",
+    modulePath: "../../tests/tool-call-lifecycle.test.js"
   },
   {
     name: "i18n",
@@ -200,6 +227,10 @@ const suites = [
     modulePath: "../../tests/browser-mode.test.js"
   },
   {
+    name: "browser-tabs-actions",
+    modulePath: "../../tests/browser-tabs-actions.test.js"
+  },
+  {
     name: "computer-benchmarks",
     modulePath: "../../tests/computer-benchmarks.test.js"
   },
@@ -268,12 +299,44 @@ const suites = [
     modulePath: "../../tests/mobile-gateway.test.js"
   },
   {
+    name: "mobile-ui-smoke",
+    modulePath: "../../tests/mobile-ui-smoke.test.js"
+  },
+  {
     name: "semantic-outcome-verifier",
     modulePath: "../../tests/semantic-outcome-verifier.test.js"
   },
   {
+    name: "evidence-alignment-guard",
+    modulePath: "../../tests/evidence-alignment-guard.test.js"
+  },
+  {
+    name: "recovery-planner",
+    modulePath: "../../tests/recovery-planner.test.js"
+  },
+  {
+    name: "mission-execution-loop",
+    modulePath: "../../tests/mission-execution-loop.test.js"
+  },
+  {
+    name: "run-completion-guard",
+    modulePath: "../../tests/run-completion-guard.test.js"
+  },
+  {
+    name: "llm-output-recovery",
+    modulePath: "../../tests/llm-output-recovery.test.js"
+  },
+  {
     name: "mission-progress-tracker",
     modulePath: "../../tests/mission-progress-tracker.test.js"
+  },
+  {
+    name: "workspace-orchestrator",
+    modulePath: "../../tests/workspace-orchestrator.test.js"
+  },
+  {
+    name: "reflective-recovery",
+    modulePath: "../../tests/reflective-recovery.test.js"
   }
 ];
 
@@ -281,6 +344,7 @@ let failures = 0;
 const results = [];
 
 // Force Playwright to use the bundled Chromium to avoid OS-level launch restrictions.
+process.env.COWORK_DATA_ROOT = process.env.COWORK_DATA_ROOT || path.join(os.tmpdir(), `cowork-prototype-tests-${process.pid}`);
 process.env.COWORK_BROWSER_CHANNEL = process.env.COWORK_BROWSER_CHANNEL || "chromium";
 process.env.COWORK_HEADLESS = process.env.COWORK_HEADLESS || "1";
 process.env.COWORK_LLM_RUNTIME_PROFILE = process.env.COWORK_LLM_RUNTIME_PROFILE || "test";
@@ -290,6 +354,9 @@ process.env.COWORK_LLM_ALLOW_MOCK_FALLBACK = process.env.COWORK_LLM_ALLOW_MOCK_F
 process.env.COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK = process.env.COWORK_LLM_ALLOW_DETERMINISTIC_FALLBACK || "1";
 process.env.COWORK_LLM_REQUIRE_OS_SECRET_STORE = process.env.COWORK_LLM_REQUIRE_OS_SECRET_STORE || "0";
 process.env.COWORK_LLM_LOG_SCOPE = process.env.COWORK_LLM_LOG_SCOPE || "test";
+
+const { RELEASE_ROOT } = await import("../config.js");
+const { ensureDir, writeJson } = await import("../utils/files.js");
 
 for (const suite of suites) {
   try {

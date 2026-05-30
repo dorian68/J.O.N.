@@ -77,6 +77,43 @@ export async function run() {
   assert.equal(browserClarification.choiceRequest.resolutionTarget.parameterPath, "parameters.browserLaunch.browserId");
   assert.equal(browserClarification.selectedBrowser, null);
 
+  const preferredBrowser = buildDeterministicMissionUnderstanding({
+    mission: "Open my browser on this machine.",
+    userPreferences: {
+      preferredBrowser: {
+        id: "edge",
+        label: "Microsoft Edge",
+        source: "explicit_user_message",
+        confidence: 0.95
+      }
+    },
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" },
+      { id: "chrome", label: "Google Chrome", processName: "chrome" }
+    ]
+  });
+  assert.equal(preferredBrowser.computerActionType, "launch_browser");
+  assert.equal(preferredBrowser.requiresClarification, false);
+  assert.equal(preferredBrowser.selectedBrowser?.id, "edge");
+
+  const explicitBrowserOverridesPreference = buildDeterministicMissionUnderstanding({
+    mission: "Open Chrome on this machine.",
+    userPreferences: {
+      preferredBrowser: {
+        id: "edge",
+        label: "Microsoft Edge",
+        source: "explicit_user_message",
+        confidence: 0.95
+      }
+    },
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" },
+      { id: "chrome", label: "Google Chrome", processName: "chrome" }
+    ]
+  });
+  assert.equal(explicitBrowserOverridesPreference.requiresClarification, false);
+  assert.equal(explicitBrowserOverridesPreference.selectedBrowser?.id, "chrome");
+
   const browserSelected = buildDeterministicMissionUnderstanding({
     mission: "Open Chrome on this machine.",
     availableBrowsers: [
@@ -97,13 +134,76 @@ export async function run() {
     ]
   });
   assert.equal(browserSearch.chosenExecutionFrame, "computer_observation");
-  assert.equal(browserSearch.computerActionType, "launch_browser_search");
+  assert.equal(browserSearch.computerActionType, "browser_autonomy");
   assert.equal(browserSearch.requiresClarification, false);
   assert.equal(browserSearch.browserSearchQuery.length > 0, true);
   assert.equal(browserSearch.browserLaunchUrl.startsWith("https://"), true);
-  assert.equal(browserSearch.nextRunRecommendation?.preferredMode, "computer");
-  assert.equal(browserSearch.nextRunRecommendation?.parameters?.computerAction?.type, "capture_browser_window");
-  assert.equal(browserSearch.nextRunRecommendation?.parameters?.browserLaunch?.browserId, "edge");
+  assert.equal(browserSearch.nextRunRecommendation?.parameters?.computerAction?.type !== "capture_browser_window", true);
+
+  const contextPromotedBrowserMission = validateMissionUnderstandingOutput({
+    ...browserSearch,
+    computerActionType: "launch_browser_search"
+  }, {
+    missionDraft: {
+      parameters: {
+        computerAction: {
+          type: "browser_autonomy"
+        }
+      }
+    },
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" }
+    ]
+  });
+  assert.equal(contextPromotedBrowserMission.computerActionType, "browser_autonomy");
+
+  const ebayResearch = buildDeterministicMissionUnderstanding({
+    mission: "Go to eBay and list current deals on high-end Android smartphones",
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" },
+      { id: "chrome", label: "Google Chrome", processName: "chrome" }
+    ]
+  });
+  assert.equal(ebayResearch.chosenExecutionFrame, "research");
+  assert.equal(ebayResearch.requiresClarification, false);
+  assert.equal(ebayResearch.coverageStatus, "full");
+
+  const ebayBrowserAlias = validateMissionUnderstandingOutput({
+    ...ebayResearch,
+    chosenExecutionFrame: "browser"
+  }, {
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" },
+      { id: "chrome", label: "Google Chrome", processName: "chrome" }
+    ]
+  });
+  assert.equal(ebayBrowserAlias.chosenExecutionFrame, "research");
+
+  const ebayWebAlias = validateMissionUnderstandingOutput({
+    ...ebayResearch,
+    chosenExecutionFrame: "web_browsing"
+  });
+  assert.equal(ebayWebAlias.chosenExecutionFrame, "research");
+
+  const ebayNestedAlias = validateMissionUnderstandingOutput({
+    ...ebayResearch,
+    chosenExecutionFrame: undefined,
+    selectedExecutionFrame: undefined,
+    routing: {
+      executionFrame: "ecommerce_research"
+    }
+  });
+  assert.equal(ebayNestedAlias.chosenExecutionFrame, "research");
+
+  const localBrowserAlias = validateMissionUnderstandingOutput({
+    ...browserSearch,
+    chosenExecutionFrame: "browser_control"
+  }, {
+    availableBrowsers: [
+      { id: "edge", label: "Microsoft Edge", processName: "msedge" }
+    ]
+  });
+  assert.equal(localBrowserAlias.chosenExecutionFrame, "computer_observation");
 
   const upworkFlatParameters = buildDeterministicMissionUnderstanding({
     mission: "Ouvrir Upwork et lister 5 postes autour de Excel.",
@@ -120,7 +220,7 @@ export async function run() {
     ]
   });
   assert.equal(upworkFlatParameters.chosenExecutionFrame, "computer_observation");
-  assert.equal(upworkFlatParameters.computerActionType, "launch_browser_search");
+  assert.equal(upworkFlatParameters.computerActionType, "browser_autonomy");
   assert.equal(upworkFlatParameters.requiresClarification, false);
   assert.equal(upworkFlatParameters.selectedBrowser?.id, "chrome");
   assert.equal(upworkFlatParameters.browserSearchQuery, "Excel");
@@ -142,7 +242,7 @@ export async function run() {
     ]
   });
   assert.equal(linkedinFlatParameters.chosenExecutionFrame, "computer_observation");
-  assert.equal(linkedinFlatParameters.computerActionType, "launch_browser_search");
+  assert.equal(linkedinFlatParameters.computerActionType, "browser_autonomy");
   assert.equal(linkedinFlatParameters.selectedBrowser?.id, "chrome");
   assert.equal(linkedinFlatParameters.browserLaunchUrl.includes("site%3Alinkedin.com"), true);
 

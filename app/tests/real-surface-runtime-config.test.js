@@ -28,6 +28,12 @@ export async function run() {
   assert.equal(defaultConfig.loadedFromFile, false);
   assert.equal(defaultConfig.research.mode, "controlled_fixture");
   assert.equal(defaultConfig.computer.mode, "controlled_fixture_window");
+  assert.equal(
+    buildComputerObservationScenarioDefinition({
+      runtimeConfig: { computer: { mode: "controlled_fixture_window" } }
+    }).mission,
+    "Verify the controlled allowlisted local window reaches ready state."
+  );
 
   const configPath = path.join(tempDir, "real-surface-runtime.local.json");
   await fs.writeFile(configPath, JSON.stringify({

@@ -26,7 +26,19 @@ export const BROWSER_PLAN_ACTIONS = Object.freeze([
   "detect_blockers",
   "verify_outcome",
   "capture_evidence",
-  "stop_manual_handoff"
+  "stop_manual_handoff",
+  // Tab management (multi-tab agentic missions)
+  "open_tab",
+  "close_tab",
+  "focus_tab",
+  "navigate_tab",
+  "observe_tab",
+  "screenshot_tab",
+  "extract_tab_text",
+  "scroll_tab",
+  "press_key",
+  "evaluate_script",
+  "cdp_command"
 ]);
 
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "about:"]);
@@ -51,6 +63,10 @@ function deterministicFallbackAllowed(llmGateway) {
     return true;
   }
   return llmGateway.getStatus?.().deterministicFallback !== false;
+}
+
+function shouldUseSafePlanFallback(error, llmGateway) {
+  return error?.category === "malformed_output" || deterministicFallbackAllowed(llmGateway);
 }
 
 function cleanText(value, maxLength = 600) {
@@ -163,14 +179,58 @@ function deriveHost(url) {
   }
 }
 
+function normalizeHostAlias(host = "") {
+  const text = cleanText(host, 120).toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "");
+  const known = {
+    upwork: "upwork.com",
+    ebay: "ebay.com",
+    amazon: "amazon.com",
+    google: "google.com",
+    linkedin: "linkedin.com",
+    github: "github.com",
+    nodejs: "nodejs.org"
+  };
+  return known[text] ?? text;
+}
+
+function expandHost(host = "") {
+  const normalized = normalizeHostAlias(host);
+  if (!normalized) return [];
+  // Freeform text with spaces (e.g. "cinestar guadeloupe") → best-effort kebab domain
+  const domainized = /\s/.test(normalized) ? normalized.replace(/\s+/g, "-") : normalized;
+  if (!domainized) return [];
+  if (domainized === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(domainized)) {
+    return [domainized];
+  }
+  return domainized.startsWith("www.")
+    ? [domainized, domainized.replace(/^www\./, "")]
+    : [domainized, `www.${domainized}`];
+}
+
 function normalizeHosts(value) {
-  return stringArray(value, { maxItems: 20, maxLength: 120 }).map((host) => {
+  const hosts = stringArray(value, { maxItems: 20, maxLength: 120 }).flatMap((host) => {
     try {
-      return new URL(host).hostname;
+      return expandHost(new URL(host).hostname);
     } catch {
-      return host.toLowerCase();
+      return expandHost(host);
     }
   }).filter(Boolean);
+  return Array.from(new Set(hosts)).slice(0, 24);
+}
+
+function hostAllowed(hostname = "", allowlistedHosts = []) {
+  const host = normalizeHostAlias(hostname);
+  return allowlistedHosts.some((entry) => {
+    const allowed = normalizeHostAlias(entry);
+    if (host === allowed || host.endsWith(`.${allowed}`)) return true;
+    // Allowlist entries without dots came from freeform text (e.g. "cinestar-guadeloupe"
+    // converted from "cinestar guadeloupe"). Match on base domain ignoring TLD.
+    if (!allowed.includes(".")) {
+      const hostBase = host.replace(/\.[^.]+$/, "");
+      if (hostBase === allowed || hostBase.endsWith(`.${allowed}`)) return true;
+    }
+    return false;
+  });
 }
 
 function normalizeUrl(value, allowlistedHosts, label) {
@@ -193,7 +253,7 @@ function normalizeUrl(value, allowlistedHosts, label) {
     }
     return parsed.href;
   }
-  if (allowlistedHosts.length > 0 && !allowlistedHosts.includes(parsed.hostname)) {
+  if (allowlistedHosts.length > 0 && !hostAllowed(parsed.hostname, allowlistedHosts)) {
     throw malformed(`${label} is not allowlisted: ${parsed.hostname}.`);
   }
   return parsed.href;
@@ -697,7 +757,7 @@ export async function generateBrowserPlan({
       generationMode: "llm"
     };
   } catch (error) {
-    if (!deterministicFallbackAllowed(llmGateway)) {
+    if (!shouldUseSafePlanFallback(error, llmGateway)) {
       throw error;
     }
     return {
@@ -777,7 +837,7 @@ export async function generateBrowserReplan({
       generationMode: "llm"
     };
   } catch (error) {
-    if (!deterministicFallbackAllowed(llmGateway)) {
+    if (!shouldUseSafePlanFallback(error, llmGateway)) {
       throw error;
     }
     return {

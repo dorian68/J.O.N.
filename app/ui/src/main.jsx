@@ -38,6 +38,11 @@ async function api(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+function runDetailUrl(runId, locale) {
+  const query = locale ? `?locale=${encodeURIComponent(locale)}` : "";
+  return `/api/runs/${encodeURIComponent(runId)}${query}`;
+}
+
 async function streamApi(path, options = {}, handlers = {}) {
   const response = await fetch(path, {
     headers: { "content-type": "application/json" },
@@ -222,23 +227,24 @@ function latestRuns(dashboard, selectedProjectId) {
   });
 }
 
-function eventLabel(event) {
+function eventLabel(event, t = stringsForLocale("fr")) {
+  const en = t.send === "Send";
   const type = String(event?.type ?? "");
   const payload = event?.payload ?? {};
-  if (type === "run.started") return "Action lancée.";
-  if (type === "run.settled" || type === "run.completed") return "Résultat prêt.";
-  if (type === "run.failed") return "Action interrompue.";
-  if (type === "approval.requested") return "Confirmation demandée.";
-  if (type === "approval.resolved" || type === "approval.granted") return "Confirmation reçue.";
-  if (type === "tool.executed") return `Action effectuée${payload.primitive ? ` : ${payload.primitive}` : ""}.`;
-  if (type === "tool.blocked") return `Action bloquée${payload.reason ? ` : ${payload.reason}` : ""}.`;
-  if (type === "tool.recovery_attempted") return "Récupération tentée.";
-  if (type === "evidence.recorded") return "Preuve capturée.";
-  if (type === "run.chain.decided") return "Suite évaluée.";
-  if (type === "run.chain.continued") return "Suite lancée.";
-  if (type === "run.chain.blocked") return "Suite en attente d’une précision.";
-  if (type === "llm.degraded_mode.activated") return "Mode IA dégradé, fallback sûr activé.";
-  return type ? `Événement : ${type}` : "Mise à jour reçue.";
+  if (type === "run.started") return en ? "Action started." : "Action lancée.";
+  if (type === "run.settled" || type === "run.completed") return en ? "Mission reviewed." : "Mission évaluée.";
+  if (type === "run.failed") return en ? "Action interrupted." : "Action interrompue.";
+  if (type === "approval.requested") return en ? "Confirmation requested." : "Confirmation demandée.";
+  if (type === "approval.resolved" || type === "approval.granted") return en ? "Confirmation received." : "Confirmation reçue.";
+  if (type === "tool.executed") return en ? `Tool succeeded${payload.primitive ? `: ${payload.primitive}` : ""}.` : `Action effectuée${payload.primitive ? ` : ${payload.primitive}` : ""}.`;
+  if (type === "tool.blocked") return en ? `Tool blocked${payload.reason ? `: ${payload.reason}` : ""}.` : `Action bloquée${payload.reason ? ` : ${payload.reason}` : ""}.`;
+  if (type === "tool.recovery_attempted") return en ? "Recovery attempted." : "Récupération tentée.";
+  if (type === "evidence.recorded") return en ? "Proof captured." : "Preuve capturée.";
+  if (type === "run.chain.decided") return en ? "Next step evaluated." : "Suite évaluée.";
+  if (type === "run.chain.continued") return en ? "Next step started." : "Suite lancée.";
+  if (type === "run.chain.blocked") return en ? "Next step needs clarification." : "Suite en attente d’une précision.";
+  if (type === "llm.degraded_mode.activated") return en ? "Safe AI fallback enabled." : "Mode IA dégradé, fallback sûr activé.";
+  return type ? (en ? `Event: ${type}` : `Événement : ${type}`) : (en ? "Update received." : "Mise à jour reçue.");
 }
 
 function statusTone(status) {
@@ -246,6 +252,204 @@ function statusTone(status) {
   if (["failed", "error", "denied", "stop_run"].includes(status)) return "danger";
   if (["paused", "pending", "running"].includes(status)) return "warn";
   return "";
+}
+
+function jonPulseState(status, { pendingApprovals = [], busy = false } = {}) {
+  if (pendingApprovals.length > 0 || status === "paused" || status === "waiting_for_input") return "waiting_user";
+  if (status === "failed" || status === "blocked" || status === "error") return "blocked";
+  if (status === "completed" || status === "passed") return "completed";
+  if (busy || status === "running" || status === "pending" || status === "queued") return "acting";
+  return "idle";
+}
+
+function JonPulse({ state = "idle", small = false, label = "JON" }) {
+  return (
+    <div className={`jon-pulse ${state} ${small ? "small" : ""}`} title={label} aria-label={label}>
+      <span className="jon-pulse-node main" />
+      <span className="jon-pulse-link one" />
+      <span className="jon-pulse-link two" />
+      <span className="jon-pulse-node satellite one" />
+      <span className="jon-pulse-node satellite two" />
+      <span className="sr-only">{label}</span>
+    </div>
+  );
+}
+
+function AssistantAvatar({ state = "idle", visible = true, small = false }) {
+  return (
+    <div className={`react-avatar ${visible ? "" : "react-avatar-empty"}`} aria-hidden={!visible}>
+      {visible ? <JonPulse state={state} small={small} /> : null}
+    </div>
+  );
+}
+
+function toolCallStatusLabel(status, t) {
+  return {
+    planned: t.toolStatusPlanned,
+    running: t.toolStatusRunning,
+    succeeded: t.toolStatusSucceeded,
+    failed: t.toolStatusFailed,
+    skipped: t.toolStatusSkipped,
+    blocked: t.toolStatusBlocked
+  }[status] ?? status;
+}
+
+function friendlyRunStatus(status, t) {
+  return {
+    queued: t.statusQueued,
+    pending: t.statusQueued,
+    running: t.statusRunning,
+    paused: t.statusWaitingUser,
+    waiting_for_input: t.statusWaitingUser,
+    completed: t.statusCompleted,
+    failed: t.statusFailed,
+    blocked: t.statusBlocked
+  }[status] ?? status ?? t.status;
+}
+
+function normalizedToolName(call) {
+  return call?.toolName ?? call?.tool ?? call?.primitive ?? "";
+}
+
+function humanToolName(call, t) {
+  const tool = normalizedToolName(call);
+  return {
+    "desktop.inspectWindows": t.toolDesktopInspect,
+    "desktop.launchApplication": t.toolDesktopLaunch,
+    "desktop.focusWindow": t.toolDesktopFocus,
+    "desktop.typeText": t.toolDesktopType,
+    "desktop.captureScreenshot": t.toolCaptureProof,
+    "browser.open": t.toolBrowserOpen,
+    "browser.navigate": t.toolBrowserNavigate,
+    "browser.search": t.toolBrowserSearch,
+    "browser.extractDom": t.toolBrowserRead,
+    "browser.waitForLoad": t.toolBrowserWait,
+    "browser.readState": t.toolBrowserState,
+    "browser.queryDom": t.toolBrowserQuery,
+    "browser.click": t.toolBrowserClick,
+    "browser.typeText": t.toolBrowserType,
+    "browser.selectOption": t.toolBrowserSelect,
+    "browser.extractText": t.toolBrowserExtract,
+    "browser.extractStructuredRows": t.toolBrowserExtract,
+    "browser.detectBlockers": t.toolBrowserBlockers,
+    "browser.captureScreenshot": t.toolCaptureProof,
+    "terminal.read": t.toolTerminalRead,
+    "terminal.injectInput": t.toolTerminalReply,
+    "file.read": t.toolFileRead,
+    "file.write": t.toolFileWrite,
+    "artifact.create": t.toolArtifactCreate,
+    "approval.request": t.toolApprovalRequest,
+    "approval.resolve": t.toolApprovalResolve,
+    "verifier.checkOutcome": t.toolVerifierCheck
+  }[tool] ?? call?.label ?? tool;
+}
+
+function toolStatusTone(status) {
+  if (status === "succeeded" || status === "completed") return "ok";
+  if (status === "failed" || status === "blocked") return "danger";
+  if (status === "running" || status === "planned") return "warn";
+  return "neutral";
+}
+
+function progressPercent(steps = [], run = null, verification = null) {
+  if (verification?.objectiveSatisfied || (run?.status === "completed" && !verification)) return 100;
+  const countable = steps.filter((step) => step.status !== "idle");
+  const done = steps.filter((step) => ["done", "completed", "succeeded"].includes(step.status)).length;
+  const active = steps.some((step) => ["active", "running", "planned"].includes(step.status)) ? 0.45 : 0;
+  const total = Math.max(steps.length || countable.length, 1);
+  const percent = Math.max(0, Math.min(100, Math.round(((done + active) / total) * 100)));
+  return verification?.objectiveSatisfied === false ? Math.min(percent, 82) : percent;
+}
+
+function normalizePlanForGraph(plan = [], fallbackSteps = []) {
+  const source = plan.length > 0 ? plan : fallbackSteps;
+  return source.slice(0, 6).map((step, index) => ({
+    id: step.id ?? `stage-${index}`,
+    label: step.label,
+    detail: step.reason ?? step.detail ?? "",
+    status: step.status === "completed" || step.status === "succeeded" ? "done" : step.status
+  }));
+}
+
+function isGenericStepLabel(value) {
+  const text = String(value ?? "").trim();
+  return !text || /^step\s*#?\s*\d+$/i.test(text) || /^étape\s*#?\s*\d+$/i.test(text);
+}
+
+function inferStepSurface(step = {}, index = 0, toolCalls = []) {
+  const text = `${step.id ?? ""} ${step.label ?? ""} ${step.reason ?? ""} ${step.detail ?? ""}`.toLowerCase();
+  const linked = toolCalls.find((call) => call.stepId && call.stepId === step.id) ?? null;
+  const tool = normalizedToolName(linked).toLowerCase();
+  const combined = `${text} ${tool}`;
+  if (/approval|accord|confirmation/.test(combined)) return "approval";
+  if (/verify|verif|vérif|outcome|result|résultat/.test(combined)) return "verify";
+  if (/evidence|proof|preuve|screenshot|capture/.test(combined)) return "proof";
+  if (/browser|chrome|edge|url|page|search|google|navigate/.test(combined)) return "browser";
+  if (/desktop|window|notepad|application|app|type|write/.test(combined)) return "desktop";
+  if (/terminal|cli|shell|codex|claude/.test(combined)) return "terminal";
+  if (/artifact|artefact|file|fichier|report|rapport/.test(combined)) return "artifact";
+  if (index === 0) return "understand";
+  return "act";
+}
+
+function readableStepLabel(step = {}, index = 0, toolCalls = [], t) {
+  if (!isGenericStepLabel(step.label)) return step.label;
+  const surface = inferStepSurface(step, index, toolCalls);
+  return {
+    understand: t.planUnderstand,
+    approval: t.planAskApproval,
+    browser: t.planUseBrowser,
+    desktop: t.planUseDesktop,
+    terminal: t.planUseTerminal,
+    proof: t.planCaptureProof,
+    artifact: t.planPrepareDeliverable,
+    verify: t.planVerifyOutcome,
+    act: t.planActWorkspace
+  }[surface] ?? t.planActWorkspace;
+}
+
+function readableStepDetail(step = {}, index = 0, toolCalls = [], state = {}, t) {
+  const direct = step.reason ?? step.detail ?? "";
+  if (direct && !/^step\s*#?\s*\d+$/i.test(String(direct).trim())) return direct;
+  const linked = toolCalls.find((call) => call.stepId && call.stepId === step.id)
+    ?? toolCalls.find((call) => inferStepSurface(step, index, [call]) === inferStepSurface(step, index, toolCalls));
+  const toolDetail = linked ? [humanToolName(linked, t), linked.reason, linked.inputSummary, linked.outputSummary].filter(Boolean).join(" · ") : "";
+  if (toolDetail) return toolDetail;
+  if (step.status === "blocked" || step.status === "failed") return state.blockage || t.planStepBlocked;
+  if (step.status === "active" || step.status === "running") return t.planStepActive;
+  if (step.status === "completed" || step.status === "done" || step.status === "succeeded") return t.planStepCompleted;
+  return t.planStepPlanned;
+}
+
+function buildReadableExecutionSteps(plan = [], fallbackSteps = [], toolCalls = [], state = {}, t) {
+  const source = plan.length > 0 ? plan : fallbackSteps;
+  return source.slice(0, 8).map((step, index) => ({
+    ...step,
+    id: step.id ?? `stage-${index}`,
+    label: readableStepLabel(step, index, toolCalls, t),
+    detail: readableStepDetail(step, index, toolCalls, state, t),
+    status: step.status === "completed" || step.status === "succeeded" ? "done" : step.status,
+    linkedTools: toolCalls.filter((call) => call.stepId && call.stepId === step.id).slice(0, 3)
+  }));
+}
+
+const CHAT_PROGRESS_BLOCK_TYPES = new Set(["approvalCard", "terminalPromptCard", "proofCard", "errorRecoveryCard", "nextStepCard"]);
+const CHAT_RESULT_BLOCK_TYPES = new Set([
+  "folderList",
+  "table",
+  "browserResultList",
+  "proofCard",
+  "artifactCard",
+  "artifactPreview",
+  "terminalPromptCard",
+  "approvalCard",
+  "errorRecoveryCard",
+  "nextStepCard",
+  "chart"
+]);
+
+function selectChatBlocks(blocks = [], allowedTypes = CHAT_RESULT_BLOCK_TYPES) {
+  return (Array.isArray(blocks) ? blocks : []).filter((block) => allowedTypes.has(block.type));
 }
 
 function technicalEventKey(event) {
@@ -592,6 +796,27 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [connectors, setConnectors] = useState(() => agentConfiguration?.connectors?.connectors ?? []);
+  const [connectorName, setConnectorName] = useState("");
+  const [connectorCommand, setConnectorCommand] = useState("");
+  const [connectorUrl, setConnectorUrl] = useState("");
+  const [connectorTools, setConnectorTools] = useState('[{"name":"send_email","description":"Send an email after explicit approval."}]');
+  const [connectorBusy, setConnectorBusy] = useState(false);
+  const [connectorError, setConnectorError] = useState(null);
+  const [connectorSaved, setConnectorSaved] = useState(false);
+
+  async function refreshConnectors() {
+    try {
+      const payload = await api("/api/connectors");
+      setConnectors(Array.isArray(payload?.connectors) ? payload.connectors : []);
+    } catch {
+      setConnectors([]);
+    }
+  }
+
+  useEffect(() => {
+    refreshConnectors();
+  }, []);
 
   function toggleApp(appId) {
     setTrustedApps((prev) => {
@@ -638,6 +863,40 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
       setSaveError("Erreur lors de la sauvegarde.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleAddConnector() {
+    const name = connectorName.trim();
+    if (!name) return;
+    setConnectorBusy(true);
+    setConnectorError(null);
+    setConnectorSaved(false);
+    try {
+      let tools = [];
+      if (connectorTools.trim()) {
+        const parsed = JSON.parse(connectorTools);
+        tools = Array.isArray(parsed) ? parsed : [parsed];
+      }
+      await api("/api/connectors", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "mcp",
+          name,
+          command: connectorCommand.trim(),
+          url: connectorUrl.trim(),
+          tools
+        })
+      });
+      setConnectorName("");
+      setConnectorCommand("");
+      setConnectorUrl("");
+      setConnectorSaved(true);
+      await refreshConnectors();
+    } catch (error) {
+      setConnectorError(error.message ?? "Connector configuration failed.");
+    } finally {
+      setConnectorBusy(false);
     }
   }
 
@@ -698,6 +957,35 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
             rows={5}
             style={{ width: "100%", fontFamily: "monospace", fontSize: "12px", resize: "vertical" }}
           />
+        </section>
+
+        <section className="settings-connectors-section">
+          <h3 style={{ fontSize: "13px", marginBottom: "6px" }}>{t.settingsConnectors}</h3>
+          <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "10px" }}>{t.settingsConnectorsHint}</p>
+          <div className="settings-connector-list">
+            {connectors.length === 0 ? (
+              <div className="settings-connector-empty">{t.settingsNoConnectors}</div>
+            ) : connectors.map((connector) => (
+              <div key={connector.connectorId} className="settings-connector-row">
+                <span>
+                  <strong>{connector.name}</strong>
+                  <small>{connector.type ?? connector.category ?? "builtin"} · {(connector.capabilities ?? []).slice(0, 3).join(", ") || "tool"}</small>
+                </span>
+                <em className={`settings-connector-status ${connector.status}`}>{connector.status === "connected" ? t.settingsConnectorConnected : t.settingsConnectorSetup}</em>
+              </div>
+            ))}
+          </div>
+          <div className="settings-connector-form">
+            <input value={connectorName} onChange={(event) => setConnectorName(event.target.value)} placeholder={t.settingsConnectorNamePlaceholder} />
+            <input value={connectorCommand} onChange={(event) => setConnectorCommand(event.target.value)} placeholder={t.settingsConnectorCommandPlaceholder} />
+            <input value={connectorUrl} onChange={(event) => setConnectorUrl(event.target.value)} placeholder={t.settingsConnectorUrlPlaceholder} />
+            <textarea value={connectorTools} onChange={(event) => setConnectorTools(event.target.value)} rows={4} placeholder='[{"name":"tool_name","description":"..."}]' />
+            <button type="button" className="primary small" onClick={handleAddConnector} disabled={connectorBusy || !connectorName.trim()}>
+              {connectorBusy ? t.settingsConnectorAdding : t.settingsConnectorAdd}
+            </button>
+            {connectorSaved ? <span className="settings-connector-ok">{t.settingsConnectorSaved}</span> : null}
+            {connectorError ? <span className="settings-connector-error">{connectorError}</span> : null}
+          </div>
         </section>
 
         {llmGatewayStatus ? (
@@ -950,7 +1238,7 @@ function App() {
     if (conversation.runId) {
       setBusy((current) => ({ ...current, loading: true }));
       try {
-        setRunDetail(await api(`/api/runs/${conversation.runId}`));
+        setRunDetail(await api(runDetailUrl(conversation.runId, locale)));
       } catch (error) {
         setFeedback({ tone: "danger", text: error.message });
       } finally {
@@ -990,7 +1278,7 @@ function App() {
     selectedRunIdRef.current = nextRunId;
 
     if (nextRunId) {
-      setRunDetail(await api(`/api/runs/${nextRunId}`));
+      setRunDetail(await api(runDetailUrl(nextRunId, locale)));
     } else {
       setRunDetail(null);
     }
@@ -1009,6 +1297,27 @@ function App() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedRunId) {
+      return;
+    }
+    let cancelled = false;
+    api(runDetailUrl(selectedRunId, locale))
+      .then((detail) => {
+        if (!cancelled) {
+          setRunDetail(detail);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setFeedback({ tone: "danger", text: error.message });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale, selectedRunId]);
 
   useEffect(() => {
     const element = transcriptRef.current;
@@ -1226,7 +1535,7 @@ function App() {
     setConfirmedDraft(null);
     setBusy((current) => ({ ...current, loading: true }));
     try {
-      setRunDetail(await api(`/api/runs/${runId}`));
+      setRunDetail(await api(runDetailUrl(runId, locale)));
     } catch (error) {
       setFeedback({ tone: "danger", text: error.message });
     } finally {
@@ -1573,26 +1882,38 @@ function App() {
               />
             ) : null}
             {selectedRunId && run ? <RunReviewIntro run={run} t={t} /> : null}
-            {messages.map((message) => (
-              <Message
-                key={message.id}
-                message={message}
-                onStartMission={startMission}
-                onClarificationAnswer={stageClarificationAnswer}
-                onTerminalInput={sendTerminalInput}
-                busy={busy}
-                t={t}
-              />
-            ))}
+            {messages.map((message) => {
+              const hasRuntimeAssistantBubble = Boolean(
+                (busy.reviewing && !hasStreamingMessage)
+                || busy.starting
+                || (run && !["completed", "failed", "stopped", "cancelled"].includes(run.status))
+                || pendingApprovals.length > 0
+                || (runDetail?.review?.outcomeSummary && ["completed", "failed", "stopped", "cancelled"].includes(run?.status))
+              );
+              const lastAssistantMessageId = [...messages].reverse().find((candidate) => ((candidate.role ?? "assistant") === "assistant"))?.id;
+              return (
+                <Message
+                  key={message.id}
+                  message={message}
+                  showIdleLogo={!hasRuntimeAssistantBubble && message.id === lastAssistantMessageId}
+                  onStartMission={startMission}
+                  onClarificationAnswer={stageClarificationAnswer}
+                  onTerminalInput={sendTerminalInput}
+                  busy={busy}
+                  t={t}
+                />
+              );
+            })}
             {busy.reviewing && !hasStreamingMessage ? <ThinkingMessage text={t.thinking} t={t} /> : null}
             {busy.starting ? <ThinkingMessage text={t.launching} t={t} /> : null}
-            {run ? (
+            {run && !["completed", "failed", "stopped", "cancelled"].includes(run.status) ? (
               <RunProgressMessage
                 run={run}
                 runDetail={runDetail}
                 liveStatus={liveStatus}
                 pendingApprovals={pendingApprovals}
                 events={activityEvents}
+                onTerminalInput={sendTerminalInput}
                 t={t}
               />
             ) : null}
@@ -1605,19 +1926,21 @@ function App() {
                 t={t}
               />
             ))}
-            {runDetail?.review?.outcomeSummary && ["completed", "failed"].includes(run?.status) ? (
-              <OutcomeMessage run={run} runDetail={runDetail} t={t} />
+            {runDetail?.review?.outcomeSummary && ["completed", "failed", "stopped", "cancelled"].includes(run?.status) ? (
+              <OutcomeMessage run={run} runDetail={runDetail} onTerminalInput={sendTerminalInput} t={t} />
             ) : null}
           </div>
 
-          <PromptSuggestions
-            draft={draft}
-            onDraftChange={updateDraft}
-            inputRef={composerInputRef}
-            disabled={busy.loading || busy.reviewing || busy.starting || !project}
-            locale={locale}
-            t={t}
-          />
+          {!hasConversation ? (
+            <PromptSuggestions
+              draft={draft}
+              onDraftChange={updateDraft}
+              inputRef={composerInputRef}
+              disabled={busy.loading || busy.reviewing || busy.starting || !project}
+              locale={locale}
+              t={t}
+            />
+          ) : null}
           <Composer
             draft={draft}
             busy={busy}
@@ -1840,7 +2163,7 @@ function runTraceItems({ scopedRun, events = [], approvals = [], artifacts = [],
     items.push({
       id: technicalEventKey(event),
       tone: event.type?.includes("failed") || event.type?.includes("blocked") ? "danger" : event.type?.includes("approval") ? "warn" : "ok",
-      label: eventLabel(event),
+      label: eventLabel(event, t),
       detail: event.type,
       timestamp: event.createdAt
     });
@@ -2639,6 +2962,11 @@ function TerminalSidebar({
   const [attachBusy, setAttachBusy] = React.useState(false);
   const [missionObjective, setMissionObjective] = React.useState("");
   const [missionBusy, setMissionBusy] = React.useState(false);
+  const [showDetect, setShowDetect] = React.useState(false);
+  const [detectBusy, setDetectBusy] = React.useState(false);
+  const [detectError, setDetectError] = React.useState(null);
+  const [detectedTerminals, setDetectedTerminals] = React.useState(null);
+  const [adoptingId, setAdoptingId] = React.useState(null);
   const missionBrief = workspace?.missionBrief ?? null;
   const terminals = workspace?.terminals ?? [];
   const activeCount = terminals.filter((terminal) => ["running", "waiting_for_input", "needs_attention"].includes(terminal.status)).length;
@@ -2768,6 +3096,49 @@ function TerminalSidebar({
       await onRefresh();
     } catch {
       // ignore — terminal may already be stopped
+    }
+  }
+
+  async function handleDetect() {
+    if (!projectId || detectBusy) return;
+    setDetectBusy(true);
+    setDetectError(null);
+    try {
+      const result = await api(`/api/projects/${projectId}/workspace/external-terminals`);
+      setDetectedTerminals(result?.terminals ?? []);
+    } catch (err) {
+      setDetectError(err.message);
+    } finally {
+      setDetectBusy(false);
+    }
+  }
+
+  async function handleAdopt(terminal) {
+    if (!projectId || adoptingId) return;
+    setAdoptingId(terminal.windowHandle ?? terminal.processId);
+    try {
+      const response = await api(`/api/projects/${projectId}/workspace/external-terminals`, {
+        method: "POST",
+        body: JSON.stringify({
+          label: terminal.label || terminal.title || terminal.processName,
+          windowHandle: terminal.windowHandle,
+          processId: terminal.processId,
+          canReadBuffer: terminal.canReadBuffer,
+          processName: terminal.processName,
+          autonomyMode: "assisted",
+          conversationId: conversationId ?? undefined
+        })
+      });
+      setDetectedTerminals(null);
+      setShowDetect(false);
+      await onRefresh();
+      if (response?.terminal?.id) {
+        onOpenOverlay?.(response.terminal.id);
+      }
+    } catch (err) {
+      setDetectError(err.message);
+    } finally {
+      setAdoptingId(null);
     }
   }
 
@@ -2943,21 +3314,72 @@ function TerminalSidebar({
         <button
           type="button"
           className={`terminal-action-btn ${showLaunch ? "active" : ""}`}
-          onClick={() => { setShowLaunch(!showLaunch); setShowAttach(false); setLaunchError(null); }}
+          onClick={() => { setShowLaunch(!showLaunch); setShowAttach(false); setShowDetect(false); setLaunchError(null); }}
         >
           <span>↗</span> {t.launchCli}
         </button>
         <button
           type="button"
           className={`terminal-action-btn ${showAttach ? "active" : ""}`}
-          onClick={() => { setShowAttach(!showAttach); setShowLaunch(false); setAttachError(null); }}
+          onClick={() => { setShowAttach(!showAttach); setShowLaunch(false); setShowDetect(false); setAttachError(null); }}
         >
           <span>⊕</span> {t.attachTerminal}
+        </button>
+        <button
+          type="button"
+          className={`terminal-action-btn ${showDetect ? "active" : ""}`}
+          onClick={() => { const next = !showDetect; setShowDetect(next); setShowLaunch(false); setShowAttach(false); if (next && detectedTerminals === null) handleDetect(); }}
+        >
+          <span>⊙</span> {t.detectExternalTerminals}
         </button>
       </div>
 
       {showLaunch ? launchForm : null}
       {showAttach ? attachForm : null}
+      {showDetect ? (
+        <div className="workspace-form">
+          <div className="workspace-form-actions">
+            <button type="button" className="small" onClick={handleDetect} disabled={detectBusy}>
+              {detectBusy ? t.sending : t.detectExternalTerminalsBtn}
+            </button>
+            <button type="button" className="ghost small" onClick={() => { setShowDetect(false); setDetectedTerminals(null); setDetectError(null); }}>{t.hide}</button>
+          </div>
+          {detectError ? <p className="workspace-form-error">{detectError}</p> : null}
+          {detectedTerminals !== null ? (
+            detectedTerminals.length === 0 ? (
+              <p className="muted small-muted">{t.externalTerminalsNone}</p>
+            ) : (
+              <div className="external-terminal-list">
+                <p className="workspace-form-hint">{t.externalTerminalsFound}</p>
+                {detectedTerminals.map((ext) => {
+                  const key = ext.windowHandle ?? ext.processId;
+                  const alreadyAdopted = ext.alreadyAdopted === true;
+                  return (
+                    <div key={key} className="external-terminal-item">
+                      <div className="external-terminal-info">
+                        <strong className="external-terminal-label">{ext.label || ext.title || ext.processName}</strong>
+                        <small className="muted">{ext.processName}{ext.canReadBuffer ? "" : ` · ${t.externalTerminalReadOnly}`}</small>
+                      </div>
+                      {alreadyAdopted ? (
+                        <span className="external-terminal-adopted">{t.externalTerminalAdopted}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="small"
+                          disabled={!!adoptingId}
+                          onClick={() => handleAdopt(ext)}
+                        >
+                          {adoptingId === key ? t.externalTerminalAdopting : t.externalTerminalAdopt}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="terminal-sidebar-list" data-testid="terminal-list">
         {terminals.length === 0 && !showLaunch && !showAttach ? (
@@ -2986,21 +3408,21 @@ function TerminalSidebar({
 
 // ── Panel widget registry ────────────────────────────────────────────────────
 
-const PANEL_CONFIG_KEY = "jon.panel.widgets.v1";
+const PANEL_CONFIG_KEY = "jon.panel.widgets.v2";
 
 const PANEL_WIDGET_REGISTRY = [
   { id: "mission_state",       labelKey: "panelWidgetMissionState",  category: "mission",   defaultOn: true  },
   { id: "jon_needs",           labelKey: "panelWidgetJonNeeds",      category: "mission",   defaultOn: true  },
   { id: "semantic_verify",     labelKey: "panelWidgetSemanticVerify",category: "mission",   defaultOn: true  },
-  { id: "token_budget",        labelKey: "panelWidgetTokenBudget",   category: "telemetry", defaultOn: true  },
+  { id: "token_budget",        labelKey: "panelWidgetTokenBudget",   category: "telemetry", defaultOn: false },
   { id: "browser_state",       labelKey: "browserState",             category: "surfaces",  defaultOn: true  },
   { id: "desktop_state",       labelKey: "panelWidgetDesktopState",  category: "surfaces",  defaultOn: false },
   { id: "approval_queue",      labelKey: "panelWidgetApprovalQueue", category: "mission",   defaultOn: true  },
   { id: "run_narrative",       labelKey: "runNarrative",             category: "trace",     defaultOn: true  },
-  { id: "llm_stages",          labelKey: "panelWidgetLlmStages",     category: "telemetry", defaultOn: true  },
+  { id: "llm_stages",          labelKey: "panelWidgetLlmStages",     category: "telemetry", defaultOn: false },
   { id: "evidence",            labelKey: "evidence",                 category: "trace",     defaultOn: true  },
   { id: "artifacts",           labelKey: "artifacts",                category: "trace",     defaultOn: false },
-  { id: "terminal_alerts",     labelKey: "terminalAlerts",           category: "surfaces",  defaultOn: false },
+  { id: "terminal_alerts",     labelKey: "terminalAlerts",           category: "surfaces",  defaultOn: true  },
   { id: "terminal_transcript", labelKey: "terminalTranscript",       category: "surfaces",  defaultOn: false },
   { id: "run_history",         labelKey: "runHistory",               category: "trace",     defaultOn: false },
 ];
@@ -3227,6 +3649,177 @@ function PanelConfigDrawer({ config, onClose, onChange, t }) {
   );
 }
 
+function MissionProgressGraph({ steps = [], run = null, verification = null, t }) {
+  const normalized = normalizePlanForGraph([], steps);
+  if (normalized.length === 0) return null;
+  const percent = progressPercent(normalized, run, verification);
+  return (
+    <div className="mission-progress-graph" aria-label={t.missionProgressGraph}>
+      <div className="mission-progress-graph-top">
+        <span>{t.missionProgressGraph}</span>
+        <strong>{percent}%</strong>
+      </div>
+      <div className="mission-progress-track" aria-hidden="true">
+        <span className="mission-progress-fill" style={{ width: `${percent}%` }} />
+        {normalized.map((step) => (
+          <i key={step.id} className={`mission-progress-node ${step.status}`} />
+        ))}
+      </div>
+      <ol className="mission-progress-stages">
+        {normalized.map((step) => (
+          <li key={step.id} className={step.status}>
+            <strong>{step.label}</strong>
+            {step.detail ? <span>{step.detail}</span> : null}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function ToolTimelineCompact({ toolCalls = [], t }) {
+  if (toolCalls.length === 0) return <p className="muted">{t.noRecentActions}</p>;
+  return (
+    <div className="execution-tool-list">
+      {toolCalls.slice(-10).reverse().map((call) => {
+        const rawName = normalizedToolName(call);
+        return (
+          <article key={call.id} className={`execution-tool-call ${call.status}`}>
+            <div>
+              <strong>{humanToolName(call, t)}</strong>
+              <span className={`mini-badge ${toolStatusTone(call.status)}`}>{toolCallStatusLabel(call.status, t)}</span>
+            </div>
+            {rawName ? <small className="tool-technical-name">{rawName}</small> : null}
+            {call.reason ? <p>{call.reason}</p> : null}
+            {call.inputSummary ? <small>{call.inputSummary}</small> : null}
+            {call.outputSummary ? <small>{call.outputSummary}</small> : null}
+            <footer>
+              {call.evidenceId ? <span>{t.evidence}: {call.evidenceId}</span> : null}
+              {call.durationMs != null ? <span>{call.durationMs} ms</span> : null}
+            </footer>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function ExecutionPlanDetailList({ steps = [], toolCalls = [], t }) {
+  if (steps.length === 0) return null;
+  return (
+    <div className="execution-step-detail-list">
+      {steps.map((step, index) => {
+        const relatedTools = step.linkedTools?.length > 0
+          ? step.linkedTools
+          : toolCalls.filter((call) => inferStepSurface(step, index, [call]) === inferStepSurface(step, index, toolCalls)).slice(0, 2);
+        return (
+          <article key={step.id} className={`execution-step-card ${step.status}`}>
+            <div className="execution-step-number">{index + 1}</div>
+            <div className="execution-step-body">
+              <div className="execution-step-title-row">
+                <strong>{step.label}</strong>
+                <span className={`mini-badge ${step.status === "done" ? "ok" : step.status === "blocked" || step.status === "failed" ? "danger" : step.status === "active" || step.status === "running" ? "warn" : "neutral"}`}>
+                  {step.status === "done" ? t.toolStatusSucceeded : step.status === "active" ? t.toolStatusRunning : toolCallStatusLabel(step.status, t)}
+                </span>
+              </div>
+              {step.detail ? <p>{step.detail}</p> : null}
+              {relatedTools.length > 0 ? (
+                <div className="execution-step-tools" aria-label={t.planLinkedTools}>
+                  {relatedTools.map((call) => (
+                    <span key={call.id} className={`mini-badge ${toolStatusTone(call.status)}`}>{humanToolName(call, t)}</span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function ExecutionThreadWidget({ thread, fallbackTraceItems = [], scopedRun, locale, t }) {
+  if (!thread) {
+    return fallbackTraceItems.length === 0 ? <p className="muted">{t.noRecentActions}</p> : (
+      <ol className="run-trace-list execution-thread-fallback">
+        {fallbackTraceItems.map((item) => (
+          <li key={item.id} className={item.tone ?? ""}>
+            <i aria-hidden="true" />
+            <div>
+              <strong>{item.label}</strong>
+              <span>{item.detail}</span>
+              {item.timestamp ? <small>{formatDate(item.timestamp, locale)}</small> : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
+  const plan = Array.isArray(thread.plan) ? thread.plan : [];
+  const toolCalls = Array.isArray(thread.toolCalls) ? thread.toolCalls : [];
+  const state = thread.state ?? {};
+  const verification = thread.verification ?? {};
+  const graphSteps = buildReadableExecutionSteps(plan, buildProgressSteps({
+    run: scopedRun,
+    pendingApprovals: state.pendingApprovals > 0 ? [{}] : [],
+    events: [],
+    outcome: null,
+    t
+  }), toolCalls, state, t);
+  return (
+    <div className="execution-thread" data-testid="execution-thread">
+      <section className="execution-thread-mission">
+        <div className="execution-thread-heading">
+          <JonPulse state={jonPulseState(scopedRun?.status)} small />
+          <div>
+            <strong>{thread.mission?.objective || scopedRun?.mission || t.selectedMission}</strong>
+            {thread.mission?.deliverable ? <span>{thread.mission.deliverable}</span> : null}
+          </div>
+        </div>
+        <span className={`mini-badge ${statusTone(scopedRun?.status)}`}>{friendlyRunStatus(thread.mission?.status ?? scopedRun?.status, t)}</span>
+      </section>
+
+      <section className="execution-thread-block">
+        <h4>{t.jonPlan}</h4>
+        <MissionProgressGraph steps={graphSteps} run={scopedRun} verification={verification} t={t} />
+        <ExecutionPlanDetailList steps={graphSteps} toolCalls={toolCalls} t={t} />
+      </section>
+
+      <section className="execution-thread-block">
+        <h4>{t.jonTools}</h4>
+        <ToolTimelineCompact toolCalls={toolCalls} t={t} />
+      </section>
+
+      <section className="execution-thread-block">
+        <h4>{t.jonWorkspaceState}</h4>
+        <div className="inspector-grid compact">
+          <span>{t.activeWindow}<strong>{state.activeWindow || t.notAvailable}</strong></span>
+          <span>{t.activeBrowser}<strong>{state.activeBrowser || t.notAvailable}</strong></span>
+          <span>{t.activeUrl}<strong>{state.activeBrowserUrl || t.notAvailable}</strong></span>
+          <span>{t.activeTerminal}<strong>{state.activeTerminal || t.notAvailable}</strong></span>
+          <span>{t.panelApprovals}<strong>{state.pendingApprovals ?? 0}</strong></span>
+          <span>{t.evidence}<strong>{state.evidenceCount ?? 0}</strong></span>
+        </div>
+        {state.blockage ? <p className="execution-blocker">{state.blockage}</p> : null}
+        {state.nextAction ? <p className="execution-next">{t.panelNextAction}: {state.nextAction}</p> : null}
+      </section>
+
+      <section className="execution-thread-block">
+        <h4>{t.jonVerification}</h4>
+        <div className="verification-strip">
+          <span className={`mini-badge ${verification.objectiveSatisfied ? "ok" : "warn"}`}>
+            {verification.objectiveSatisfied ? t.panelVerdictPass : verification.verdict ?? t.panelNotVerified}
+          </span>
+          {verification.confidence != null ? <span>{t.panelConfidence}: {Math.round(verification.confidence * 100)}%</span> : null}
+        </div>
+        {verification.evidenceUsed?.length > 0 ? <MiniList title={t.evidence} items={verification.evidenceUsed} /> : null}
+        {verification.missingEvidence?.length > 0 ? <MiniList title={t.panelObjectiveUnverified} items={verification.missingEvidence} tone="warn" /> : null}
+      </section>
+    </div>
+  );
+}
+
 function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId, conversation, conversationId, onOpenRun, open, onToggle, onOpenTerminals, pendingApprovals, liveStatus, locale, t }) {
   const linkedRunIds = new Set([
     ...(Array.isArray(conversation?.metadata?.linkedRunIds) ? conversation.metadata.linkedRunIds : []),
@@ -3259,6 +3852,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
   const workspaceDecisions = workspace?.decisions ?? [];
   const workspaceTerminalEvents = workspace?.terminalEvents ?? [];
   const traceItems = runTraceItems({ scopedRun, events: scopedEvents, approvals: scopedPendingApprovals, artifacts, evidence, calls, t });
+  const executionThread = scopedRunDetail?.conversationResponse?.executionThread ?? null;
   const capabilitySummary = runCapabilitySummary(scopedRun, scopedRunDetail);
 
   const [panelConfig, setPanelConfig] = React.useState(loadPanelConfig);
@@ -3304,29 +3898,13 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
         return (
           <section key={widgetId} className="activity-section">
             <h3>{t.runNarrative}</h3>
-            {traceItems.length === 0 ? <p className="muted">{t.noRecentActions}</p> : null}
-            <ol className="run-trace-list">
-              {traceItems.map((item) => (
-                <li key={item.id} className={item.tone ?? ""}>
-                  <i aria-hidden="true" />
-                  <div>
-                    <strong>{item.label}</strong>
-                    <span>{item.detail}</span>
-                    {item.timestamp ? <small>{formatDate(item.timestamp, locale)}</small> : null}
-                  </div>
-                </li>
-              ))}
-            </ol>
-            {scopedEvents.length > 0 && (
-              <ul className="activity-timeline compact" style={{ marginTop: "0.5rem" }}>
-                {scopedEvents.slice(0, 6).map((event) => (
-                  <li key={technicalEventKey(event)}>
-                    <span>{eventLabel(event)}</span>
-                    <small>{event.type} · {formatDate(event.createdAt, locale)}</small>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ExecutionThreadWidget
+              thread={executionThread}
+              fallbackTraceItems={traceItems}
+              scopedRun={scopedRun}
+              locale={locale}
+              t={t}
+            />
           </section>
         );
 
@@ -4154,16 +4732,16 @@ function Composer({ draft, busy, project, onDraftChange, onReview, detailsOpen, 
   );
 }
 
-function TerminalEventMessage({ message, t }) {
+function TerminalEventMessage({ message, showAvatar = true, t }) {
   const ev = message.terminalEvent ?? {};
   const kindMeta = {
-    terminal_started: { icon: "⌁", labelKey: "terminalStartedTitle", tone: "neutral" },
-    terminal_completion: { icon: "✓", labelKey: "terminalCompletionTitle", tone: "ok" },
-    terminal_auto_action: { icon: "⚡", labelKey: "terminalAutoActionTitle", tone: "neutral" }
-  }[message.kind] ?? { icon: "⌁", labelKey: "terminalAlertTitle", tone: "neutral" };
+    terminal_started: { state: "acting", labelKey: "terminalStartedTitle", tone: "neutral" },
+    terminal_completion: { state: "completed", labelKey: "terminalCompletionTitle", tone: "ok" },
+    terminal_auto_action: { state: "acting", labelKey: "terminalAutoActionTitle", tone: "neutral" }
+  }[message.kind] ?? { state: "idle", labelKey: "terminalAlertTitle", tone: "neutral" };
   return (
     <article className={`react-message assistant terminal-event-message ${kindMeta.tone}`}>
-      <div className="react-avatar">{kindMeta.icon}</div>
+      <AssistantAvatar state={kindMeta.state} visible={showAvatar} />
       <div className="react-bubble terminal-event-bubble">
         <p className="chat-meta">{t[kindMeta.labelKey] ?? kindMeta.labelKey}</p>
         <strong>{ev.terminalLabel ?? ev.terminalId ?? "Terminal"}</strong>
@@ -4181,11 +4759,11 @@ function TerminalEventMessage({ message, t }) {
   );
 }
 
-function MissionPausedMessage({ message, t }) {
+function MissionPausedMessage({ message, showAvatar = true, t }) {
   const pause = message.missionPause ?? {};
   return (
     <article className="react-message assistant terminal-event-message warn">
-      <div className="react-avatar">⏸</div>
+      <AssistantAvatar state="waiting_user" visible={showAvatar} />
       <div className="react-bubble terminal-event-bubble">
         <p className="chat-meta">{t.missionPausedTitle ?? "Mission en pause"}</p>
         <strong>{pause.actionLabel ?? "Action manuelle requise"}</strong>
@@ -4196,21 +4774,23 @@ function MissionPausedMessage({ message, t }) {
   );
 }
 
-function Message({ message, onStartMission, onClarificationAnswer, onTerminalInput, busy, t }) {
+function Message({ message, showIdleLogo = false, onStartMission, onClarificationAnswer, onTerminalInput, busy, t }) {
   if (message.kind === "terminal_alert") {
-    return <TerminalAlertMessage message={message} onTerminalInput={onTerminalInput} t={t} />;
+    return <TerminalAlertMessage message={message} showAvatar={showIdleLogo || message.streaming} onTerminalInput={onTerminalInput} t={t} />;
   }
   if (message.kind === "terminal_started" || message.kind === "terminal_completion" || message.kind === "terminal_auto_action") {
-    return <TerminalEventMessage message={message} t={t} />;
+    return <TerminalEventMessage message={message} showAvatar={showIdleLogo || message.streaming} t={t} />;
   }
   if (message.kind === "mission_paused") {
-    return <MissionPausedMessage message={message} t={t} />;
+    return <MissionPausedMessage message={message} showAvatar={showIdleLogo} t={t} />;
   }
   if (message.kind === "turn") {
     return <TurnMessage
       message={message}
+      showAvatar={showIdleLogo || message.streaming}
       onStartMission={onStartMission}
       onClarificationAnswer={onClarificationAnswer}
+      onTerminalInput={onTerminalInput}
       busy={busy.starting}
       t={t}
     />;
@@ -4218,6 +4798,7 @@ function Message({ message, onStartMission, onClarificationAnswer, onTerminalInp
   if (message.kind === "preflight") {
     return <PreflightMessage
       message={message}
+      showAvatar={showIdleLogo || message.streaming}
       onStartMission={onStartMission}
       onClarificationAnswer={onClarificationAnswer}
       busy={busy.starting}
@@ -4229,7 +4810,11 @@ function Message({ message, onStartMission, onClarificationAnswer, onTerminalInp
   }
   return (
     <article className={`react-message ${message.role ?? "assistant"} ${message.tone ?? ""}`}>
-      <div className="react-avatar">{message.role === "user" ? t.userAvatar : message.role === "tool" ? t.toolAvatar : "JON"}</div>
+      {message.role === "user" || message.role === "tool" ? (
+        <div className="react-avatar">{message.role === "user" ? t.userAvatar : t.toolAvatar}</div>
+      ) : (
+        <AssistantAvatar state={message.streaming ? "thinking" : message.tone === "warn" ? "waiting_user" : "idle"} visible={showIdleLogo || message.streaming} />
+      )}
       <div className="react-bubble">
         {message.meta ? <p className="chat-meta">{message.meta}</p> : null}
         <p>{message.text}</p>
@@ -4257,7 +4842,7 @@ function WorkspaceTerminalMessage({
   const leadingTerminals = terminals.slice(0, 3);
   return (
     <article className="react-message assistant workspace-terminal-message">
-      <div className="react-avatar">⌁</div>
+      <AssistantAvatar state={waitingCount > 0 ? "waiting_user" : activeCount > 0 ? "acting" : "idle"} visible={waitingCount > 0 || activeCount > 0} />
       <div className="react-bubble workspace-terminal-bubble" data-testid="workspace-terminal-bubble">
         <div className="workspace-terminal-bubble-head">
           <div>
@@ -4304,7 +4889,7 @@ function WorkspaceTerminalMessage({
   );
 }
 
-function TerminalAlertMessage({ message, onTerminalInput, t }) {
+function TerminalAlertMessage({ message, showAvatar = true, onTerminalInput, t }) {
   const alert = message.terminalAlert ?? {};
   const [replyInput, setReplyInput] = React.useState(alert.suggestedInput ?? "");
   const [replySent, setReplySent] = React.useState(false);
@@ -4350,7 +4935,7 @@ function TerminalAlertMessage({ message, onTerminalInput, t }) {
 
   return (
     <article className={`react-message assistant terminal-alert-message ${tone}`}>
-      <div className="react-avatar">⌁</div>
+      <AssistantAvatar state={tone === "warn" ? "waiting_user" : tone === "danger" ? "blocked" : "acting"} visible={showAvatar} />
       <div className="react-bubble terminal-alert-bubble">
         <p className="chat-meta">{t.terminalAlertTitle}</p>
         <div className="terminal-alert-header">
@@ -4404,7 +4989,7 @@ function TerminalAlertMessage({ message, onTerminalInput, t }) {
   );
 }
 
-function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }) {
+function TurnMessage({ message, showAvatar = true, onStartMission, onClarificationAnswer, onTerminalInput, busy, t }) {
   const turn = message.turn ?? {};
   const understanding = normalizePreflight(message.preflight);
   const choiceRequest = turn.choiceRequest ?? understanding?.choiceRequest ?? null;
@@ -4421,10 +5006,10 @@ function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }
   const showStatusChip = Boolean(requiresClarification || canStart || turn.action === "refuse");
   return (
     <article className={`react-message assistant ${message.tone ?? ""}`}>
-      <div className="react-avatar">JON</div>
+      <AssistantAvatar state={message.streaming ? "thinking" : requiresClarification ? "waiting_user" : canStart ? "thinking" : "idle"} visible={showAvatar} />
       <div className="react-bubble turn-bubble">
         {message.meta ? <p className="chat-meta">{message.meta}</p> : null}
-        {message.text ? <p>{message.text}<StreamingCursor active={message.streaming} /></p> : message.streaming ? <div className="typing-row compact"><span /><span /><span /></div> : null}
+        {message.text ? <p>{message.text}<StreamingCursor active={message.streaming} /></p> : message.streaming ? <span className="sr-only">{t.thinking}</span> : null}
         {showStatusChip ? (
           <div className="pill-row">
             {requiresClarification ? <span className="mini-badge warn">{t.clarification}</span> : null}
@@ -4432,7 +5017,14 @@ function TurnMessage({ message, onStartMission, onClarificationAnswer, busy, t }
             {turn.action === "refuse" ? <span className="mini-badge warn">{t.actionNotStarted}</span> : null}
           </div>
         ) : null}
-        {!message.streaming ? <UiBlocks blocks={message.uiBlocks ?? turn.uiBlocks ?? []} /> : null}
+        {!message.streaming ? (
+          <UiBlocks
+            blocks={message.uiBlocks ?? turn.uiBlocks ?? []}
+            t={t}
+            onTerminalInput={onTerminalInput}
+            projectId={message.projectId}
+          />
+        ) : null}
         {requiresClarification ? (
           <ChoiceCard
             choiceRequest={choiceRequest}
@@ -4526,17 +5118,25 @@ function RunPlanPreview({ understanding }) {
   );
 }
 
-function UiBlocks({ blocks = [] }) {
+function UiBlocks({ blocks = [], t = stringsForLocale("fr"), onTerminalInput = null, projectId = null }) {
   const normalized = Array.isArray(blocks) ? blocks : [];
   if (normalized.length === 0) return null;
   return (
     <div className="ui-block-stack">
-      {normalized.map((block, index) => <UiBlock key={block.id ?? `${block.type}-${index}`} block={block} />)}
+      {normalized.map((block, index) => (
+        <UiBlock
+          key={block.id ?? `${block.type}-${index}`}
+          block={block}
+          t={t}
+          onTerminalInput={onTerminalInput}
+          projectId={projectId}
+        />
+      ))}
     </div>
   );
 }
 
-function UiBlock({ block }) {
+function UiBlock({ block, t, onTerminalInput, projectId }) {
   switch (block.type) {
     case "folderList":
       return <FolderListBlock block={block} />;
@@ -4549,6 +5149,7 @@ function UiBlock({ block }) {
     case "reportPreview":
       return <ReportPreviewBlock block={block} />;
     case "artifactCard":
+    case "artifactPreview":
       return <ArtifactCardBlock block={block} />;
     case "actionPlan":
       return <ActionPlanBlock block={block} />;
@@ -4556,6 +5157,18 @@ function UiBlock({ block }) {
       return <EvidenceGalleryBlock block={block} />;
     case "approvalCard":
       return <ApprovalUiBlock block={block} />;
+    case "resultSummary":
+      return <ResultSummaryBlock block={block} t={t} />;
+    case "proofCard":
+      return <ProofCardBlock block={block} t={t} />;
+    case "browserResultList":
+      return <BrowserResultListBlock block={block} />;
+    case "terminalPromptCard":
+      return <TerminalPromptCardBlock block={block} t={t} onTerminalInput={onTerminalInput} projectId={projectId} />;
+    case "errorRecoveryCard":
+      return <ErrorRecoveryCardBlock block={block} />;
+    case "nextStepCard":
+      return <NextStepCardBlock block={block} />;
     case "text":
     default:
       return <TextUiBlock block={block} />;
@@ -4721,27 +5334,144 @@ function ApprovalUiBlock({ block }) {
   );
 }
 
+function ResultSummaryBlock({ block, t }) {
+  const bullets = Array.isArray(block.bullets) ? block.bullets : [];
+  return (
+    <div className={`ui-block result-summary-block ${block.objectiveSatisfied ? "ok" : "warn"}`}>
+      <div className="ui-block-header">
+        <strong>{block.title ?? t.result}</strong>
+        <span className={`mini-badge ${block.objectiveSatisfied ? "ok" : "warn"}`}>{block.verdict || block.status || t.status}</span>
+      </div>
+      {block.summary ? <p>{block.summary}</p> : null}
+      {bullets.length > 0 ? (
+        <ul className="compact-check-list">
+          {bullets.map((item) => <li key={item}>{item}</li>)}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function ProofCardBlock({ block, t }) {
+  return (
+    <div className="ui-block proof-card-block">
+      <div>
+        <strong>{block.title ?? t.evidence}</strong>
+        <p>{block.label || block.description || block.evidenceId}</p>
+        {block.description ? <small>{block.description}</small> : null}
+      </div>
+      {block.href ? <a href={block.href} target="_blank" rel="noreferrer">{t.proofScreenshot}</a> : null}
+    </div>
+  );
+}
+
+function BrowserResultListBlock({ block }) {
+  const results = Array.isArray(block.results) ? block.results : [];
+  return (
+    <div className="ui-block browser-result-list-block">
+      <strong>{block.title ?? "Résultats"}</strong>
+      <div className="browser-result-list">
+        {results.map((result, index) => (
+          <a key={`${result.url}-${index}`} href={result.url || "#"} target="_blank" rel="noreferrer">
+            <strong>{result.title || result.url}</strong>
+            {result.source ? <span>{result.source}</span> : null}
+            {result.snippet ? <small>{result.snippet}</small> : null}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TerminalPromptCardBlock({ block, t, onTerminalInput, projectId }) {
+  const [reply, setReply] = React.useState(block.suggestedReply ?? "");
+  const [busy, setBusy] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+  const [askFirst, setAskFirst] = React.useState(false);
+  const canSend = Boolean(onTerminalInput && projectId && block.terminalId && reply.trim());
+
+  async function handleSend() {
+    if (!canSend || busy) return;
+    setBusy(true);
+    try {
+      await onTerminalInput(projectId, block.terminalId, reply, { approved: true });
+      setSent(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="ui-block terminal-prompt-card-block">
+      <div className="ui-block-header">
+        <strong>{block.title ?? t.terminalAlertTitle}</strong>
+        <span className="mini-badge warn">{block.requiresApproval ? t.confirmationNeeded : t.terminalWaiting}</span>
+      </div>
+      {block.prompt ? <p>{block.prompt}</p> : null}
+      <div className="terminal-prompt-actions">
+        <label>
+          <span>{t.terminalSuggestedInput}</span>
+          <input
+            value={reply}
+            onChange={(event) => setReply(event.target.value)}
+            placeholder={t.terminalReplyPlaceholder}
+            disabled={busy || sent}
+          />
+        </label>
+        <div>
+          <button type="button" className="small" onClick={handleSend} disabled={!canSend || busy || sent}>
+            {sent ? t.terminalReplySent : busy ? t.sending : t.terminalReplySend}
+          </button>
+          <button type="button" className="ghost small" onClick={() => setAskFirst(true)} disabled={askFirst || sent}>
+            {t.terminalAskBeforeSending}
+          </button>
+        </div>
+      </div>
+      {askFirst ? <small>{t.terminalAskBeforeSendingSet}</small> : null}
+    </div>
+  );
+}
+
+function ErrorRecoveryCardBlock({ block }) {
+  return (
+    <div className="ui-block error-recovery-card-block">
+      <strong>{block.title ?? "Récupération"}</strong>
+      {block.blocker ? <p>{block.blocker}</p> : null}
+      {block.recovery ? <small>{block.recovery}</small> : null}
+    </div>
+  );
+}
+
+function NextStepCardBlock({ block }) {
+  return (
+    <div className="ui-block next-step-card-block">
+      <strong>{block.title ?? "Prochaine action"}</strong>
+      {block.action ? <p>{block.action}</p> : null}
+      {block.reason ? <small>{block.reason}</small> : null}
+    </div>
+  );
+}
+
 function ThinkingMessage({ text, meta, t = stringsForLocale("fr") }) {
   return (
     <article className="react-message assistant active">
-      <div className="react-avatar">JON</div>
+      <AssistantAvatar state="thinking" visible />
       <div className="react-bubble">
         <p className="chat-meta">{meta ?? t.working}</p>
-        <div className="typing-row"><span /><span /><span /></div>
         <p>{text}</p>
       </div>
     </article>
   );
 }
 
-function PreflightMessage({ message, onStartMission, onClarificationAnswer, busy, t }) {
+function PreflightMessage({ message, showAvatar = true, onStartMission, onClarificationAnswer, busy, t }) {
   const understanding = normalizePreflight(message.preflight);
   if (!understanding) return null;
   const requiresClarification = Boolean(understanding.requiresClarification);
   const choiceRequest = understanding.choiceRequest ?? null;
   return (
     <article className={`react-message assistant ${requiresClarification ? "warn" : "ok"}`}>
-      <div className="react-avatar">JON</div>
+      <AssistantAvatar state={requiresClarification ? "waiting_user" : "thinking"} visible={showAvatar} />
       <div className="react-bubble preflight-bubble">
         {message.meta ? <p className="chat-meta">{message.meta}</p> : null}
         <p>{understanding.missionSummary ?? understanding.clarifiedObjective ?? message.text}</p>
@@ -4786,8 +5516,9 @@ function RunReviewIntro({ run, t }) {
   );
 }
 
-function RunProgressMessage({ run, runDetail, liveStatus, pendingApprovals, events, t }) {
+function RunProgressMessage({ run, runDetail, liveStatus, pendingApprovals, events, onTerminalInput, t }) {
   const outcome = runDetail?.review?.outcomeSummary ?? null;
+  const response = runDetail?.conversationResponse ?? null;
   const steps = buildProgressSteps({
     run,
     pendingApprovals,
@@ -4796,36 +5527,34 @@ function RunProgressMessage({ run, runDetail, liveStatus, pendingApprovals, even
     t
   });
   const heading = run.status === "running"
-    ? t.working
+    ? t.workingHeading
     : run.status === "completed"
-      ? t.done
+      ? t.doneHeading
       : run.status === "paused"
         ? t.waitingApproval
         : run.status === "failed"
           ? t.failed
           : `${t.status}: ${run.status}`;
+  const naturalReply = response?.naturalReply || (run.status === "paused" ? t.waitingApproval : run.summary ?? t.working);
+  const workingStatus = response?.currentWorkingStatus || steps.find((step) => step.status === "active")?.detail || t.working;
+  const visibleBlocks = selectChatBlocks(response?.uiBlocks ?? [], CHAT_PROGRESS_BLOCK_TYPES);
   return (
     <article className={`react-message assistant progress-message ${statusTone(run.status)}`}>
-      <div className="react-avatar">JON</div>
+      <AssistantAvatar state={jonPulseState(run.status, { pendingApprovals, busy: true })} visible />
       <div className="react-bubble progress-bubble">
         <p className="chat-meta">{t.progress}</p>
         <h3>{heading}</h3>
-        <p>{run.status === "paused" ? t.waitingApproval : run.summary ?? t.working}</p>
+        <p>{naturalReply}</p>
         <div className="pill-row">
-          <span className={`mini-badge ${statusTone(run.status)}`}>{run.status === "paused" ? t.confirmationNeeded : run.status}</span>
+          <span className={`mini-badge ${statusTone(run.status)}`}>{run.status === "paused" ? t.confirmationNeeded : friendlyRunStatus(run.status, t)}</span>
           <span className={`mini-badge ${liveStatus === "live" ? "ok" : "warn"}`}>{liveStatus === "live" ? t.live : t.degraded}</span>
         </div>
-        <ol className="premium-progress-list">
-          {steps.map((step) => (
-            <li key={step.id} className={step.status}>
-              <i aria-hidden="true" />
-              <div>
-                <strong>{step.label}</strong>
-                <span>{step.detail}</span>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <div className="agent-working-status">
+          <JonPulse state={jonPulseState(run.status, { pendingApprovals, busy: true })} small />
+          <span>{workingStatus}</span>
+        </div>
+        <MissionProgressGraph steps={steps} run={run} verification={response?.executionThread?.verification} t={t} />
+        <UiBlocks blocks={visibleBlocks} t={t} onTerminalInput={onTerminalInput} projectId={run.projectId} />
       </div>
     </article>
   );
@@ -4836,7 +5565,7 @@ function ApprovalMessage({ approval, busy, onResolve, t }) {
   const risk = approval.riskLevel ?? "medium";
   return (
     <article className="react-message approval premium-approval warn">
-      <div className="react-avatar">OK</div>
+      <AssistantAvatar state="waiting_user" visible />
       <div className="react-bubble approval-bubble">
         <p className="chat-meta">{t.confirmationNeeded}</p>
         <div className="approval-hero">
@@ -4871,7 +5600,7 @@ function ApprovalMessage({ approval, busy, onResolve, t }) {
   );
 }
 
-function TechnicalActivityDrawer({ events = [], runDetail }) {
+function TechnicalActivityDrawer({ events = [], runDetail, t = stringsForLocale("fr") }) {
   const calls = runDetail?.llmCalls ?? [];
   if (events.length === 0 && calls.length === 0) {
     return null;
@@ -4888,7 +5617,7 @@ function TechnicalActivityDrawer({ events = [], runDetail }) {
           <ul>
             {events.slice(0, 12).map((event) => (
               <li key={technicalEventKey(event)}>
-                <span>{eventLabel(event)}</span>
+                <span>{eventLabel(event, t)}</span>
                 <small>{event.type} · {formatDate(event.createdAt)}</small>
               </li>
             ))}
@@ -4910,40 +5639,47 @@ function TechnicalActivityDrawer({ events = [], runDetail }) {
   );
 }
 
-function EventMessage({ event }) {
+function EventMessage({ event, t = stringsForLocale("fr") }) {
   return (
     <article className={`react-message ${event.type?.startsWith("tool.") ? "tool" : "assistant"} compact`}>
       <div className="react-avatar">{event.type?.startsWith("tool.") ? "Tool" : "AI"}</div>
       <div className="react-bubble">
         <p className="chat-meta">{formatDate(event.createdAt)}</p>
-        <p>{eventLabel(event)}</p>
+        <p>{eventLabel(event, t)}</p>
       </div>
     </article>
   );
 }
 
-function OutcomeMessage({ run, runDetail, t }) {
+function OutcomeMessage({ run, runDetail, onTerminalInput, t }) {
   const outcome = runDetail.review.outcomeSummary;
+  const response = runDetail?.conversationResponse ?? null;
+  const naturalReply = response?.naturalReply || (run.status === "completed" ? t.done : run.summary ?? t.failed);
+  const selectedBlocks = selectChatBlocks(response?.uiBlocks ?? []);
+  const visibleBlocks = selectedBlocks.length > 0
+    ? selectedBlocks
+    : (!response?.naturalReply ? [
+      {
+        id: "legacy_result_summary",
+        type: "resultSummary",
+        title: t.result,
+        status: run.status,
+        verdict: run.status === "completed" ? "satisfied" : "failed",
+        objectiveSatisfied: run.status === "completed",
+        summary: run.summary ?? "",
+        bullets: [
+          ...(outcome.didNow ?? []),
+          ...(outcome.verifiedNow ?? [])
+        ].slice(0, 5)
+      }
+    ] : []);
   return (
     <article className={`react-message assistant ${statusTone(run.status)}`}>
-      <div className="react-avatar">JON</div>
+      <AssistantAvatar state={jonPulseState(run.status)} visible />
       <div className="react-bubble outcome-bubble">
         <p className="chat-meta">{t.result}</p>
-        <h3>{run.status === "completed" ? t.completedSummary : t.establishedSummary}</h3>
-        <div className="preflight-grid compact">
-          <MiniList title={t.did} items={outcome.didNow} />
-          <MiniList title={t.verified} items={outcome.verifiedNow} />
-          <MiniList title={t.notDone} items={outcome.notDoneNow} tone="warn" />
-        </div>
-        <div className="proof-strip">
-          <span>{outcome.artifactsCreated ?? 0} {t.artifactCount}</span>
-          <span>{outcome.proofItems ?? 0} {t.evidenceCount}</span>
-        </div>
-        {runDetail.evidence?.filter((item) => item.hasScreenshot).slice(0, 3).map((item) => (
-          <a key={item.id} className="proof-link" href={`/api/runs/${run.id}/evidence/${item.id}/screenshot`} target="_blank" rel="noreferrer">
-            {t.proofScreenshot}
-          </a>
-        ))}
+        <p>{naturalReply}</p>
+        <UiBlocks blocks={visibleBlocks} t={t} onTerminalInput={onTerminalInput} projectId={run.projectId} />
       </div>
     </article>
   );

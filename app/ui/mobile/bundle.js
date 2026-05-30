@@ -711,7 +711,7 @@
 						nonce: "string" === typeof options.nonce ? options.nonce : void 0
 					});
 				}
-			} else options ?? Internals.d.M(href);
+			} else null == options && Internals.d.M(href);
 		};
 		exports.preload = function(href, options) {
 			if ("string" === typeof href && "object" === typeof options && null !== options && "string" === typeof options.as) {
@@ -1575,7 +1575,7 @@
 					}
 					defaultValue = children;
 				}
-				defaultValue ??= "";
+				null == defaultValue && (defaultValue = "");
 				value = defaultValue;
 			}
 			defaultValue = getToStringValue(value);
@@ -3539,10 +3539,10 @@
 					index: 0
 				})));
 			}
-			memoCache ??= {
+			null == memoCache && (memoCache = {
 				data: [],
 				index: 0
-			};
+			});
 			null === updateQueue && (updateQueue = createFunctionComponentUpdateQueue(), currentlyRenderingFiber.updateQueue = updateQueue);
 			updateQueue.memoCache = memoCache;
 			updateQueue = memoCache.data[memoCache.index];
@@ -9162,14 +9162,14 @@
 			prior ? prior.parentNode.insertBefore(instance, prior.nextSibling) : (precedence = 9 === root.nodeType ? root.head : root, precedence.insertBefore(instance, precedence.firstChild));
 		}
 		function adoptPreloadPropsForStylesheet(stylesheetProps, preloadProps) {
-			stylesheetProps.crossOrigin ??= preloadProps.crossOrigin;
-			stylesheetProps.referrerPolicy ??= preloadProps.referrerPolicy;
-			stylesheetProps.title ??= preloadProps.title;
+			null == stylesheetProps.crossOrigin && (stylesheetProps.crossOrigin = preloadProps.crossOrigin);
+			null == stylesheetProps.referrerPolicy && (stylesheetProps.referrerPolicy = preloadProps.referrerPolicy);
+			null == stylesheetProps.title && (stylesheetProps.title = preloadProps.title);
 		}
 		function adoptPreloadPropsForScript(scriptProps, preloadProps) {
-			scriptProps.crossOrigin ??= preloadProps.crossOrigin;
-			scriptProps.referrerPolicy ??= preloadProps.referrerPolicy;
-			scriptProps.integrity ??= preloadProps.integrity;
+			null == scriptProps.crossOrigin && (scriptProps.crossOrigin = preloadProps.crossOrigin);
+			null == scriptProps.referrerPolicy && (scriptProps.referrerPolicy = preloadProps.referrerPolicy);
+			null == scriptProps.integrity && (scriptProps.integrity = preloadProps.integrity);
 		}
 		var tagCaches = null;
 		function getHydratableHoistableCache(type, keyAttribute, ownerDocument) {
@@ -9865,6 +9865,7 @@
 	//#region node_modules/@xterm/xterm/lib/xterm.mjs
 	var import_react = require_react();
 	var import_client = require_client();
+	var _process, _xe$versions;
 	/**
 	* Copyright (c) 2014-2024 The xterm.js authors. All rights reserved.
 	* @license MIT
@@ -10295,7 +10296,8 @@
 				} else h = o.extended.urlId !== a;
 				else u !== -1 && (h = !0);
 				if (h || u !== -1 && c === l - 1) {
-					let d = this._oscLinkService.getLinkData(a)?.uri;
+					var _this$_oscLinkService;
+					let d = (_this$_oscLinkService = this._oscLinkService.getLinkData(a)) === null || _this$_oscLinkService === void 0 ? void 0 : _this$_oscLinkService.uri;
 					if (d) {
 						let _ = {
 							start: {
@@ -10307,18 +10309,24 @@
 								y: t
 							}
 						}, p = !1;
-						if (!n?.allowNonHttpProtocols) try {
+						if (!(n === null || n === void 0 ? void 0 : n.allowNonHttpProtocols)) try {
 							let m = new URL(d);
 							["http:", "https:"].includes(m.protocol) || (p = !0);
-						} catch {
+						} catch (_unused) {
 							p = !0;
 						}
 						p || r.push({
 							text: d,
 							range: _,
 							activate: (m, f) => n ? n.activate(m, f, _) : Ol(m, f),
-							hover: (m, f) => n?.hover?.(m, f, _),
-							leave: (m, f) => n?.leave?.(m, f, _)
+							hover: (m, f) => {
+								var _n$hover;
+								return n === null || n === void 0 || (_n$hover = n.hover) === null || _n$hover === void 0 ? void 0 : _n$hover.call(n, m, f, _);
+							},
+							leave: (m, f) => {
+								var _n$leave;
+								return n === null || n === void 0 || (_n$leave = n.leave) === null || _n$leave === void 0 ? void 0 : _n$leave.call(n, m, f, _);
+							}
 						});
 					}
 					h = !1, o.hasExtendedAttrs() && o.extended.urlId ? (u = c, a = o.extended.urlId) : (u = -1, a = -1);
@@ -10340,7 +10348,7 @@ WARNING: This link could potentially be dangerous`)) {
 			if (i) {
 				try {
 					i.opener = null;
-				} catch {}
+				} catch (_unused2) {}
 				i.location.href = t;
 			} else console.warn("Opening link blocked as opener could not be cleared");
 		}
@@ -10462,7 +10470,7 @@ WARNING: This link could potentially be dangerous`)) {
 			return a === 0;
 		}
 		l.isNeitherLessOrGreaterThan = i, l.greaterThan = 1, l.lessThan = -1, l.neitherLessOrGreaterThan = 0;
-	})(ro ||= {});
+	})(ro || (ro = {}));
 	function no(s, t) {
 		return (e, i) => t(s(e), s(i));
 	}
@@ -10636,7 +10644,7 @@ WARNING: This link could potentially be dangerous`)) {
 			return Promise.resolve(k);
 		}
 		O.asyncToArray = R;
-	})(zn ||= {});
+	})(zn || (zn = {}));
 	var Wl = !1, dt = null, hr = class hr {
 		constructor() {
 			this.livingDisposables = /* @__PURE__ */ new Map();
@@ -10755,30 +10763,30 @@ ${h.join(`
 			setParent(t, e) {
 				if (t && t !== D.None) try {
 					t[s] = !0;
-				} catch {}
+				} catch (_unused3) {}
 			}
 			markAsDisposed(t) {
 				if (t && t !== D.None) try {
 					t[s] = !0;
-				} catch {}
+				} catch (_unused4) {}
 			}
 			markAsSingleton(t) {}
 		}());
 	}
 	function fr(s) {
-		return dt?.trackDisposable(s), s;
+		return dt === null || dt === void 0 || dt.trackDisposable(s), s;
 	}
 	function pr(s) {
-		dt?.markAsDisposed(s);
+		dt === null || dt === void 0 || dt.markAsDisposed(s);
 	}
 	function vi(s, t) {
-		dt?.setParent(s, t);
+		dt === null || dt === void 0 || dt.setParent(s, t);
 	}
 	function Kl(s, t) {
 		if (dt) for (let e of s) dt.setParent(e, t);
 	}
 	function Gn(s) {
-		return dt?.markAsSingleton(s), s;
+		return dt === null || dt === void 0 || dt.markAsSingleton(s), s;
 	}
 	function Ne(s) {
 		if (zn.is(s)) {
@@ -10861,13 +10869,15 @@ ${h.join(`
 			return this._isDisposed ? void 0 : this._value;
 		}
 		set value(t) {
-			this._isDisposed || t === this._value || (this._value?.dispose(), t && vi(t, this), this._value = t);
+			var _this$_value;
+			this._isDisposed || t === this._value || ((_this$_value = this._value) === null || _this$_value === void 0 || _this$_value.dispose(), t && vi(t, this), this._value = t);
 		}
 		clear() {
 			this.value = void 0;
 		}
 		dispose() {
-			this._isDisposed = !0, pr(this), this._value?.dispose(), this._value = void 0;
+			var _this$_value2;
+			this._isDisposed = !0, pr(this), (_this$_value2 = this._value) === null || _this$_value2 === void 0 || _this$_value2.dispose(), this._value = void 0;
 		}
 		clearAndLeak() {
 			let t = this._value;
@@ -10971,7 +10981,7 @@ ${h.join(`
 			if ($l) {
 				let { onDidAddListener: T } = y, g = gi.create(), w = 0;
 				y.onDidAddListener = () => {
-					++w === 2 && (console.warn("snapshotted emitter LIKELY used public and SHOULD HAVE BEEN created with DisposableStore. snapshotted here"), g.print()), T?.();
+					++w === 2 && (console.warn("snapshotted emitter LIKELY used public and SHOULD HAVE BEEN created with DisposableStore. snapshotted here"), g.print()), T === null || T === void 0 || T();
 				};
 			}
 		}
@@ -11023,12 +11033,12 @@ ${h.join(`
 					g = y(E.fire, E);
 				},
 				onDidRemoveLastListener() {
-					g?.dispose();
+					g === null || g === void 0 || g.dispose();
 				}
 			};
 			T || t(w);
 			let E = new v(w);
-			return T?.add(E), E.event;
+			return T === null || T === void 0 || T.add(E), E.event;
 		}
 		function c(y, T) {
 			return T instanceof Array ? T.push(y) : T && T.add(y), y;
@@ -11045,7 +11055,7 @@ ${h.join(`
 					});
 				},
 				onWillRemoveListener() {
-					E && ze > 0 && le?.();
+					E && ze > 0 && (le === null || le === void 0 || le());
 				},
 				onDidRemoveLastListener() {
 					le = void 0, Z.dispose();
@@ -11053,7 +11063,7 @@ ${h.join(`
 			};
 			N || t(et);
 			let me = new v(et);
-			return N?.add(me), me.event;
+			return N === null || N === void 0 || N.add(me), me.event;
 		}
 		Qe.debounce = d;
 		function _(y, T = 0, g) {
@@ -11078,7 +11088,7 @@ ${h.join(`
 			});
 			w && w.add(x);
 			let N = () => {
-				E?.forEach((te) => Z.fire(te)), E = null;
+				E === null || E === void 0 || E.forEach((te) => Z.fire(te)), E = null;
 			}, Z = new v({
 				onWillAddFirstListener() {
 					x || (x = y((te) => Z.fire(te)), w && w.add(x));
@@ -11224,7 +11234,7 @@ ${h.join(`
 			};
 		}
 		Qe.fromObservableLight = V;
-	})($ ||= {});
+	})($ || ($ = {}));
 	var Mt = class Mt {
 		constructor(t) {
 			this.listenerCount = 0;
@@ -11253,7 +11263,8 @@ ${h.join(`
 			this._warnCountdown = 0;
 		}
 		dispose() {
-			this._stacks?.clear();
+			var _this$_stacks;
+			(_this$_stacks = this._stacks) === null || _this$_stacks === void 0 || _this$_stacks.clear();
 		}
 		check(t, e) {
 			let i = this.threshold;
@@ -11285,7 +11296,8 @@ ${h.join(`
 			this.value = t;
 		}
 		static create() {
-			return new s((/* @__PURE__ */ new Error()).stack ?? "");
+			var _t$stack;
+			return new s((_t$stack = (/* @__PURE__ */ new Error()).stack) !== null && _t$stack !== void 0 ? _t$stack : "");
 		}
 		print() {
 			console.warn(this.value.split(`
@@ -11323,51 +11335,62 @@ ${h.join(`
 	}
 	var v = class {
 		constructor(t) {
+			var _this$_options, _t$onListenerError, _this$_options$leakWa, _this$_options2, _this$_options3, _this$_options4;
 			this._size = 0;
-			this._options = t, this._leakageMon = po > 0 || this._options?.leakWarningThreshold ? new Vn(t?.onListenerError ?? Lt, this._options?.leakWarningThreshold ?? po) : void 0, this._perfMon = this._options?._profName ? new $n(this._options._profName) : void 0, this._deliveryQueue = this._options?.deliveryQueue;
+			this._options = t, this._leakageMon = po > 0 || ((_this$_options = this._options) === null || _this$_options === void 0 ? void 0 : _this$_options.leakWarningThreshold) ? new Vn((_t$onListenerError = t === null || t === void 0 ? void 0 : t.onListenerError) !== null && _t$onListenerError !== void 0 ? _t$onListenerError : Lt, (_this$_options$leakWa = (_this$_options2 = this._options) === null || _this$_options2 === void 0 ? void 0 : _this$_options2.leakWarningThreshold) !== null && _this$_options$leakWa !== void 0 ? _this$_options$leakWa : po) : void 0, this._perfMon = ((_this$_options3 = this._options) === null || _this$_options3 === void 0 ? void 0 : _this$_options3._profName) ? new $n(this._options._profName) : void 0, this._deliveryQueue = (_this$_options4 = this._options) === null || _this$_options4 === void 0 ? void 0 : _this$_options4.deliveryQueue;
 		}
 		dispose() {
 			if (!this._disposed) {
-				if (this._disposed = !0, this._deliveryQueue?.current === this && this._deliveryQueue.reset(), this._listeners) {
+				var _this$_deliveryQueue, _this$_options5, _this$_options5$onDid, _this$_leakageMon;
+				if (this._disposed = !0, ((_this$_deliveryQueue = this._deliveryQueue) === null || _this$_deliveryQueue === void 0 ? void 0 : _this$_deliveryQueue.current) === this && this._deliveryQueue.reset(), this._listeners) {
 					if (fo) {
 						let t = this._listeners;
 						queueMicrotask(() => {
-							Yl(t, (e) => e.stack?.print());
+							Yl(t, (e) => {
+								var _e$stack;
+								return (_e$stack = e.stack) === null || _e$stack === void 0 ? void 0 : _e$stack.print();
+							});
 						});
 					}
 					this._listeners = void 0, this._size = 0;
 				}
-				this._options?.onDidRemoveLastListener?.(), this._leakageMon?.dispose();
+				(_this$_options5 = this._options) === null || _this$_options5 === void 0 || (_this$_options5$onDid = _this$_options5.onDidRemoveLastListener) === null || _this$_options5$onDid === void 0 || _this$_options5$onDid.call(_this$_options5), (_this$_leakageMon = this._leakageMon) === null || _this$_leakageMon === void 0 || _this$_leakageMon.dispose();
 			}
 		}
 		get event() {
-			return this._event ??= (t, e, i) => {
+			var _this$_event;
+			return (_this$_event = this._event) !== null && _this$_event !== void 0 || (this._event = (t, e, i) => {
+				var _this$_deliveryQueue2, _this$_options7, _this$_options7$onWil, _this$_options8, _this$_options8$onDid;
 				if (this._leakageMon && this._size > this._leakageMon.threshold ** 2) {
+					var _this$_leakageMon$get, _this$_options6;
 					let a = `[${this._leakageMon.name}] REFUSES to accept new listeners because it exceeded its threshold by far (${this._size} vs ${this._leakageMon.threshold})`;
 					console.warn(a);
-					let u = this._leakageMon.getMostFrequentStack() ?? ["UNKNOWN stack", -1], h = new Yn(`${a}. HINT: Stack shows most frequent listener (${u[1]}-times)`, u[0]);
-					return (this._options?.onListenerError || Lt)(h), D.None;
+					let u = (_this$_leakageMon$get = this._leakageMon.getMostFrequentStack()) !== null && _this$_leakageMon$get !== void 0 ? _this$_leakageMon$get : ["UNKNOWN stack", -1], h = new Yn(`${a}. HINT: Stack shows most frequent listener (${u[1]}-times)`, u[0]);
+					return (((_this$_options6 = this._options) === null || _this$_options6 === void 0 ? void 0 : _this$_options6.onListenerError) || Lt)(h), D.None;
 				}
 				if (this._disposed) return D.None;
 				e && (t = t.bind(e));
 				let r = new Pt(t), n, o;
-				this._leakageMon && this._size >= Math.ceil(this._leakageMon.threshold * .2) && (r.stack = gi.create(), n = this._leakageMon.check(r.stack, this._size + 1)), fo && (r.stack = o ?? gi.create()), this._listeners ? this._listeners instanceof Pt ? (this._deliveryQueue ??= new jn(), this._listeners = [this._listeners, r]) : this._listeners.push(r) : (this._options?.onWillAddFirstListener?.(this), this._listeners = r, this._options?.onDidAddFirstListener?.(this)), this._size++;
+				this._leakageMon && this._size >= Math.ceil(this._leakageMon.threshold * .2) && (r.stack = gi.create(), n = this._leakageMon.check(r.stack, this._size + 1)), fo && (r.stack = o !== null && o !== void 0 ? o : gi.create()), this._listeners ? this._listeners instanceof Pt ? ((_this$_deliveryQueue2 = this._deliveryQueue) !== null && _this$_deliveryQueue2 !== void 0 || (this._deliveryQueue = new jn()), this._listeners = [this._listeners, r]) : this._listeners.push(r) : ((_this$_options7 = this._options) === null || _this$_options7 === void 0 || (_this$_options7$onWil = _this$_options7.onWillAddFirstListener) === null || _this$_options7$onWil === void 0 || _this$_options7$onWil.call(_this$_options7, this), this._listeners = r, (_this$_options8 = this._options) === null || _this$_options8 === void 0 || (_this$_options8$onDid = _this$_options8.onDidAddFirstListener) === null || _this$_options8$onDid === void 0 || _this$_options8$onDid.call(_this$_options8, this)), this._size++;
 				let l = C(() => {
-					_r?.unregister(l), n?.(), this._removeListener(r);
+					_r === null || _r === void 0 || _r.unregister(l), n === null || n === void 0 || n(), this._removeListener(r);
 				});
 				if (i instanceof Ee ? i.add(l) : Array.isArray(i) && i.push(l), _r) {
+					var _u$;
 					let a = (/* @__PURE__ */ new Error()).stack.split(`
 `).slice(2, 3).join(`
 `).trim(), u = /(file:|vscode-file:\/\/vscode-app)?(\/[^:]*:\d+:\d+)/.exec(a);
-					_r.register(l, u?.[2] ?? a, l);
+					_r.register(l, (_u$ = u === null || u === void 0 ? void 0 : u[2]) !== null && _u$ !== void 0 ? _u$ : a, l);
 				}
 				return l;
-			}, this._event;
+			}), this._event;
 		}
 		_removeListener(t) {
-			if (this._options?.onWillRemoveListener?.(this), !this._listeners) return;
+			var _this$_options9, _this$_options9$onWil;
+			if ((_this$_options9 = this._options) === null || _this$_options9 === void 0 || (_this$_options9$onWil = _this$_options9.onWillRemoveListener) === null || _this$_options9$onWil === void 0 || _this$_options9$onWil.call(_this$_options9, this), !this._listeners) return;
 			if (this._size === 1) {
-				this._listeners = void 0, this._options?.onDidRemoveLastListener?.(this), this._size = 0;
+				var _this$_options10, _this$_options10$onDi;
+				this._listeners = void 0, (_this$_options10 = this._options) === null || _this$_options10 === void 0 || (_this$_options10$onDi = _this$_options10.onDidRemoveLastListener) === null || _this$_options10$onDi === void 0 || _this$_options10$onDi.call(_this$_options10, this), this._size = 0;
 				return;
 			}
 			let e = this._listeners, i = e.indexOf(t);
@@ -11381,8 +11404,9 @@ ${h.join(`
 			}
 		}
 		_deliver(t, e) {
+			var _this$_options11;
 			if (!t) return;
-			let i = this._options?.onListenerError || Lt;
+			let i = ((_this$_options11 = this._options) === null || _this$_options11 === void 0 ? void 0 : _this$_options11.onListenerError) || Lt;
 			if (!i) {
 				t.value(e);
 				return;
@@ -11399,12 +11423,13 @@ ${h.join(`
 			t.reset();
 		}
 		fire(t) {
-			if (this._deliveryQueue?.current && (this._deliverQueue(this._deliveryQueue), this._perfMon?.stop()), this._perfMon?.start(this._size), this._listeners) if (this._listeners instanceof Pt) this._deliver(this._listeners, t);
+			var _this$_deliveryQueue3, _this$_perfMon, _this$_perfMon2, _this$_perfMon3;
+			if (!((_this$_deliveryQueue3 = this._deliveryQueue) === null || _this$_deliveryQueue3 === void 0) && _this$_deliveryQueue3.current && (this._deliverQueue(this._deliveryQueue), (_this$_perfMon = this._perfMon) === null || _this$_perfMon === void 0 || _this$_perfMon.stop()), (_this$_perfMon2 = this._perfMon) === null || _this$_perfMon2 === void 0 || _this$_perfMon2.start(this._size), this._listeners) if (this._listeners instanceof Pt) this._deliver(this._listeners, t);
 			else {
 				let e = this._deliveryQueue;
 				e.enqueue(this, t, this._listeners.length), this._deliverQueue(e);
 			}
-			this._perfMon?.stop();
+			(_this$_perfMon3 = this._perfMon) === null || _this$_perfMon3 === void 0 || _this$_perfMon3.stop();
 		}
 		hasListeners() {
 			return this._size > 0;
@@ -11433,7 +11458,8 @@ ${h.join(`
 			this.mapWindowIdToFullScreen = /* @__PURE__ */ new Map();
 		}
 		getZoomLevel(t) {
-			return this.mapWindowIdToZoomLevel.get(this.getWindowId(t)) ?? 0;
+			var _this$mapWindowIdToZo;
+			return (_this$mapWindowIdToZo = this.mapWindowIdToZoomLevel.get(this.getWindowId(t))) !== null && _this$mapWindowIdToZo !== void 0 ? _this$mapWindowIdToZo : 0;
 		}
 		setZoomLevel(t, e) {
 			if (this.getZoomLevel(e) === t) return;
@@ -11441,7 +11467,8 @@ ${h.join(`
 			this.mapWindowIdToZoomLevel.set(i, t), this._onDidChangeZoomLevel.fire(i);
 		}
 		getZoomFactor(t) {
-			return this.mapWindowIdToZoomFactor.get(this.getWindowId(t)) ?? 1;
+			var _this$mapWindowIdToZo2;
+			return (_this$mapWindowIdToZo2 = this.mapWindowIdToZoomFactor.get(this.getWindowId(t))) !== null && _this$mapWindowIdToZo2 !== void 0 ? _this$mapWindowIdToZo2 : 1;
 		}
 		setZoomFactor(t, e) {
 			this.mapWindowIdToZoomFactor.set(this.getWindowId(e), t);
@@ -11482,17 +11509,18 @@ ${h.join(`
 		return vr;
 	}
 	var Nt = "en", yr = !1, xr = !1, Ii = !1, vo = !1, go = !1, Ir = Nt, $e, Ve = globalThis, xe;
-	typeof Ve.vscode < "u" && typeof Ve.vscode.process < "u" ? xe = Ve.vscode.process : typeof process < "u" && typeof process?.versions?.node == "string" && (xe = process);
-	var ra = typeof xe?.versions?.electron == "string" && xe?.type === "renderer";
+	typeof Ve.vscode < "u" && typeof Ve.vscode.process < "u" ? xe = Ve.vscode.process : typeof process < "u" && typeof ((_process = process) === null || _process === void 0 || (_process = _process.versions) === null || _process === void 0 ? void 0 : _process.node) == "string" && (xe = process);
+	var ra = typeof (xe === null || xe === void 0 || (_xe$versions = xe.versions) === null || _xe$versions === void 0 ? void 0 : _xe$versions.electron) == "string" && (xe === null || xe === void 0 ? void 0 : xe.type) === "renderer";
 	if (typeof xe == "object") {
 		yr = xe.platform === "win32", xr = xe.platform === "darwin", Ii = xe.platform === "linux", Ii && xe.env.SNAP && xe.env.SNAP_REVISION, xe.env.CI || xe.env.BUILD_ARTIFACTSTAGINGDIRECTORY, Ir = Nt;
 		let s = xe.env.VSCODE_NLS_CONFIG;
 		if (s) try {
+			var _t$languagePack;
 			let t = JSON.parse(s);
-			t.userLocale, t.osLocale, Ir = t.resolvedLanguage || Nt, t.languagePack?.translationsConfigFile;
-		} catch {}
+			t.userLocale, t.osLocale, Ir = t.resolvedLanguage || Nt, (_t$languagePack = t.languagePack) === null || _t$languagePack === void 0 || _t$languagePack.translationsConfigFile;
+		} catch (_unused5) {}
 		vo = !0;
-	} else typeof navigator == "object" && !ra ? ($e = navigator.userAgent, yr = $e.indexOf("Windows") >= 0, xr = $e.indexOf("Macintosh") >= 0, ($e.indexOf("Macintosh") >= 0 || $e.indexOf("iPad") >= 0 || $e.indexOf("iPhone") >= 0) && navigator.maxTouchPoints && navigator.maxTouchPoints, Ii = $e.indexOf("Linux") >= 0, $e?.indexOf("Mobi"), go = !0, Ir = globalThis._VSCODE_NLS_LANGUAGE || Nt, navigator.language.toLowerCase()) : console.error("Unable to resolve platform.");
+	} else typeof navigator == "object" && !ra ? ($e = navigator.userAgent, yr = $e.indexOf("Windows") >= 0, xr = $e.indexOf("Macintosh") >= 0, ($e.indexOf("Macintosh") >= 0 || $e.indexOf("iPad") >= 0 || $e.indexOf("iPhone") >= 0) && navigator.maxTouchPoints && navigator.maxTouchPoints, Ii = $e.indexOf("Linux") >= 0, $e === null || $e === void 0 || $e.indexOf("Mobi"), go = !0, Ir = globalThis._VSCODE_NLS_LANGUAGE || Nt, navigator.language.toLowerCase()) : console.error("Unable to resolve platform.");
 	var wr = yr, Te = xr, Zn = Ii;
 	var Dr = vo;
 	go && typeof Ve.importScripts == "function" && Ve.origin;
@@ -11510,7 +11538,7 @@ ${h.join(`
 			return st === "en";
 		}
 		i.isDefault = e;
-	})(sa ||= {});
+	})(sa || (sa = {}));
 	var oa = typeof Ve.postMessage == "function" && !Ve.importScripts;
 	(() => {
 		if (oa) {
@@ -11589,7 +11617,7 @@ ${h.join(`
 			return Jn.keyCodeToStr(l);
 		}
 		o.toElectronAccelerator = n;
-	})(Qn ||= {});
+	})(Qn || (Qn = {}));
 	var Rr = class s {
 		constructor(t, e, i, r, n) {
 			this.ctrlKey = t;
@@ -11659,9 +11687,10 @@ ${h.join(`
 	var ua = Te ? 256 : 2048, ha = 512, da = 1024, fa = Te ? 2048 : 256;
 	var ft = class {
 		constructor(t) {
+			var _e$getModifierState;
 			this._standardKeyboardEventBrand = !0;
 			let e = t;
-			this.browserEvent = e, this.target = e.target, this.ctrlKey = e.ctrlKey, this.shiftKey = e.shiftKey, this.altKey = e.altKey, this.metaKey = e.metaKey, this.altGraphKey = e.getModifierState?.("AltGraph"), this.keyCode = ca(e), this.code = e.code, this.ctrlKey = this.ctrlKey || this.keyCode === 5, this.altKey = this.altKey || this.keyCode === 6, this.shiftKey = this.shiftKey || this.keyCode === 4, this.metaKey = this.metaKey || this.keyCode === 57, this._asKeybinding = this._computeKeybinding(), this._asKeyCodeChord = this._computeKeyCodeChord();
+			this.browserEvent = e, this.target = e.target, this.ctrlKey = e.ctrlKey, this.shiftKey = e.shiftKey, this.altKey = e.altKey, this.metaKey = e.metaKey, this.altGraphKey = (_e$getModifierState = e.getModifierState) === null || _e$getModifierState === void 0 ? void 0 : _e$getModifierState.call(e, "AltGraph"), this.keyCode = ca(e), this.code = e.code, this.ctrlKey = this.ctrlKey || this.keyCode === 5, this.altKey = this.altKey || this.keyCode === 6, this.shiftKey = this.shiftKey || this.keyCode === 4, this.metaKey = this.metaKey || this.keyCode === 57, this._asKeybinding = this._computeKeybinding(), this._asKeyCodeChord = this._computeKeyCodeChord();
 		}
 		preventDefault() {
 			this.browserEvent && this.browserEvent.preventDefault && this.browserEvent.preventDefault();
@@ -11692,7 +11721,7 @@ ${h.join(`
 		try {
 			let t = s.location, e = s.parent.location;
 			if (t.origin !== "null" && e.origin !== "null" && t.origin !== e.origin) return null;
-		} catch {
+		} catch (_unused6) {
 			return null;
 		}
 		return s.parent;
@@ -11722,8 +11751,9 @@ ${h.join(`
 			};
 			let i = 0, r = 0, n = this.getSameOriginWindowChain(t);
 			for (let o of n) {
+				var _l$scrollY, _l$scrollX;
 				let l = o.window.deref();
-				if (i += l?.scrollY ?? 0, r += l?.scrollX ?? 0, l === e || !o.iframeElement) break;
+				if (i += (_l$scrollY = l === null || l === void 0 ? void 0 : l.scrollY) !== null && _l$scrollY !== void 0 ? _l$scrollY : 0, r += (_l$scrollX = l === null || l === void 0 ? void 0 : l.scrollX) !== null && _l$scrollX !== void 0 ? _l$scrollX : 0, l === e || !o.iframeElement) break;
 				let a = o.iframeElement.getBoundingClientRect();
 				i += a.top, r += a.left;
 			}
@@ -11755,7 +11785,8 @@ ${h.join(`
 				r = (n ? parseInt(n[1]) : 123) <= 122;
 			}
 			if (t) {
-				let n = t, o = t, l = t.view?.devicePixelRatio || 1;
+				var _t$view;
+				let n = t, o = t, l = ((_t$view = t.view) === null || _t$view === void 0 ? void 0 : _t$view.devicePixelRatio) || 1;
 				if (typeof n.wheelDeltaY < "u") r ? this.deltaY = n.wheelDeltaY / (120 * l) : this.deltaY = n.wheelDeltaY / 120;
 				else if (typeof o.VERTICAL_AXIS < "u" && o.axis === o.VERTICAL_AXIS) this.deltaY = -o.detail / 3;
 				else if (t.type === "wheel") {
@@ -11772,10 +11803,12 @@ ${h.join(`
 			}
 		}
 		preventDefault() {
-			this.browserEvent?.preventDefault();
+			var _this$browserEvent;
+			(_this$browserEvent = this.browserEvent) === null || _this$browserEvent === void 0 || _this$browserEvent.preventDefault();
 		}
 		stopPropagation() {
-			this.browserEvent?.stopPropagation();
+			var _this$browserEvent2;
+			(_this$browserEvent2 = this.browserEvent) === null || _this$browserEvent2 === void 0 || _this$browserEvent2.stopPropagation();
 		}
 	};
 	var Do = Object.freeze(function(s, t) {
@@ -11795,7 +11828,7 @@ ${h.join(`
 			isCancellationRequested: !0,
 			onCancellationRequested: Do
 		});
-	})(ma ||= {});
+	})(ma || (ma = {}));
 	var ts = class {
 		constructor() {
 			this._isCancelled = !1;
@@ -11842,7 +11875,8 @@ ${h.join(`
 			this.isDisposed = !1;
 		}
 		cancel() {
-			this.disposable?.dispose(), this.disposable = void 0;
+			var _this$disposable;
+			(_this$disposable = this.disposable) === null || _this$disposable === void 0 || _this$disposable.dispose(), this.disposable = void 0;
 		}
 		cancelAndSet(t, e, i = globalThis) {
 			if (this.isDisposed) throw new Rt("Calling 'cancelAndSet' on a disposed IntervalTimer");
@@ -11881,7 +11915,7 @@ ${h.join(`
 			});
 		}
 		e.withAsyncBody = t;
-	})(va ||= {});
+	})(va || (va = {}));
 	var _e = class _e {
 		static fromArray(t) {
 			return new _e((e) => {
@@ -11938,10 +11972,13 @@ ${h.join(`
 						await $.toPromise(this._onStateChanged.event);
 					} while (!0);
 				},
-				return: async () => (this._onReturn?.(), {
-					done: !0,
-					value: void 0
-				})
+				return: async () => {
+					var _this$_onReturn;
+					return (_this$_onReturn = this._onReturn) === null || _this$_onReturn === void 0 || _this$_onReturn.call(this), {
+						done: !0,
+						value: void 0
+					};
+				}
 			};
 		}
 		static map(t, e) {
@@ -12099,7 +12136,8 @@ ${h.join(`
 		s.set(fe.vscodeWindowId, t);
 		let e = new v(), i = new v(), r = new v();
 		function n(o, l) {
-			return (typeof o == "number" ? s.get(o) : void 0) ?? (l ? t : void 0);
+			var _ref;
+			return (_ref = typeof o == "number" ? s.get(o) : void 0) !== null && _ref !== void 0 ? _ref : l ? t : void 0;
 		}
 		return {
 			onDidRegisterWindow: e.event,
@@ -12131,10 +12169,11 @@ ${h.join(`
 			},
 			getWindowById: n,
 			getWindow(o) {
+				var _l$ownerDocument;
 				let l = o;
-				if (l?.ownerDocument?.defaultView) return l.ownerDocument.defaultView.window;
+				if (l === null || l === void 0 || (_l$ownerDocument = l.ownerDocument) === null || _l$ownerDocument === void 0 ? void 0 : _l$ownerDocument.defaultView) return l.ownerDocument.defaultView.window;
 				let a = o;
-				return a?.view ? a.view.window : fe;
+				return (a === null || a === void 0 ? void 0 : a.view) ? a.view.window : fe;
 			},
 			getDocument(o) {
 				return be(o).document;
@@ -12171,7 +12210,7 @@ ${h.join(`
 			super(), this.defaultTarget = t && be(t);
 		}
 		cancelAndSet(t, e, i) {
-			return super.cancelAndSet(t, e, i ?? this.defaultTarget);
+			return super.cancelAndSet(t, e, i !== null && i !== void 0 ? i : this.defaultTarget);
 		}
 	}, Di = class {
 		constructor(t, e = 0) {
@@ -12193,8 +12232,9 @@ ${h.join(`
 	};
 	(function() {
 		let s = /* @__PURE__ */ new Map(), t = /* @__PURE__ */ new Map(), e = /* @__PURE__ */ new Map(), i = /* @__PURE__ */ new Map(), r = (n) => {
+			var _s$get;
 			e.set(n, !1);
-			let o = s.get(n) ?? [];
+			let o = (_s$get = s.get(n)) !== null && _s$get !== void 0 ? _s$get : [];
 			for (t.set(n, o), s.set(n, []), i.set(n, !0); o.length > 0;) o.sort(Di.sort), o.shift().execute();
 			i.set(n, !1);
 		};
@@ -12249,7 +12289,7 @@ ${h.join(`
 					onDidMutate: o.event
 				};
 				t.add(C(() => {
-					a.users -= 1, a.users === 0 && (o.dispose(), l.disconnect(), i?.delete(r), i?.size === 0 && this.mutationObservers.delete(s));
+					a.users -= 1, a.users === 0 && (o.dispose(), l.disconnect(), i === null || i === void 0 || i.delete(r), (i === null || i === void 0 ? void 0 : i.size) === 0 && this.mutationObservers.delete(s));
 				})), i.set(r, n);
 			}
 			return n.onDidMutate;
@@ -12505,9 +12545,9 @@ ${h.join(`
 				t.setPointerCapture(e), this._hooks.add(C(() => {
 					try {
 						t.releasePointerCapture(e);
-					} catch {}
+					} catch (_unused7) {}
 				}));
-			} catch {
+			} catch (_unused8) {
 				o = be(t);
 			}
 			this._hooks.add(L(o, Y.POINTER_MOVE, (l) => {
@@ -12533,7 +12573,7 @@ ${h.join(`
 		};
 	}
 	var He;
-	((n) => (n.Tap = "-xterm-gesturetap", n.Change = "-xterm-gesturechange", n.Start = "-xterm-gesturestart", n.End = "-xterm-gesturesend", n.Contextmenu = "-xterm-gesturecontextmenu"))(He ||= {});
+	((n) => (n.Tap = "-xterm-gesturetap", n.Change = "-xterm-gesturechange", n.Start = "-xterm-gesturestart", n.End = "-xterm-gesturesend", n.Contextmenu = "-xterm-gesturecontextmenu"))(He || (He = {}));
 	var Q = class Q extends D {
 		constructor() {
 			super();
@@ -12760,8 +12800,9 @@ ${h.join(`
 			return this._state;
 		}
 		setScrollDimensions(e, i) {
+			var _this$_smoothScrollin;
 			let r = this._state.withScrollDimensions(e, i);
-			this._setState(r, !!this._smoothScrolling), this._smoothScrolling?.acceptScrollDimensions(this._state);
+			this._setState(r, !!this._smoothScrolling), (_this$_smoothScrollin = this._smoothScrolling) === null || _this$_smoothScrollin === void 0 || _this$_smoothScrollin.acceptScrollDimensions(this._state);
 		}
 		getFutureScrollPosition() {
 			return this._smoothScrolling ? this._smoothScrolling.to : this._state;
@@ -12902,11 +12943,13 @@ ${h.join(`
 		}
 		_reveal() {
 			this._isVisible || (this._isVisible = !0, this._revealTimer.setIfNotSet(() => {
-				this._domNode?.setClassName(this._visibleClassName);
+				var _this$_domNode;
+				(_this$_domNode = this._domNode) === null || _this$_domNode === void 0 || _this$_domNode.setClassName(this._visibleClassName);
 			}, 0));
 		}
 		_hide(t) {
-			this._revealTimer.cancel(), this._isVisible && (this._isVisible = !1, this._domNode?.setClassName(this._invisibleClassName + (t ? " fade" : "")));
+			var _this$_domNode2;
+			this._revealTimer.cancel(), this._isVisible && (this._isVisible = !1, (_this$_domNode2 = this._domNode) === null || _this$_domNode2 === void 0 || _this$_domNode2.setClassName(this._invisibleClassName + (t ? " fade" : "")));
 		}
 	};
 	var Ca = 140, Ut = class extends lt {
@@ -13257,7 +13300,8 @@ ${h.join(`
 			}
 		}
 		_onMouseWheel(e) {
-			if (e.browserEvent?.defaultPrevented) return;
+			var _e$browserEvent;
+			if ((_e$browserEvent = e.browserEvent) === null || _e$browserEvent === void 0 ? void 0 : _e$browserEvent.defaultPrevented) return;
 			let i = hs.INSTANCE;
 			zo && i.acceptStandardWheelEvent(e);
 			let r = !1;
@@ -13420,10 +13464,11 @@ ${h.join(`
 			});
 		}
 		_getChangeOptions() {
+			var _this$_optionsService;
 			return {
 				mouseWheelScrollSensitivity: this._optionsService.rawOptions.scrollSensitivity,
 				fastScrollSensitivity: this._optionsService.rawOptions.fastScrollSensitivity,
-				verticalScrollbarSize: this._optionsService.rawOptions.overviewRuler?.width || 14
+				verticalScrollbarSize: ((_this$_optionsService = this._optionsService.rawOptions.overviewRuler) === null || _this$_optionsService === void 0 ? void 0 : _this$_optionsService.width) || 14
 			};
 		}
 		queueSync(e) {
@@ -13484,9 +13529,10 @@ ${h.join(`
 			this._refreshStyle(e), this._dimensionsChanged && this._refreshXPosition(e);
 		}
 		_createElement(e) {
+			var _e$options, _e$options$x;
 			let i = this._coreBrowserService.mainDocument.createElement("div");
-			i.classList.add("xterm-decoration"), i.classList.toggle("xterm-decoration-top-layer", e?.options?.layer === "top"), i.style.width = `${Math.round((e.options.width || 1) * this._renderService.dimensions.css.cell.width)}px`, i.style.height = `${(e.options.height || 1) * this._renderService.dimensions.css.cell.height}px`, i.style.top = `${(e.marker.line - this._bufferService.buffers.active.ydisp) * this._renderService.dimensions.css.cell.height}px`, i.style.lineHeight = `${this._renderService.dimensions.css.cell.height}px`;
-			let r = e.options.x ?? 0;
+			i.classList.add("xterm-decoration"), i.classList.toggle("xterm-decoration-top-layer", (e === null || e === void 0 || (_e$options = e.options) === null || _e$options === void 0 ? void 0 : _e$options.layer) === "top"), i.style.width = `${Math.round((e.options.width || 1) * this._renderService.dimensions.css.cell.width)}px`, i.style.height = `${(e.options.height || 1) * this._renderService.dimensions.css.cell.height}px`, i.style.top = `${(e.marker.line - this._bufferService.buffers.active.ydisp) * this._renderService.dimensions.css.cell.height}px`, i.style.lineHeight = `${this._renderService.dimensions.css.cell.height}px`;
+			let r = (_e$options$x = e.options.x) !== null && _e$options$x !== void 0 ? _e$options$x : 0;
 			return r && r > this._bufferService.cols && (i.style.display = "none"), this._refreshXPosition(e, i), i;
 		}
 		_refreshStyle(e) {
@@ -13500,12 +13546,14 @@ ${h.join(`
 			}
 		}
 		_refreshXPosition(e, i = e.element) {
+			var _e$options$x2;
 			if (!i) return;
-			let r = e.options.x ?? 0;
+			let r = (_e$options$x2 = e.options.x) !== null && _e$options$x2 !== void 0 ? _e$options$x2 : 0;
 			(e.options.anchor || "left") === "right" ? i.style.right = r ? `${r * this._renderService.dimensions.css.cell.width}px` : "" : i.style.left = r ? `${r * this._renderService.dimensions.css.cell.width}px` : "";
 		}
 		_removeDecoration(e) {
-			this._decorationElements.get(e)?.remove(), this._decorationElements.delete(e), e.dispose();
+			var _this$_decorationElem;
+			(_this$_decorationElem = this._decorationElements.get(e)) === null || _this$_decorationElem === void 0 || _this$_decorationElem.remove(), this._decorationElements.delete(e), e.dispose();
 		}
 	};
 	Gt = M([
@@ -13583,6 +13631,7 @@ ${h.join(`
 		right: 0
 	}, bt = class extends D {
 		constructor(e, i, r, n, o, l, a, u) {
+			var _this$_viewportElemen;
 			super();
 			this._viewportElement = e;
 			this._screenElement = i;
@@ -13596,7 +13645,10 @@ ${h.join(`
 			this._shouldUpdateDimensions = !0;
 			this._shouldUpdateAnchor = !0;
 			this._lastKnownBufferLength = 0;
-			this._canvas = this._coreBrowserService.mainDocument.createElement("canvas"), this._canvas.classList.add("xterm-decoration-overview-ruler"), this._refreshCanvasDimensions(), this._viewportElement.parentElement?.insertBefore(this._canvas, this._viewportElement), this._register(C(() => this._canvas?.remove()));
+			this._canvas = this._coreBrowserService.mainDocument.createElement("canvas"), this._canvas.classList.add("xterm-decoration-overview-ruler"), this._refreshCanvasDimensions(), (_this$_viewportElemen = this._viewportElement.parentElement) === null || _this$_viewportElemen === void 0 || _this$_viewportElemen.insertBefore(this._canvas, this._viewportElement), this._register(C(() => {
+				var _this$_canvas;
+				return (_this$_canvas = this._canvas) === null || _this$_canvas === void 0 ? void 0 : _this$_canvas.remove();
+			}));
 			let h = this._canvas.getContext("2d");
 			if (h) this._ctx = h;
 			else throw new Error("Ctx cannot be null");
@@ -13609,7 +13661,8 @@ ${h.join(`
 			})), this._register(this._coreBrowserService.onDprChange(() => this._queueRefresh(!0))), this._register(this._optionsService.onSpecificOptionChange("overviewRuler", () => this._queueRefresh(!0))), this._register(this._themeService.onChangeColors(() => this._queueRefresh())), this._queueRefresh(!0);
 		}
 		get _width() {
-			return this._optionsService.options.overviewRuler?.width || 0;
+			var _this$_optionsService2;
+			return ((_this$_optionsService2 = this._optionsService.options.overviewRuler) === null || _this$_optionsService2 === void 0 ? void 0 : _this$_optionsService2.width) || 0;
 		}
 		_refreshDrawConstants() {
 			let e = Math.floor((this._canvas.width - 1) / 3), i = Math.ceil((this._canvas.width - 1) / 3);
@@ -13662,11 +13715,11 @@ ${h.join(`
 	], bt);
 	var b;
 	((E) => (E.NUL = "\0", E.SOH = "", E.STX = "", E.ETX = "", E.EOT = "", E.ENQ = "", E.ACK = "", E.BEL = "\x07", E.BS = "\b", E.HT = "	", E.LF = `
-`, E.VT = "\v", E.FF = "\f", E.CR = "\r", E.SO = "", E.SI = "", E.DLE = "", E.DC1 = "", E.DC2 = "", E.DC3 = "", E.DC4 = "", E.NAK = "", E.SYN = "", E.ETB = "", E.CAN = "", E.EM = "", E.SUB = "", E.ESC = "\x1B", E.FS = "", E.GS = "", E.RS = "", E.US = "", E.SP = " ", E.DEL = ""))(b ||= {});
+`, E.VT = "\v", E.FF = "\f", E.CR = "\r", E.SO = "", E.SI = "", E.DLE = "", E.DC1 = "", E.DC2 = "", E.DC3 = "", E.DC4 = "", E.NAK = "", E.SYN = "", E.ETB = "", E.CAN = "", E.EM = "", E.SUB = "", E.ESC = "\x1B", E.FS = "", E.GS = "", E.RS = "", E.US = "", E.SP = " ", E.DEL = ""))(b || (b = {}));
 	var Ai;
-	((g) => (g.PAD = "", g.HOP = "", g.BPH = "", g.NBH = "", g.IND = "", g.NEL = "", g.SSA = "", g.ESA = "", g.HTS = "", g.HTJ = "", g.VTS = "", g.PLD = "", g.PLU = "", g.RI = "", g.SS2 = "", g.SS3 = "", g.DCS = "", g.PU1 = "", g.PU2 = "", g.STS = "", g.CCH = "", g.MW = "", g.SPA = "", g.EPA = "", g.SOS = "", g.SGCI = "", g.SCI = "", g.CSI = "", g.ST = "", g.OSC = "", g.PM = "", g.APC = ""))(Ai ||= {});
+	((g) => (g.PAD = "", g.HOP = "", g.BPH = "", g.NBH = "", g.IND = "", g.NEL = "", g.SSA = "", g.ESA = "", g.HTS = "", g.HTJ = "", g.VTS = "", g.PLD = "", g.PLU = "", g.RI = "", g.SS2 = "", g.SS3 = "", g.DCS = "", g.PU1 = "", g.PU2 = "", g.STS = "", g.CCH = "", g.MW = "", g.SPA = "", g.EPA = "", g.SOS = "", g.SGCI = "", g.SCI = "", g.CSI = "", g.ST = "", g.OSC = "", g.PM = "", g.APC = ""))(Ai || (Ai = {}));
 	var fs;
-	((t) => t.ST = `${b.ESC}\\`)(fs ||= {});
+	((t) => t.ST = `${b.ESC}\\`)(fs || (fs = {}));
 	var $t = class {
 		constructor(t, e, i, r, n, o) {
 			this._textarea = t;
@@ -13767,7 +13820,7 @@ ${h.join(`
 			};
 		}
 		i.toColor = e;
-	})(j ||= {});
+	})(j || (j = {}));
 	var U;
 	((l) => {
 		function s(a, u) {
@@ -13819,7 +13872,7 @@ ${h.join(`
 			];
 		}
 		l.toColorRGB = o;
-	})(U ||= {});
+	})(U || (U = {}));
 	var z;
 	((i) => {
 		let s, t;
@@ -13828,7 +13881,7 @@ ${h.join(`
 			r.width = 1, r.height = 1;
 			let n = r.getContext("2d", { willReadFrequently: !0 });
 			n && (s = n, s.globalCompositeOperation = "copy", t = s.createLinearGradient(0, 0, 1, 1));
-		} catch {}
+		} catch (_unused9) {}
 		function e(r) {
 			if (r.match(/#[\da-f]{3,8}/i)) switch (r.length) {
 				case 4: return ue = parseInt(r.slice(1, 2).repeat(2), 16), he = parseInt(r.slice(2, 3).repeat(2), 16), de = parseInt(r.slice(3, 4).repeat(2), 16), j.toColor(ue, he, de);
@@ -13853,7 +13906,7 @@ ${h.join(`
 			};
 		}
 		i.toColor = e;
-	})(z ||= {});
+	})(z || (z = {}));
 	var ve;
 	((e) => {
 		function s(i) {
@@ -13865,7 +13918,7 @@ ${h.join(`
 			return u * .2126 + h * .7152 + c * .0722;
 		}
 		e.relativeLuminance2 = t;
-	})(ve ||= {});
+	})(ve || (ve = {}));
 	var $r;
 	((n) => {
 		function s(o, l) {
@@ -13915,7 +13968,7 @@ ${h.join(`
 			];
 		}
 		n.toChannels = r;
-	})($r ||= {});
+	})($r || ($r = {}));
 	function vt(s) {
 		let t = s.toString(16);
 		return t.length < 2 ? "0" + t : t;
@@ -14102,8 +14155,8 @@ ${h.join(`
 				let g = !1, w = y >= di, E = y, x = this._workCell;
 				if (_.length > 0 && y === _[0][0] && w) {
 					let W = _.shift(), An = this._isCellInSelection(W[0], e);
-					for (O = W[0] + 1; O < W[1]; O++) w &&= An === this._isCellInSelection(O, e);
-					w &&= !i || o < W[0] || o >= W[1], w ? (g = !0, x = new Vr(this._workCell, t.translateToString(!0, W[0], W[1]), W[1] - W[0]), E = W[1] - 1, T = x.getWidth()) : di = W[1];
+					for (O = W[0] + 1; O < W[1]; O++) w && (w = An === this._isCellInSelection(O, e));
+					w && (w = !i || o < W[0] || o >= W[1]), w ? (g = !0, x = new Vr(this._workCell, t.translateToString(!0, W[0], W[1]), W[1] - W[0]), E = W[1] - 1, T = x.getWidth()) : di = W[1];
 				}
 				let N = this._isCellInSelection(y, e), Z = i && y === o, te = Qe && y >= h && y <= c, Oe = !1;
 				this._decorationService.forEachDecorationAtCell(y, e, void 0, (W) => {
@@ -14180,8 +14233,9 @@ ${h.join(`
 			if (this._optionsService.rawOptions.minimumContrastRatio === 1 || $o(r.getCode())) return !1;
 			let l = this._getContrastCache(r), a;
 			if (!n && !o && (a = l.getColor(e.rgba, i.rgba)), a === void 0) {
+				var _a2;
 				let u = this._optionsService.rawOptions.minimumContrastRatio / (r.isDim() ? 2 : 1);
-				a = U.ensureContrastRatio(n || e, o || i, u), l.setColor((n || e).rgba, (o || i).rgba, a ?? null);
+				a = U.ensureContrastRatio(n || e, o || i, u), l.setColor((n || e).rgba, (o || i).rgba, (_a2 = a) !== null && _a2 !== void 0 ? _a2 : null);
 			}
 			return a ? (this._addStyle(t, `color:${a.css}`), !0) : !1;
 		}
@@ -14383,7 +14437,8 @@ ${h.join(`
 			for (let e of this._rowElements) e.replaceChildren();
 		}
 		renderRows(e, i) {
-			let r = this._bufferService.buffer, n = r.ybase + r.y, o = Math.min(r.x, this._bufferService.cols - 1), l = this._coreService.decPrivateModes.cursorBlink ?? this._optionsService.rawOptions.cursorBlink, a = this._coreService.decPrivateModes.cursorStyle ?? this._optionsService.rawOptions.cursorStyle, u = this._optionsService.rawOptions.cursorInactiveStyle;
+			var _this$_coreService$de, _this$_coreService$de2;
+			let r = this._bufferService.buffer, n = r.ybase + r.y, o = Math.min(r.x, this._bufferService.cols - 1), l = (_this$_coreService$de = this._coreService.decPrivateModes.cursorBlink) !== null && _this$_coreService$de !== void 0 ? _this$_coreService$de : this._optionsService.rawOptions.cursorBlink, a = (_this$_coreService$de2 = this._coreService.decPrivateModes.cursorStyle) !== null && _this$_coreService$de2 !== void 0 ? _this$_coreService$de2 : this._optionsService.rawOptions.cursorStyle, u = this._optionsService.rawOptions.cursorInactiveStyle;
 			for (let h = e; h <= i; h++) {
 				let c = h + r.ydisp, d = this._rowElements[h], _ = r.lines.get(c);
 				if (!d || !_) break;
@@ -14430,7 +14485,7 @@ ${h.join(`
 			this.onCharSizeChange = this._onCharSizeChange.event;
 			try {
 				this._measureStrategy = this._register(new vs(this._optionsService));
-			} catch {
+			} catch (_unused10) {
 				this._measureStrategy = this._register(new bs(e, i, this._optionsService));
 			}
 			this._register(this._optionsService.onMultipleOptionChange(["fontFamily", "fontSize"], () => this.measure()));
@@ -14526,7 +14581,8 @@ ${h.join(`
 			this._parentWindow.devicePixelRatio !== this._currentDevicePixelRatio && this._onDprChange.fire(this._parentWindow.devicePixelRatio), this._updateDpr();
 		}
 		_updateDpr() {
-			this._outerListener && (this._resolutionMediaMatchList?.removeListener(this._outerListener), this._currentDevicePixelRatio = this._parentWindow.devicePixelRatio, this._resolutionMediaMatchList = this._parentWindow.matchMedia(`screen and (resolution: ${this._parentWindow.devicePixelRatio}dppx)`), this._resolutionMediaMatchList.addListener(this._outerListener));
+			var _this$_resolutionMedi;
+			this._outerListener && ((_this$_resolutionMedi = this._resolutionMediaMatchList) === null || _this$_resolutionMedi === void 0 || _this$_resolutionMedi.removeListener(this._outerListener), this._currentDevicePixelRatio = this._parentWindow.devicePixelRatio, this._resolutionMediaMatchList = this._parentWindow.matchMedia(`screen and (resolution: ${this._parentWindow.devicePixelRatio}dppx)`), this._resolutionMediaMatchList.addListener(this._outerListener));
 		}
 		clearListener() {
 			!this._resolutionMediaMatchList || !this._outerListener || (this._resolutionMediaMatchList.removeListener(this._outerListener), this._resolutionMediaMatchList = void 0, this._outerListener = void 0);
@@ -14721,7 +14777,10 @@ ${h.join(`
 			this.onRender = this._onRender.event;
 			this._onRefreshRequest = this._register(new v());
 			this.onRefreshRequest = this._onRefreshRequest.event;
-			this._renderDebouncer = new en((c, d) => this._renderRows(c, d), this._coreBrowserService), this._register(this._renderDebouncer), this._syncOutputHandler = new xs(this._coreBrowserService, this._coreService, () => this._fullRefresh()), this._register(C(() => this._syncOutputHandler.dispose())), this._register(this._coreBrowserService.onDprChange(() => this.handleDevicePixelRatioChange())), this._register(a.onResize(() => this._fullRefresh())), this._register(a.buffers.onBufferActivate(() => this._renderer.value?.clear())), this._register(this._optionsService.onOptionChange(() => this._handleOptionsChanged())), this._register(this._charSizeService.onCharSizeChange(() => this.handleCharSizeChanged())), this._register(l.onDecorationRegistered(() => this._fullRefresh())), this._register(l.onDecorationRemoved(() => this._fullRefresh())), this._register(this._optionsService.onMultipleOptionChange([
+			this._renderDebouncer = new en((c, d) => this._renderRows(c, d), this._coreBrowserService), this._register(this._renderDebouncer), this._syncOutputHandler = new xs(this._coreBrowserService, this._coreService, () => this._fullRefresh()), this._register(C(() => this._syncOutputHandler.dispose())), this._register(this._coreBrowserService.onDprChange(() => this.handleDevicePixelRatioChange())), this._register(a.onResize(() => this._fullRefresh())), this._register(a.buffers.onBufferActivate(() => {
+				var _this$_renderer$value;
+				return (_this$_renderer$value = this._renderer.value) === null || _this$_renderer$value === void 0 ? void 0 : _this$_renderer$value.clear();
+			})), this._register(this._optionsService.onOptionChange(() => this._handleOptionsChanged())), this._register(this._charSizeService.onCharSizeChange(() => this.handleCharSizeChanged())), this._register(l.onDecorationRegistered(() => this._fullRefresh())), this._register(l.onDecorationRemoved(() => this._fullRefresh())), this._register(this._optionsService.onMultipleOptionChange([
 				"customGlyphs",
 				"drawBoldTextInBrightColors",
 				"letterSpacing",
@@ -14797,31 +14856,41 @@ ${h.join(`
 			this._isPaused ? this._needsFullRefresh = !0 : this.refreshRows(0, this._rowCount - 1);
 		}
 		clearTextureAtlas() {
-			this._renderer.value && (this._renderer.value.clearTextureAtlas?.(), this._fullRefresh());
+			var _this$_renderer$value2, _this$_renderer$value3;
+			this._renderer.value && ((_this$_renderer$value2 = (_this$_renderer$value3 = this._renderer.value).clearTextureAtlas) === null || _this$_renderer$value2 === void 0 || _this$_renderer$value2.call(_this$_renderer$value3), this._fullRefresh());
 		}
 		handleDevicePixelRatioChange() {
 			this._charSizeService.measure(), this._renderer.value && (this._renderer.value.handleDevicePixelRatioChange(), this.refreshRows(0, this._rowCount - 1));
 		}
 		handleResize(e, i) {
-			this._renderer.value && (this._isPaused ? this._pausedResizeTask.set(() => this._renderer.value?.handleResize(e, i)) : this._renderer.value.handleResize(e, i), this._fullRefresh());
+			this._renderer.value && (this._isPaused ? this._pausedResizeTask.set(() => {
+				var _this$_renderer$value4;
+				return (_this$_renderer$value4 = this._renderer.value) === null || _this$_renderer$value4 === void 0 ? void 0 : _this$_renderer$value4.handleResize(e, i);
+			}) : this._renderer.value.handleResize(e, i), this._fullRefresh());
 		}
 		handleCharSizeChanged() {
-			this._renderer.value?.handleCharSizeChanged();
+			var _this$_renderer$value5;
+			(_this$_renderer$value5 = this._renderer.value) === null || _this$_renderer$value5 === void 0 || _this$_renderer$value5.handleCharSizeChanged();
 		}
 		handleBlur() {
-			this._renderer.value?.handleBlur();
+			var _this$_renderer$value6;
+			(_this$_renderer$value6 = this._renderer.value) === null || _this$_renderer$value6 === void 0 || _this$_renderer$value6.handleBlur();
 		}
 		handleFocus() {
-			this._renderer.value?.handleFocus();
+			var _this$_renderer$value7;
+			(_this$_renderer$value7 = this._renderer.value) === null || _this$_renderer$value7 === void 0 || _this$_renderer$value7.handleFocus();
 		}
 		handleSelectionChanged(e, i, r) {
-			this._selectionState.start = e, this._selectionState.end = i, this._selectionState.columnSelectMode = r, this._renderer.value?.handleSelectionChanged(e, i, r);
+			var _this$_renderer$value8;
+			this._selectionState.start = e, this._selectionState.end = i, this._selectionState.columnSelectMode = r, (_this$_renderer$value8 = this._renderer.value) === null || _this$_renderer$value8 === void 0 || _this$_renderer$value8.handleSelectionChanged(e, i, r);
 		}
 		handleCursorMove() {
-			this._renderer.value?.handleCursorMove();
+			var _this$_renderer$value9;
+			(_this$_renderer$value9 = this._renderer.value) === null || _this$_renderer$value9 === void 0 || _this$_renderer$value9.handleCursorMove();
 		}
 		clear() {
-			this._renderer.value?.clear();
+			var _this$_renderer$value10;
+			(_this$_renderer$value10 = this._renderer.value) === null || _this$_renderer$value10 === void 0 || _this$_renderer$value10.clear();
 		}
 	};
 	Qt = M([
@@ -14890,14 +14959,15 @@ ${h.join(`
 	function Va(s, t, e) {
 		let i = 0, r = s - gt(s, e), n = t - gt(t, e);
 		for (let o = 0; o < Math.abs(r - n); o++) {
+			var _e$buffer$lines$get;
 			let l = Qo(s, t) === "A" ? -1 : 1;
-			e.buffer.lines.get(r + l * o)?.isWrapped && i++;
+			!((_e$buffer$lines$get = e.buffer.lines.get(r + l * o)) === null || _e$buffer$lines$get === void 0) && _e$buffer$lines$get.isWrapped && i++;
 		}
 		return i;
 	}
 	function gt(s, t) {
-		let e = 0, i = t.buffer.lines.get(s), r = i?.isWrapped;
-		for (; r && s >= 0 && s < t.rows;) e++, i = t.buffer.lines.get(--s), r = i?.isWrapped;
+		let e = 0, i = t.buffer.lines.get(s), r = i === null || i === void 0 ? void 0 : i.isWrapped;
+		for (; r && s >= 0 && s < t.rows;) e++, i = t.buffer.lines.get(--s), r = i === null || i === void 0 ? void 0 : i.isWrapped;
 		return e;
 	}
 	function qa(s, t, e, i, r, n) {
@@ -15031,7 +15101,7 @@ ${h.join(`
 				n.push(r.translateBufferLineToString(e[1], !0, e[0], l));
 				for (let a = e[1] + 1; a <= i[1] - 1; a++) {
 					let u = r.lines.get(a), h = r.translateBufferLineToString(a, !0);
-					u?.isWrapped ? n[n.length - 1] += h : n.push(h);
+					(u === null || u === void 0 ? void 0 : u.isWrapped) ? n[n.length - 1] += h : n.push(h);
 				}
 				if (e[1] !== i[1]) {
 					let a = r.lines.get(i[1]), u = r.translateBufferLineToString(i[1], !0, 0, i[0]);
@@ -15067,7 +15137,8 @@ ${h.join(`
 			return e[1] > i[1] && e[1] < r[1] || i[1] === r[1] && e[1] === i[1] && e[0] >= i[0] && e[0] < r[0] || i[1] < r[1] && e[1] === r[1] && e[0] < r[0] || i[1] < r[1] && e[1] === i[1] && e[0] >= i[0];
 		}
 		_selectWordAtCursor(e, i) {
-			let r = this._linkifier.currentLink?.link?.range;
+			var _this$_linkifier$curr;
+			let r = (_this$_linkifier$curr = this._linkifier.currentLink) === null || _this$_linkifier$curr === void 0 || (_this$_linkifier$curr = _this$_linkifier$curr.link) === null || _this$_linkifier$curr === void 0 ? void 0 : _this$_linkifier$curr.range;
 			if (r) return this._model.selectionStart = [r.start.x - 1, r.start.y - 1], this._model.selectionStartLength = ws(r, this._bufferService.cols), this._model.selectionEnd = void 0, !0;
 			let n = this._getMouseBufferCoords(e);
 			return n ? (this._selectWordAt(n, i), this._model.selectionEnd = void 0, !0) : !1;
@@ -15229,7 +15300,7 @@ ${h.join(`
 				}
 				if (n && f + A === this._bufferService.cols && l.getCodePoint(this._bufferService.cols - 1) !== 32) {
 					let R = o.lines.get(e[1] + 1);
-					if (R?.isWrapped && R.getCodePoint(0) !== 32) {
+					if ((R === null || R === void 0 ? void 0 : R.isWrapped) && R.getCodePoint(0) !== 32) {
 						let O = this._getWordAt([0, e[1] + 1], !1, !1, !0);
 						O && (A += O.length);
 					}
@@ -15436,7 +15507,7 @@ ${h.join(`
 	function K(s, t) {
 		if (s !== void 0) try {
 			return z.toColor(s);
-		} catch {}
+		} catch (_unused11) {}
 		return t;
 	}
 	var Rs = class {
@@ -15507,19 +15578,24 @@ ${h.join(`
 			this._evalLazyOptionalParams(r), e.call(console, (this._optionsService.options.logger ? "" : tc) + i, ...r);
 		}
 		trace(e, ...i) {
-			this._logLevel <= 0 && this._log(this._optionsService.options.logger?.trace.bind(this._optionsService.options.logger) ?? console.log, e, i);
+			var _this$_optionsService3, _this$_optionsService4;
+			this._logLevel <= 0 && this._log((_this$_optionsService3 = (_this$_optionsService4 = this._optionsService.options.logger) === null || _this$_optionsService4 === void 0 ? void 0 : _this$_optionsService4.trace.bind(this._optionsService.options.logger)) !== null && _this$_optionsService3 !== void 0 ? _this$_optionsService3 : console.log, e, i);
 		}
 		debug(e, ...i) {
-			this._logLevel <= 1 && this._log(this._optionsService.options.logger?.debug.bind(this._optionsService.options.logger) ?? console.log, e, i);
+			var _this$_optionsService5, _this$_optionsService6;
+			this._logLevel <= 1 && this._log((_this$_optionsService5 = (_this$_optionsService6 = this._optionsService.options.logger) === null || _this$_optionsService6 === void 0 ? void 0 : _this$_optionsService6.debug.bind(this._optionsService.options.logger)) !== null && _this$_optionsService5 !== void 0 ? _this$_optionsService5 : console.log, e, i);
 		}
 		info(e, ...i) {
-			this._logLevel <= 2 && this._log(this._optionsService.options.logger?.info.bind(this._optionsService.options.logger) ?? console.info, e, i);
+			var _this$_optionsService7, _this$_optionsService8;
+			this._logLevel <= 2 && this._log((_this$_optionsService7 = (_this$_optionsService8 = this._optionsService.options.logger) === null || _this$_optionsService8 === void 0 ? void 0 : _this$_optionsService8.info.bind(this._optionsService.options.logger)) !== null && _this$_optionsService7 !== void 0 ? _this$_optionsService7 : console.info, e, i);
 		}
 		warn(e, ...i) {
-			this._logLevel <= 3 && this._log(this._optionsService.options.logger?.warn.bind(this._optionsService.options.logger) ?? console.warn, e, i);
+			var _this$_optionsService9, _this$_optionsService10;
+			this._logLevel <= 3 && this._log((_this$_optionsService9 = (_this$_optionsService10 = this._optionsService.options.logger) === null || _this$_optionsService10 === void 0 ? void 0 : _this$_optionsService10.warn.bind(this._optionsService.options.logger)) !== null && _this$_optionsService9 !== void 0 ? _this$_optionsService9 : console.warn, e, i);
 		}
 		error(e, ...i) {
-			this._logLevel <= 4 && this._log(this._optionsService.options.logger?.error.bind(this._optionsService.options.logger) ?? console.error, e, i);
+			var _this$_optionsService11, _this$_optionsService12;
+			this._logLevel <= 4 && this._log((_this$_optionsService11 = (_this$_optionsService12 = this._optionsService.options.logger) === null || _this$_optionsService12 === void 0 ? void 0 : _this$_optionsService12.error.bind(this._optionsService.options.logger)) !== null && _this$_optionsService11 !== void 0 ? _this$_optionsService11 : console.error, e, i);
 		}
 	};
 	ii = M([S(0, H)], ii);
@@ -15779,7 +15855,8 @@ ${h.join(`
 			}
 		}
 		translateToString(t, e, i, r) {
-			e = e ?? 0, i = i ?? this.length, t && (i = Math.min(i, this.getTrimmedLength())), r && (r.length = 0);
+			var _e2, _i2;
+			e = (_e2 = e) !== null && _e2 !== void 0 ? _e2 : 0, i = (_i2 = i) !== null && _i2 !== void 0 ? _i2 : this.length, t && (i = Math.min(i, this.getTrimmedLength())), r && (r.length = 0);
 			let n = "";
 			for (; e < i;) {
 				let o = this._data[e * B + 0], l = o & 2097151, a = o & 2097152 ? this._combined[e] : l ? Ce(l) : we;
@@ -16205,11 +16282,11 @@ ${h.join(`
 			for (t != null ? this.tabs[t] || (t = this.prevStop(t)) : (this.tabs = {}, t = 0); t < this._cols; t += this._optionsService.rawOptions.tabStopWidth) this.tabs[t] = !0;
 		}
 		prevStop(t) {
-			for (t ??= this.x; !this.tabs[--t] && t > 0;);
+			for (t == null && (t = this.x); !this.tabs[--t] && t > 0;);
 			return t >= this._cols ? this._cols - 1 : t < 0 ? 0 : t;
 		}
 		nextStop(t) {
-			for (t ??= this.x; !this.tabs[++t] && t < this._cols;);
+			for (t == null && (t = this.x); !this.tabs[++t] && t < this._cols;);
 			return t >= this._cols ? this._cols - 1 : t < 0 ? 0 : t;
 		}
 		clearMarkers(t) {
@@ -16465,7 +16542,8 @@ ${h.join(`
 					if (!i && i !== 0) throw new Error(`${e} must be numeric, value: ${i}`);
 					break;
 				case "windowsPty":
-					i = i ?? {};
+					var _i3;
+					i = (_i3 = i) !== null && _i3 !== void 0 ? _i3 : {};
 					break;
 			}
 			return i;
@@ -16894,7 +16972,8 @@ ${h.join(`
 		}
 	};
 	function Bs(s) {
-		let e = s.buffer.lines.get(s.buffer.ybase + s.buffer.y - 1)?.get(s.cols - 1), i = s.buffer.lines.get(s.buffer.ybase + s.buffer.y);
+		var _s$buffer$lines$get;
+		let e = (_s$buffer$lines$get = s.buffer.lines.get(s.buffer.ybase + s.buffer.y - 1)) === null || _s$buffer$lines$get === void 0 ? void 0 : _s$buffer$lines$get.get(s.cols - 1), i = s.buffer.lines.get(s.buffer.ybase + s.buffer.y);
 		i && e && (i.isWrapped = e[3] !== 0 && e[3] !== 32);
 	}
 	var Vi = 2147483647, uc = 256, ci = class s {
@@ -17780,9 +17859,10 @@ ${h.join(`
 			return this._activeBuffer.x = 0, !0;
 		}
 		backspace() {
+			var _this$_activeBuffer$l;
 			if (!this._coreService.decPrivateModes.reverseWraparound) return this._restrictCursor(), this._activeBuffer.x > 0 && this._activeBuffer.x--, !0;
 			if (this._restrictCursor(this._bufferService.cols), this._activeBuffer.x > 0) this._activeBuffer.x--;
-			else if (this._activeBuffer.x === 0 && this._activeBuffer.y > this._activeBuffer.scrollTop && this._activeBuffer.y <= this._activeBuffer.scrollBottom && this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y)?.isWrapped) {
+			else if (this._activeBuffer.x === 0 && this._activeBuffer.y > this._activeBuffer.scrollTop && this._activeBuffer.y <= this._activeBuffer.scrollBottom && ((_this$_activeBuffer$l = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y)) === null || _this$_activeBuffer$l === void 0 ? void 0 : _this$_activeBuffer$l.isWrapped)) {
 				this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y).isWrapped = !1, this._activeBuffer.y--, this._activeBuffer.x = this._bufferService.cols - 1;
 				let e = this._activeBuffer.lines.get(this._activeBuffer.ybase + this._activeBuffer.y);
 				e.hasWidth(this._activeBuffer.x) && !e.hasContent(this._activeBuffer.x) && this._activeBuffer.x--;
@@ -17892,7 +17972,8 @@ ${h.join(`
 					break;
 				case 2:
 					if (this._optionsService.rawOptions.scrollOnEraseInDisplay) {
-						for (r = this._bufferService.rows, this._dirtyRowTracker.markRangeDirty(0, r - 1); r-- && !this._activeBuffer.lines.get(this._activeBuffer.ybase + r)?.getTrimmedLength(););
+						var _this$_activeBuffer$l2;
+						for (r = this._bufferService.rows, this._dirtyRowTracker.markRangeDirty(0, r - 1); r-- && !((_this$_activeBuffer$l2 = this._activeBuffer.lines.get(this._activeBuffer.ybase + r)) === null || _this$_activeBuffer$l2 === void 0 ? void 0 : _this$_activeBuffer$l2.getTrimmedLength()););
 						for (; r >= 0; r--) this._bufferService.scroll(this._eraseAttrData());
 					} else {
 						for (r = this._bufferService.rows, this._dirtyRowTracker.markDirty(r - 1); r--;) this._resetBufferLine(r, i);
@@ -18179,7 +18260,7 @@ ${h.join(`
 		}
 		requestMode(e, i) {
 			let r;
-			((P) => (P[P.NOT_RECOGNIZED = 0] = "NOT_RECOGNIZED", P[P.SET = 1] = "SET", P[P.RESET = 2] = "RESET", P[P.PERMANENTLY_SET = 3] = "PERMANENTLY_SET", P[P.PERMANENTLY_RESET = 4] = "PERMANENTLY_RESET"))(r ||= {});
+			((P) => (P[P.NOT_RECOGNIZED = 0] = "NOT_RECOGNIZED", P[P.SET = 1] = "SET", P[P.RESET = 2] = "RESET", P[P.PERMANENTLY_SET = 3] = "PERMANENTLY_SET", P[P.PERMANENTLY_RESET = 4] = "PERMANENTLY_RESET"))(r || (r = {}));
 			let n = this._coreService.decPrivateModes, { activeProtocol: o, activeEncoding: l } = this._coreMouseService, a = this._coreService, { buffers: u, cols: h } = this._bufferService, { active: c, alt: d } = u, _ = this._optionsService.rawOptions, p = (A, R) => (a.triggerDataEvent(`${b.ESC}[${i ? "" : "?"}${A};${R}$y`), !0), m = (A) => A ? 1 : 2, f = e.params[0];
 			return i ? f === 2 ? p(f, 4) : f === 4 ? p(f, m(a.modes.insertMode)) : f === 12 ? p(f, 3) : f === 20 ? p(f, m(_.convertEol)) : p(f, 0) : f === 1 ? p(f, m(n.applicationCursorKeys)) : f === 3 ? p(f, _.windowOptions.setWinLines ? h === 80 ? 2 : h === 132 ? 1 : 0 : 0) : f === 6 ? p(f, m(n.origin)) : f === 7 ? p(f, m(n.wraparound)) : f === 8 ? p(f, 3) : f === 9 ? p(f, m(o === "X10")) : f === 12 ? p(f, m(_.cursorBlink)) : f === 25 ? p(f, m(!a.isCursorHidden)) : f === 45 ? p(f, m(n.reverseWraparound)) : f === 66 ? p(f, m(n.applicationKeypad)) : f === 67 ? p(f, 4) : f === 1e3 ? p(f, m(o === "VT200")) : f === 1002 ? p(f, m(o === "DRAG")) : f === 1003 ? p(f, m(o === "ANY")) : f === 1004 ? p(f, m(n.sendFocus)) : f === 1005 ? p(f, 4) : f === 1006 ? p(f, m(l === "SGR")) : f === 1015 ? p(f, 4) : f === 1016 ? p(f, m(l === "SGR_PIXELS")) : f === 1048 ? p(f, 1) : f === 47 || f === 1047 || f === 1049 ? p(f, m(c === d)) : f === 2004 ? p(f, m(n.bracketedPasteMode)) : f === 2026 ? p(f, m(n.synchronizedOutput)) : p(f, 0);
 		}
@@ -18594,7 +18675,8 @@ ${h.join(`
 			}
 		}
 		getLinkData(t) {
-			return this._dataByLinkId.get(t)?.data;
+			var _this$_dataByLinkId$g;
+			return (_this$_dataByLinkId$g = this._dataByLinkId.get(t)) === null || _this$_dataByLinkId$g === void 0 ? void 0 : _this$_dataByLinkId$g.data;
 		}
 		_getEntryIdKey(t) {
 			return `${t.id};;${t.uri}`;
@@ -18626,7 +18708,8 @@ ${h.join(`
 		}
 		get onScroll() {
 			return this._onScrollApi || (this._onScrollApi = this._register(new v()), this._onScroll.event((e) => {
-				this._onScrollApi?.fire(e.position);
+				var _this$_onScrollApi;
+				(_this$_onScrollApi = this._onScrollApi) === null || _this$_onScrollApi === void 0 || _this$_onScrollApi.fire(e.position);
 			})), this._onScrollApi.event;
 		}
 		get cols() {
@@ -18828,7 +18911,8 @@ ${h.join(`
 			default:
 				if (s.ctrlKey && !s.shiftKey && !s.altKey && !s.metaKey) s.keyCode >= 65 && s.keyCode <= 90 ? r.key = String.fromCharCode(s.keyCode - 64) : s.keyCode === 32 ? r.key = b.NUL : s.keyCode >= 51 && s.keyCode <= 55 ? r.key = String.fromCharCode(s.keyCode - 51 + 27) : s.keyCode === 56 ? r.key = b.DEL : s.keyCode === 219 ? r.key = b.ESC : s.keyCode === 220 ? r.key = b.FS : s.keyCode === 221 && (r.key = b.GS);
 				else if ((!e || i) && s.altKey && !s.metaKey) {
-					let l = gc[s.keyCode]?.[s.shiftKey ? 1 : 0];
+					var _gc$s$keyCode;
+					let l = (_gc$s$keyCode = gc[s.keyCode]) === null || _gc$s$keyCode === void 0 ? void 0 : _gc$s$keyCode[s.shiftKey ? 1 : 0];
 					if (l) r.key = b.ESC + l;
 					else if (s.keyCode >= 65 && s.keyCode <= 90) {
 						let a = s.ctrlKey ? s.keyCode - 64 : s.keyCode + 32, u = String.fromCharCode(a);
@@ -18916,7 +19000,7 @@ ${h.join(`
 	var Us = 0, yl = 0, Tn = class extends D {
 		constructor() {
 			super();
-			this._decorations = new En((e) => e?.marker.line);
+			this._decorations = new En((e) => e === null || e === void 0 ? void 0 : e.marker.line);
 			this._onDecorationRegistered = this._register(new v());
 			this.onDecorationRegistered = this._onDecorationRegistered.event;
 			this._onDecorationRemoved = this._register(new v());
@@ -18942,12 +19026,14 @@ ${h.join(`
 			this._decorations.clear();
 		}
 		*getDecorationsAtCell(e, i, r) {
+			var _l$options$x, _l$options$width, _l$options$layer;
 			let n = 0, o = 0;
-			for (let l of this._decorations.getKeyIterator(i)) n = l.options.x ?? 0, o = n + (l.options.width ?? 1), e >= n && e < o && (!r || (l.options.layer ?? "bottom") === r) && (yield l);
+			for (let l of this._decorations.getKeyIterator(i)) n = (_l$options$x = l.options.x) !== null && _l$options$x !== void 0 ? _l$options$x : 0, o = n + ((_l$options$width = l.options.width) !== null && _l$options$width !== void 0 ? _l$options$width : 1), e >= n && e < o && (!r || ((_l$options$layer = l.options.layer) !== null && _l$options$layer !== void 0 ? _l$options$layer : "bottom") === r) && (yield l);
 		}
 		forEachDecorationAtCell(e, i, r, n) {
 			this._decorations.forEachByKey(i, (o) => {
-				Us = o.options.x ?? 0, yl = Us + (o.options.width ?? 1), e >= Us && e < yl && (!r || (o.options.layer ?? "bottom") === r) && n(o);
+				var _o$options$x, _o$options$width, _o$options$layer;
+				Us = (_o$options$x = o.options.x) !== null && _o$options$x !== void 0 ? _o$options$x : 0, yl = Us + ((_o$options$width = o.options.width) !== null && _o$options$width !== void 0 ? _o$options$width : 1), e >= Us && e < yl && (!r || ((_o$options$layer = o.options.layer) !== null && _o$options$layer !== void 0 ? _o$options$layer : "bottom") === r) && n(o);
 			});
 		}
 	}, Ks = class extends Ee {
@@ -19038,7 +19124,7 @@ ${h.join(`
 		_renderRows(e, i) {
 			let r = this._terminal.buffer, n = r.lines.length.toString();
 			for (let o = e; o <= i; o++) {
-				let l = r.lines.get(r.ydisp + o), a = [], u = l?.translateToString(!0, void 0, void 0, a) || "", h = (r.ydisp + o + 1).toString(), c = this._rowElements[o];
+				let l = r.lines.get(r.ydisp + o), a = [], u = (l === null || l === void 0 ? void 0 : l.translateToString(!0, void 0, void 0, a)) || "", h = (r.ydisp + o + 1).toString(), c = this._rowElements[o];
 				c && (u.length === 0 ? (c.textContent = "\xA0", this._rowColumns.set(c, [0, 1])) : (c.textContent = u, this._rowColumns.set(c, a)), c.setAttribute("aria-posinset", h), c.setAttribute("aria-setsize", n), this._alignRowWidth(c));
 			}
 			this._announceCharacters();
@@ -19060,6 +19146,7 @@ ${h.join(`
 			this._rowElements[0].addEventListener("focus", this._topBoundaryFocusListener), this._rowElements[this._rowElements.length - 1].addEventListener("focus", this._bottomBoundaryFocusListener), this._terminal.scrollLines(i === 0 ? -1 : 1), this._rowElements[i === 0 ? 1 : this._rowElements.length - 2].focus(), e.preventDefault(), e.stopImmediatePropagation();
 		}
 		_handleSelectionChange() {
+			var _n$textContent$length, _n$textContent;
 			if (this._rowElements.length === 0) return;
 			let e = this._coreBrowserService.mainDocument.getSelection();
 			if (!e) return;
@@ -19085,10 +19172,10 @@ ${h.join(`
 			let n = this._rowElements.slice(-1)[0];
 			if (r.node.compareDocumentPosition(n) & (Node.DOCUMENT_POSITION_CONTAINED_BY | Node.DOCUMENT_POSITION_PRECEDING) && (r = {
 				node: n,
-				offset: n.textContent?.length ?? 0
+				offset: (_n$textContent$length = (_n$textContent = n.textContent) === null || _n$textContent === void 0 ? void 0 : _n$textContent.length) !== null && _n$textContent$length !== void 0 ? _n$textContent$length : 0
 			}), !this._rowContainer.contains(r.node)) return;
 			let o = ({ node: u, offset: h }) => {
-				let c = u instanceof Text ? u.parentNode : u, d = parseInt(c?.getAttribute("aria-posinset"), 10) - 1;
+				let c = u instanceof Text ? u.parentNode : u, d = parseInt(c === null || c === void 0 ? void 0 : c.getAttribute("aria-posinset"), 10) - 1;
 				if (isNaN(d)) return console.warn("row is invalid. Race condition?"), null;
 				let _ = this._rowColumns.get(c);
 				if (!_) return console.warn("columns is null. Race condition?"), null;
@@ -19126,8 +19213,9 @@ ${h.join(`
 			e.style.height = `${this._renderService.dimensions.css.cell.height}px`;
 		}
 		_alignRowWidth(e) {
+			var _this$_rowColumns$get;
 			e.style.transform = "";
-			let i = e.getBoundingClientRect().width, r = this._rowColumns.get(e)?.slice(-1)?.[0];
+			let i = e.getBoundingClientRect().width, r = (_this$_rowColumns$get = this._rowColumns.get(e)) === null || _this$_rowColumns$get === void 0 || (_this$_rowColumns$get = _this$_rowColumns$get.slice(-1)) === null || _this$_rowColumns$get === void 0 ? void 0 : _this$_rowColumns$get[0];
 			if (!r) return;
 			let n = r * this._renderService.dimensions.css.cell.width;
 			e.style.transform = `scaleX(${n / i})`;
@@ -19155,7 +19243,8 @@ ${h.join(`
 			this._onHideLinkUnderline = this._register(new v());
 			this.onHideLinkUnderline = this._onHideLinkUnderline.event;
 			this._register(C(() => {
-				Ne(this._linkCacheDisposables), this._linkCacheDisposables.length = 0, this._lastMouseEvent = void 0, this._activeProviderReplies?.clear();
+				var _this$_activeProvider;
+				Ne(this._linkCacheDisposables), this._linkCacheDisposables.length = 0, this._lastMouseEvent = void 0, (_this$_activeProvider = this._activeProviderReplies) === null || _this$_activeProvider === void 0 || _this$_activeProvider.clear();
 			})), this._register(this._bufferService.onResize(() => {
 				this._clearCurrentLink(), this._wasResized = !0;
 			})), this._register(L(this._element, "mouseleave", () => {
@@ -19186,16 +19275,18 @@ ${h.join(`
 			this._currentLink && this._linkAtPosition(this._currentLink.link, e) || (this._clearCurrentLink(), this._askForLink(e, !0));
 		}
 		_askForLink(e, i) {
-			(!this._activeProviderReplies || !i) && (this._activeProviderReplies?.forEach((n) => {
-				n?.forEach((o) => {
+			var _this$_activeProvider2, _this$_activeProvider3;
+			(!this._activeProviderReplies || !i) && ((_this$_activeProvider2 = this._activeProviderReplies) === null || _this$_activeProvider2 === void 0 || _this$_activeProvider2.forEach((n) => {
+				n === null || n === void 0 || n.forEach((o) => {
 					o.link.dispose && o.link.dispose();
 				});
 			}), this._activeProviderReplies = /* @__PURE__ */ new Map(), this._activeLine = e.y);
 			let r = !1;
-			for (let [n, o] of this._linkProviderService.linkProviders.entries()) i ? this._activeProviderReplies?.get(n) && (r = this._checkLinkProviderResult(n, e, r)) : o.provideLinks(e.y, (l) => {
+			for (let [n, o] of this._linkProviderService.linkProviders.entries()) i ? !((_this$_activeProvider3 = this._activeProviderReplies) === null || _this$_activeProvider3 === void 0) && _this$_activeProvider3.get(n) && (r = this._checkLinkProviderResult(n, e, r)) : o.provideLinks(e.y, (l) => {
+				var _this$_activeProvider4, _this$_activeProvider5;
 				if (this._isMouseOut) return;
-				let a = l?.map((u) => ({ link: u }));
-				this._activeProviderReplies?.set(n, a), r = this._checkLinkProviderResult(n, e, r), this._activeProviderReplies?.size === this._linkProviderService.linkProviders.length && this._removeIntersectingLinks(e.y, this._activeProviderReplies);
+				let a = l === null || l === void 0 ? void 0 : l.map((u) => ({ link: u }));
+				(_this$_activeProvider4 = this._activeProviderReplies) === null || _this$_activeProvider4 === void 0 || _this$_activeProvider4.set(n, a), r = this._checkLinkProviderResult(n, e, r), ((_this$_activeProvider5 = this._activeProviderReplies) === null || _this$_activeProvider5 === void 0 ? void 0 : _this$_activeProvider5.size) === this._linkProviderService.linkProviders.length && this._removeIntersectingLinks(e.y, this._activeProviderReplies);
 			});
 		}
 		_removeIntersectingLinks(e, i) {
@@ -19223,7 +19314,8 @@ ${h.join(`
 				l && (r = !0, this._handleNewLink(l));
 			}
 			if (this._activeProviderReplies.size === this._linkProviderService.linkProviders.length && !r) for (let l = 0; l < this._activeProviderReplies.size; l++) {
-				let a = this._activeProviderReplies.get(l)?.find((u) => this._linkAtPosition(u.link, i));
+				var _this$_activeProvider6;
+				let a = (_this$_activeProvider6 = this._activeProviderReplies.get(l)) === null || _this$_activeProvider6 === void 0 ? void 0 : _this$_activeProvider6.find((u) => this._linkAtPosition(u.link, i));
 				if (a) {
 					r = !0, this._handleNewLink(a);
 					break;
@@ -19253,15 +19345,23 @@ ${h.join(`
 				isHovered: !0
 			}, this._linkHover(this._element, e.link, this._lastMouseEvent), e.link.decorations = {}, Object.defineProperties(e.link.decorations, {
 				pointerCursor: {
-					get: () => this._currentLink?.state?.decorations.pointerCursor,
+					get: () => {
+						var _this$_currentLink;
+						return (_this$_currentLink = this._currentLink) === null || _this$_currentLink === void 0 || (_this$_currentLink = _this$_currentLink.state) === null || _this$_currentLink === void 0 ? void 0 : _this$_currentLink.decorations.pointerCursor;
+					},
 					set: (r) => {
-						this._currentLink?.state && this._currentLink.state.decorations.pointerCursor !== r && (this._currentLink.state.decorations.pointerCursor = r, this._currentLink.state.isHovered && this._element.classList.toggle("xterm-cursor-pointer", r));
+						var _this$_currentLink2;
+						!((_this$_currentLink2 = this._currentLink) === null || _this$_currentLink2 === void 0) && _this$_currentLink2.state && this._currentLink.state.decorations.pointerCursor !== r && (this._currentLink.state.decorations.pointerCursor = r, this._currentLink.state.isHovered && this._element.classList.toggle("xterm-cursor-pointer", r));
 					}
 				},
 				underline: {
-					get: () => this._currentLink?.state?.decorations.underline,
+					get: () => {
+						var _this$_currentLink3;
+						return (_this$_currentLink3 = this._currentLink) === null || _this$_currentLink3 === void 0 || (_this$_currentLink3 = _this$_currentLink3.state) === null || _this$_currentLink3 === void 0 ? void 0 : _this$_currentLink3.decorations.underline;
+					},
 					set: (r) => {
-						this._currentLink?.state && this._currentLink?.state?.decorations.underline !== r && (this._currentLink.state.decorations.underline = r, this._currentLink.state.isHovered && this._fireUnderlineEvent(e.link, r));
+						var _this$_currentLink4, _this$_currentLink5;
+						!((_this$_currentLink4 = this._currentLink) === null || _this$_currentLink4 === void 0) && _this$_currentLink4.state && ((_this$_currentLink5 = this._currentLink) === null || _this$_currentLink5 === void 0 || (_this$_currentLink5 = _this$_currentLink5.state) === null || _this$_currentLink5 === void 0 ? void 0 : _this$_currentLink5.decorations.underline) !== r && (this._currentLink.state.decorations.underline = r, this._currentLink.state.isHovered && this._fireUnderlineEvent(e.link, r));
 					}
 				}
 			}), this._linkCacheDisposables.push(this._renderService.onRenderedViewportChange((r) => {
@@ -19274,14 +19374,16 @@ ${h.join(`
 			})));
 		}
 		_linkHover(e, i, r) {
-			this._currentLink?.state && (this._currentLink.state.isHovered = !0, this._currentLink.state.decorations.underline && this._fireUnderlineEvent(i, !0), this._currentLink.state.decorations.pointerCursor && e.classList.add("xterm-cursor-pointer")), i.hover && i.hover(r, i.text);
+			var _this$_currentLink6;
+			!((_this$_currentLink6 = this._currentLink) === null || _this$_currentLink6 === void 0) && _this$_currentLink6.state && (this._currentLink.state.isHovered = !0, this._currentLink.state.decorations.underline && this._fireUnderlineEvent(i, !0), this._currentLink.state.decorations.pointerCursor && e.classList.add("xterm-cursor-pointer")), i.hover && i.hover(r, i.text);
 		}
 		_fireUnderlineEvent(e, i) {
 			let r = e.range, n = this._bufferService.buffer.ydisp, o = this._createLinkUnderlineEvent(r.start.x - 1, r.start.y - n - 1, r.end.x, r.end.y - n - 1, void 0);
 			(i ? this._onShowLinkUnderline : this._onHideLinkUnderline).fire(o);
 		}
 		_linkLeave(e, i, r) {
-			this._currentLink?.state && (this._currentLink.state.isHovered = !1, this._currentLink.state.decorations.underline && this._fireUnderlineEvent(i, !1), this._currentLink.state.decorations.pointerCursor && e.classList.remove("xterm-cursor-pointer")), i.leave && i.leave(r, i.text);
+			var _this$_currentLink7;
+			!((_this$_currentLink7 = this._currentLink) === null || _this$_currentLink7 === void 0) && _this$_currentLink7.state && (this._currentLink.state.isHovered = !1, this._currentLink.state.decorations.underline && this._fireUnderlineEvent(i, !1), this._currentLink.state.decorations.pointerCursor && e.classList.remove("xterm-cursor-pointer")), i.leave && i.leave(r, i.text);
 		}
 		_linkAtPosition(e, i) {
 			let r = e.range.start.y * this._bufferService.cols + e.range.start.x, n = e.range.end.y * this._bufferService.cols + e.range.end.x, o = i.y * this._bufferService.cols + i.x;
@@ -19341,8 +19443,12 @@ ${h.join(`
 			this._onA11yCharEmitter = this._register(new v());
 			this._onA11yTabEmitter = this._register(new v());
 			this._onWillOpen = this._register(new v());
-			this._setup(), this._decorationService = this._instantiationService.createInstance(Tn), this._instantiationService.setService(Be, this._decorationService), this._linkProviderService = this._instantiationService.createInstance(Qr), this._instantiationService.setService(lr, this._linkProviderService), this._linkProviderService.registerLinkProvider(this._instantiationService.createInstance(wt)), this._register(this._inputHandler.onRequestBell(() => this._onBell.fire())), this._register(this._inputHandler.onRequestRefreshRows((i) => this.refresh(i?.start ?? 0, i?.end ?? this.rows - 1))), this._register(this._inputHandler.onRequestSendFocus(() => this._reportFocus())), this._register(this._inputHandler.onRequestReset(() => this.reset())), this._register(this._inputHandler.onRequestWindowsOptionsReport((i) => this._reportWindowsOptions(i))), this._register(this._inputHandler.onColor((i) => this._handleColorEvent(i))), this._register($.forward(this._inputHandler.onCursorMove, this._onCursorMove)), this._register($.forward(this._inputHandler.onTitleChange, this._onTitleChange)), this._register($.forward(this._inputHandler.onA11yChar, this._onA11yCharEmitter)), this._register($.forward(this._inputHandler.onA11yTab, this._onA11yTabEmitter)), this._register(this._bufferService.onResize((i) => this._afterResize(i.cols, i.rows))), this._register(C(() => {
-				this._customKeyEventHandler = void 0, this.element?.parentNode?.removeChild(this.element);
+			this._setup(), this._decorationService = this._instantiationService.createInstance(Tn), this._instantiationService.setService(Be, this._decorationService), this._linkProviderService = this._instantiationService.createInstance(Qr), this._instantiationService.setService(lr, this._linkProviderService), this._linkProviderService.registerLinkProvider(this._instantiationService.createInstance(wt)), this._register(this._inputHandler.onRequestBell(() => this._onBell.fire())), this._register(this._inputHandler.onRequestRefreshRows((i) => {
+				var _i$start, _i$end;
+				return this.refresh((_i$start = i === null || i === void 0 ? void 0 : i.start) !== null && _i$start !== void 0 ? _i$start : 0, (_i$end = i === null || i === void 0 ? void 0 : i.end) !== null && _i$end !== void 0 ? _i$end : this.rows - 1);
+			})), this._register(this._inputHandler.onRequestSendFocus(() => this._reportFocus())), this._register(this._inputHandler.onRequestReset(() => this.reset())), this._register(this._inputHandler.onRequestWindowsOptionsReport((i) => this._reportWindowsOptions(i))), this._register(this._inputHandler.onColor((i) => this._handleColorEvent(i))), this._register($.forward(this._inputHandler.onCursorMove, this._onCursorMove)), this._register($.forward(this._inputHandler.onTitleChange, this._onTitleChange)), this._register($.forward(this._inputHandler.onA11yChar, this._onA11yCharEmitter)), this._register($.forward(this._inputHandler.onA11yTab, this._onA11yTabEmitter)), this._register(this._bufferService.onResize((i) => this._afterResize(i.cols, i.rows))), this._register(C(() => {
+				var _this$element;
+				this._customKeyEventHandler = void 0, (_this$element = this.element) === null || _this$element === void 0 || (_this$element = _this$element.parentNode) === null || _this$element === void 0 || _this$element.removeChild(this.element);
 			}));
 		}
 		get linkifier() {
@@ -19412,7 +19518,8 @@ ${h.join(`
 			this.coreService.decPrivateModes.sendFocus && this.coreService.triggerDataEvent(b.ESC + "[I"), this.element.classList.add("focus"), this._showCursor(), this._onFocus.fire();
 		}
 		blur() {
-			return this.textarea?.blur();
+			var _this$textarea;
+			return (_this$textarea = this.textarea) === null || _this$textarea === void 0 ? void 0 : _this$textarea.blur();
 		}
 		_handleTextAreaBlur() {
 			this.textarea.value = "", this.refresh(this.buffer.y, this.buffer.y), this.coreService.decPrivateModes.sendFocus && this.coreService.triggerDataEvent(b.ESC + "[O"), this.element.classList.remove("focus"), this._onBlur.fire();
@@ -19441,8 +19548,9 @@ ${h.join(`
 			this._register(L(this.textarea, "keyup", (e) => this._keyUp(e), !0)), this._register(L(this.textarea, "keydown", (e) => this._keyDown(e), !0)), this._register(L(this.textarea, "keypress", (e) => this._keyPress(e), !0)), this._register(L(this.textarea, "compositionstart", () => this._compositionHelper.compositionstart())), this._register(L(this.textarea, "compositionupdate", (e) => this._compositionHelper.compositionupdate(e))), this._register(L(this.textarea, "compositionend", () => this._compositionHelper.compositionend())), this._register(L(this.textarea, "input", (e) => this._inputEvent(e), !0)), this._register(this.onRender(() => this._compositionHelper.updateCompositionElements()));
 		}
 		open(e) {
+			var _this$element2, _e$ownerDocument$defa, _this$_document;
 			if (!e) throw new Error("Terminal requires a parent element.");
-			if (e.isConnected || this._logService.debug("Terminal.open was called on an element that was not attached to the DOM"), this.element?.ownerDocument.defaultView && this._coreBrowserService) {
+			if (e.isConnected || this._logService.debug("Terminal.open was called on an element that was not attached to the DOM"), ((_this$element2 = this.element) === null || _this$element2 === void 0 ? void 0 : _this$element2.ownerDocument.defaultView) && this._coreBrowserService) {
 				this.element.ownerDocument.defaultView !== this._coreBrowserService.window && (this._coreBrowserService.window = this.element.ownerDocument.defaultView);
 				return;
 			}
@@ -19450,12 +19558,12 @@ ${h.join(`
 			let i = this._document.createDocumentFragment();
 			this._viewportElement = this._document.createElement("div"), this._viewportElement.classList.add("xterm-viewport"), i.appendChild(this._viewportElement), this.screenElement = this._document.createElement("div"), this.screenElement.classList.add("xterm-screen"), this._register(L(this.screenElement, "mousemove", (o) => this.updateCursorStyle(o))), this._helperContainer = this._document.createElement("div"), this._helperContainer.classList.add("xterm-helpers"), this.screenElement.appendChild(this._helperContainer), i.appendChild(this.screenElement);
 			let r = this.textarea = this._document.createElement("textarea");
-			this.textarea.classList.add("xterm-helper-textarea"), this.textarea.setAttribute("aria-label", mi.get()), Ts || this.textarea.setAttribute("aria-multiline", "false"), this.textarea.setAttribute("autocorrect", "off"), this.textarea.setAttribute("autocapitalize", "off"), this.textarea.setAttribute("spellcheck", "false"), this.textarea.tabIndex = 0, this._register(this.optionsService.onSpecificOptionChange("disableStdin", () => r.readOnly = this.optionsService.rawOptions.disableStdin)), this.textarea.readOnly = this.optionsService.rawOptions.disableStdin, this._coreBrowserService = this._register(this._instantiationService.createInstance(Jr, this.textarea, e.ownerDocument.defaultView ?? window, this._document ?? typeof window < "u" ? window.document : null)), this._instantiationService.setService(ae, this._coreBrowserService), this._register(L(this.textarea, "focus", (o) => this._handleTextAreaFocus(o))), this._register(L(this.textarea, "blur", () => this._handleTextAreaBlur())), this._helperContainer.appendChild(this.textarea), this._charSizeService = this._instantiationService.createInstance(jt, this._document, this._helperContainer), this._instantiationService.setService(nt, this._charSizeService), this._themeService = this._instantiationService.createInstance(ti), this._instantiationService.setService(Re, this._themeService), this._characterJoinerService = this._instantiationService.createInstance(ct), this._instantiationService.setService(or, this._characterJoinerService), this._renderService = this._register(this._instantiationService.createInstance(Qt, this.rows, this.screenElement)), this._instantiationService.setService(ce, this._renderService), this._register(this._renderService.onRenderedViewportChange((o) => this._onRender.fire(o))), this.onResize((o) => this._renderService.resize(o.cols, o.rows)), this._compositionView = this._document.createElement("div"), this._compositionView.classList.add("composition-view"), this._compositionHelper = this._instantiationService.createInstance($t, this.textarea, this._compositionView), this._helperContainer.appendChild(this._compositionView), this._mouseService = this._instantiationService.createInstance(Xt), this._instantiationService.setService(Dt, this._mouseService);
+			this.textarea.classList.add("xterm-helper-textarea"), this.textarea.setAttribute("aria-label", mi.get()), Ts || this.textarea.setAttribute("aria-multiline", "false"), this.textarea.setAttribute("autocorrect", "off"), this.textarea.setAttribute("autocapitalize", "off"), this.textarea.setAttribute("spellcheck", "false"), this.textarea.tabIndex = 0, this._register(this.optionsService.onSpecificOptionChange("disableStdin", () => r.readOnly = this.optionsService.rawOptions.disableStdin)), this.textarea.readOnly = this.optionsService.rawOptions.disableStdin, this._coreBrowserService = this._register(this._instantiationService.createInstance(Jr, this.textarea, (_e$ownerDocument$defa = e.ownerDocument.defaultView) !== null && _e$ownerDocument$defa !== void 0 ? _e$ownerDocument$defa : window, ((_this$_document = this._document) !== null && _this$_document !== void 0 ? _this$_document : typeof window < "u") ? window.document : null)), this._instantiationService.setService(ae, this._coreBrowserService), this._register(L(this.textarea, "focus", (o) => this._handleTextAreaFocus(o))), this._register(L(this.textarea, "blur", () => this._handleTextAreaBlur())), this._helperContainer.appendChild(this.textarea), this._charSizeService = this._instantiationService.createInstance(jt, this._document, this._helperContainer), this._instantiationService.setService(nt, this._charSizeService), this._themeService = this._instantiationService.createInstance(ti), this._instantiationService.setService(Re, this._themeService), this._characterJoinerService = this._instantiationService.createInstance(ct), this._instantiationService.setService(or, this._characterJoinerService), this._renderService = this._register(this._instantiationService.createInstance(Qt, this.rows, this.screenElement)), this._instantiationService.setService(ce, this._renderService), this._register(this._renderService.onRenderedViewportChange((o) => this._onRender.fire(o))), this.onResize((o) => this._renderService.resize(o.cols, o.rows)), this._compositionView = this._document.createElement("div"), this._compositionView.classList.add("composition-view"), this._compositionHelper = this._instantiationService.createInstance($t, this.textarea, this._compositionView), this._helperContainer.appendChild(this._compositionView), this._mouseService = this._instantiationService.createInstance(Xt), this._instantiationService.setService(Dt, this._mouseService);
 			let n = this._linkifier.value = this._register(this._instantiationService.createInstance(hi, this.screenElement));
 			this.element.appendChild(i);
 			try {
 				this._onWillOpen.fire(this.element);
-			} catch {}
+			} catch (_unused12) {}
 			this._renderService.hasRenderer() || this._renderService.setRenderer(this._createRenderer()), this._register(this.onCursorMove(() => {
 				this._renderService.handleCursorMove(), this._syncTextArea();
 			})), this._register(this.onResize(() => this._renderService.handleResize(this.cols, this.rows))), this._register(this.onBlur(() => this._renderService.handleBlur())), this._register(this.onFocus(() => this._renderService.handleFocus())), this._viewport = this._register(this._instantiationService.createInstance(zt, this.element, this.screenElement)), this._register(this._viewport.onRequestScrollLines((o) => {
@@ -19463,7 +19571,8 @@ ${h.join(`
 			})), this._selectionService = this._register(this._instantiationService.createInstance(ei, this.element, this.screenElement, n)), this._instantiationService.setService(Qs, this._selectionService), this._register(this._selectionService.onRequestScrollLines((o) => this.scrollLines(o.amount, o.suppressScrollEvent))), this._register(this._selectionService.onSelectionChange(() => this._onSelectionChange.fire())), this._register(this._selectionService.onRequestRedraw((o) => this._renderService.handleSelectionChanged(o.start, o.end, o.columnSelectMode))), this._register(this._selectionService.onLinuxMouseSelection((o) => {
 				this.textarea.value = o, this.textarea.focus(), this.textarea.select();
 			})), this._register($.any(this._onScroll.event, this._inputHandler.onScroll)(() => {
-				this._selectionService.refresh(), this._viewport?.queueSync();
+				var _this$_viewport;
+				this._selectionService.refresh(), (_this$_viewport = this._viewport) === null || _this$_viewport === void 0 || _this$_viewport.queueSync();
 			})), this._register(this._instantiationService.createInstance(Gt, this.screenElement)), this._register(L(this.element, "mousedown", (o) => this._selectionService.handleMouseDown(o))), this.coreMouseService.areMouseEventsActive ? (this._selectionService.disable(), this.element.classList.add("enable-mouse-events")) : this._selectionService.enable(), this.options.screenReaderMode && (this._accessibilityManager.value = this._instantiationService.createInstance(Tt, this)), this._register(this.optionsService.onSpecificOptionChange("screenReaderMode", (o) => this._handleScreenReaderModeOptionChange(o))), this.options.overviewRuler.width && (this._overviewRulerRenderer = this._register(this._instantiationService.createInstance(bt, this._viewportElement, this.screenElement))), this.optionsService.onSpecificOptionChange("overviewRuler", (o) => {
 				!this._overviewRulerRenderer && o && this._viewportElement && this.screenElement && (this._overviewRulerRenderer = this._register(this._instantiationService.createInstance(bt, this._viewportElement, this.screenElement)));
 			}), this._charSizeService.measure(), this.refresh(0, this.rows - 1), this._initGlobal(), this.bindMouse();
@@ -19488,9 +19597,10 @@ ${h.join(`
 						h = 1, u = l.button < 3 ? l.button : 3;
 						break;
 					case "wheel":
+						var _e$_renderService, _e$_coreBrowserServic;
 						if (e._customWheelEventHandler && e._customWheelEventHandler(l) === !1) return !1;
 						let c = l.deltaY;
-						if (c === 0 || e.coreMouseService.consumeWheelEvent(l, e._renderService?.dimensions?.device?.cell?.height, e._coreBrowserService?.dpr) === 0) return !1;
+						if (c === 0 || e.coreMouseService.consumeWheelEvent(l, (_e$_renderService = e._renderService) === null || _e$_renderService === void 0 || (_e$_renderService = _e$_renderService.dimensions) === null || _e$_renderService === void 0 || (_e$_renderService = _e$_renderService.device) === null || _e$_renderService === void 0 || (_e$_renderService = _e$_renderService.cell) === null || _e$_renderService === void 0 ? void 0 : _e$_renderService.height, (_e$_coreBrowserServic = e._coreBrowserService) === null || _e$_coreBrowserServic === void 0 ? void 0 : _e$_coreBrowserServic.dpr) === 0) return !1;
 						h = c < 0 ? 0 : 1, u = 4;
 						break;
 					default: return !1;
@@ -19530,8 +19640,9 @@ ${h.join(`
 				if (!n.wheel) {
 					if (this._customWheelEventHandler && this._customWheelEventHandler(l) === !1) return !1;
 					if (!this.buffer.hasScrollback) {
+						var _e$_renderService2, _e$_coreBrowserServic2;
 						if (l.deltaY === 0) return !1;
-						if (e.coreMouseService.consumeWheelEvent(l, e._renderService?.dimensions?.device?.cell?.height, e._coreBrowserService?.dpr) === 0) return this.cancel(l, !0);
+						if (e.coreMouseService.consumeWheelEvent(l, (_e$_renderService2 = e._renderService) === null || _e$_renderService2 === void 0 || (_e$_renderService2 = _e$_renderService2.dimensions) === null || _e$_renderService2 === void 0 || (_e$_renderService2 = _e$_renderService2.device) === null || _e$_renderService2 === void 0 || (_e$_renderService2 = _e$_renderService2.cell) === null || _e$_renderService2 === void 0 ? void 0 : _e$_renderService2.height, (_e$_coreBrowserServic2 = e._coreBrowserService) === null || _e$_coreBrowserServic2 === void 0 ? void 0 : _e$_coreBrowserServic2.dpr) === 0) return this.cancel(l, !0);
 						let h = b.ESC + (this.coreService.decPrivateModes.applicationCursorKeys ? "O" : "[") + (l.deltaY < 0 ? "A" : "B");
 						return this.coreService.triggerDataEvent(h, !0), this.cancel(l, !0);
 					}
@@ -19539,10 +19650,12 @@ ${h.join(`
 			}, { passive: !1 }));
 		}
 		refresh(e, i) {
-			this._renderService?.refreshRows(e, i);
+			var _this$_renderService;
+			(_this$_renderService = this._renderService) === null || _this$_renderService === void 0 || _this$_renderService.refreshRows(e, i);
 		}
 		updateCursorStyle(e) {
-			this._selectionService?.shouldColumnSelect(e) ? this.element.classList.add("column-select") : this.element.classList.remove("column-select");
+			var _this$_selectionServi;
+			((_this$_selectionServi = this._selectionService) === null || _this$_selectionServi === void 0 ? void 0 : _this$_selectionServi.shouldColumnSelect(e)) ? this.element.classList.add("column-select") : this.element.classList.remove("column-select");
 		}
 		_showCursor() {
 			this.coreService.isCursorInitialized || (this.coreService.isCursorInitialized = !0, this.refresh(this.buffer.y, this.buffer.y));
@@ -19615,13 +19728,16 @@ ${h.join(`
 			};
 		}
 		clearSelection() {
-			this._selectionService?.clearSelection();
+			var _this$_selectionServi2;
+			(_this$_selectionServi2 = this._selectionService) === null || _this$_selectionServi2 === void 0 || _this$_selectionServi2.clearSelection();
 		}
 		selectAll() {
-			this._selectionService?.selectAll();
+			var _this$_selectionServi3;
+			(_this$_selectionServi3 = this._selectionService) === null || _this$_selectionServi3 === void 0 || _this$_selectionServi3.selectAll();
 		}
 		selectLines(e, i) {
-			this._selectionService?.selectLines(e, i);
+			var _this$_selectionServi4;
+			(_this$_selectionServi4 = this._selectionService) === null || _this$_selectionServi4 === void 0 || _this$_selectionServi4.selectLines(e, i);
 		}
 		_keyDown(e) {
 			if (this._keyDownHandled = !1, this._keyDownSeen = !0, this._customKeyEventHandler && this._customKeyEventHandler(e) === !1) return !1;
@@ -19677,7 +19793,8 @@ ${h.join(`
 			super.resize(e, i);
 		}
 		_afterResize(e, i) {
-			this._charSizeService?.measure();
+			var _this$_charSizeServic;
+			(_this$_charSizeServic = this._charSizeService) === null || _this$_charSizeServic === void 0 || _this$_charSizeServic.measure();
 		}
 		clear() {
 			if (!(this.buffer.ybase === 0 && this.buffer.y === 0)) {
@@ -19687,15 +19804,18 @@ ${h.join(`
 			}
 		}
 		reset() {
+			var _this$_selectionServi5;
 			this.options.rows = this.rows, this.options.cols = this.cols;
 			let e = this._customKeyEventHandler;
-			this._setup(), super.reset(), this._selectionService?.reset(), this._decorationService.reset(), this._customKeyEventHandler = e, this.refresh(0, this.rows - 1);
+			this._setup(), super.reset(), (_this$_selectionServi5 = this._selectionService) === null || _this$_selectionServi5 === void 0 || _this$_selectionServi5.reset(), this._decorationService.reset(), this._customKeyEventHandler = e, this.refresh(0, this.rows - 1);
 		}
 		clearTextureAtlas() {
-			this._renderService?.clearTextureAtlas();
+			var _this$_renderService2;
+			(_this$_renderService2 = this._renderService) === null || _this$_renderService2 === void 0 || _this$_renderService2.clearTextureAtlas();
 		}
 		_reportFocus() {
-			this.element?.classList.contains("focus") ? this.coreService.triggerDataEvent(b.ESC + "[I") : this.coreService.triggerDataEvent(b.ESC + "[O");
+			var _this$element3;
+			((_this$element3 = this.element) === null || _this$element3 === void 0 ? void 0 : _this$element3.classList.contains("focus")) ? this.coreService.triggerDataEvent(b.ESC + "[I") : this.coreService.triggerDataEvent(b.ESC + "[O");
 		}
 		_reportWindowsOptions(e) {
 			if (this._renderService) switch (e) {
@@ -20005,7 +20125,8 @@ ${h.join(`
 			return this._verifyIntegers(t), this._core.registerMarker(t);
 		}
 		registerDecoration(t) {
-			return this._checkProposedApi(), this._verifyPositiveIntegers(t.x ?? 0, t.width ?? 0, t.height ?? 0), this._core.registerDecoration(t);
+			var _t$x, _t$width, _t$height;
+			return this._checkProposedApi(), this._verifyPositiveIntegers((_t$x = t.x) !== null && _t$x !== void 0 ? _t$x : 0, (_t$width = t.width) !== null && _t$width !== void 0 ? _t$width : 0, (_t$height = t.height) !== null && _t$height !== void 0 ? _t$height : 0), this._core.registerDecoration(t);
 		}
 		hasSelection() {
 			return this._core.hasSelection();
@@ -20120,10 +20241,11 @@ ${h.join(`
 			(this._terminal.rows !== e.rows || this._terminal.cols !== e.cols) && (t._renderService.clear(), this._terminal.resize(e.cols, e.rows));
 		}
 		proposeDimensions() {
+			var _this$_terminal$optio;
 			if (!this._terminal || !this._terminal.element || !this._terminal.element.parentElement) return;
 			let t = this._terminal._core._renderService.dimensions;
 			if (t.css.cell.width === 0 || t.css.cell.height === 0) return;
-			let s = this._terminal.options.scrollback === 0 ? 0 : this._terminal.options.overviewRuler?.width || 14, r = window.getComputedStyle(this._terminal.element.parentElement), l = parseInt(r.getPropertyValue("height")), a = Math.max(0, parseInt(r.getPropertyValue("width"))), i = window.getComputedStyle(this._terminal.element), n = {
+			let s = this._terminal.options.scrollback === 0 ? 0 : ((_this$_terminal$optio = this._terminal.options.overviewRuler) === null || _this$_terminal$optio === void 0 ? void 0 : _this$_terminal$optio.width) || 14, r = window.getComputedStyle(this._terminal.element.parentElement), l = parseInt(r.getPropertyValue("height")), a = Math.max(0, parseInt(r.getPropertyValue("width"))), i = window.getComputedStyle(this._terminal.element), n = {
 				top: parseInt(i.getPropertyValue("padding-top")),
 				bottom: parseInt(i.getPropertyValue("padding-bottom")),
 				right: parseInt(i.getPropertyValue("padding-right")),
@@ -20138,18 +20260,18 @@ ${h.join(`
 	//#endregion
 	//#region ui/mobile/app.js
 	var TABS = [
-		"chat",
-		"live",
-		"terminals",
-		"resultats",
-		"admin"
+		"dashboard",
+		"control",
+		"tabs",
+		"terminal",
+		"tasks"
 	];
 	var TAB_LABELS = {
-		chat: "Chat",
-		live: "Live",
-		terminals: "Terminaux",
-		resultats: "Résultats",
-		admin: "Admin"
+		dashboard: "Accueil",
+		control: "Contrôle",
+		tabs: "Onglets",
+		terminal: "Terminal",
+		tasks: "Tâches"
 	};
 	var IC = (d, extra = {}) => (0, import_react.createElement)("svg", {
 		width: 20,
@@ -20163,35 +20285,49 @@ ${h.join(`
 		...extra
 	}, ...d);
 	var TAB_ICONS = {
-		chat: IC([(0, import_react.createElement)("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" })]),
-		live: IC([(0, import_react.createElement)("polygon", { points: "13 2 3 14 12 14 11 22 21 10 12 10 13 2" })]),
-		terminals: IC([(0, import_react.createElement)("polyline", { points: "4 17 10 11 4 5" }), (0, import_react.createElement)("line", {
+		dashboard: IC([
+			(0, import_react.createElement)("path", { d: "M3 12l9-9 9 9" }),
+			(0, import_react.createElement)("path", { d: "M5 10v10h14V10" }),
+			(0, import_react.createElement)("path", { d: "M9 20v-6h6v6" })
+		]),
+		control: IC([
+			(0, import_react.createElement)("rect", {
+				x: 3,
+				y: 4,
+				width: 18,
+				height: 14,
+				rx: 2
+			}),
+			(0, import_react.createElement)("circle", {
+				cx: 8,
+				cy: 18,
+				r: 1
+			}),
+			(0, import_react.createElement)("circle", {
+				cx: 16,
+				cy: 18,
+				r: 1
+			}),
+			(0, import_react.createElement)("path", { d: "M12 14v4" })
+		]),
+		tabs: IC([
+			(0, import_react.createElement)("rect", {
+				x: 4,
+				y: 5,
+				width: 16,
+				height: 12,
+				rx: 2
+			}),
+			(0, import_react.createElement)("path", { d: "M8 5V3h8v2" }),
+			(0, import_react.createElement)("path", { d: "M8 21h8" })
+		]),
+		terminal: IC([(0, import_react.createElement)("polyline", { points: "4 17 10 11 4 5" }), (0, import_react.createElement)("line", {
 			x1: 12,
 			y1: 19,
 			x2: 20,
 			y2: 19
 		})]),
-		resultats: IC([
-			(0, import_react.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-			(0, import_react.createElement)("polyline", { points: "14 2 14 8 20 8" }),
-			(0, import_react.createElement)("line", {
-				x1: 9,
-				y1: 13,
-				x2: 15,
-				y2: 13
-			}),
-			(0, import_react.createElement)("line", {
-				x1: 9,
-				y1: 17,
-				x2: 12,
-				y2: 17
-			})
-		]),
-		admin: IC([(0, import_react.createElement)("circle", {
-			cx: 12,
-			cy: 12,
-			r: 3
-		}), (0, import_react.createElement)("path", { d: "M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" })])
+		tasks: IC([(0, import_react.createElement)("path", { d: "M9 11l3 3L22 4" }), (0, import_react.createElement)("path", { d: "M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" })])
 	};
 	var SVG = {
 		send: IC([(0, import_react.createElement)("line", {
@@ -20234,6 +20370,34 @@ ${h.join(`
 			width: 15,
 			height: 15
 		}),
+		back: IC([(0, import_react.createElement)("polyline", { points: "15 18 9 12 15 6" })], {
+			width: 17,
+			height: 17
+		}),
+		forward: IC([(0, import_react.createElement)("polyline", { points: "9 18 15 12 9 6" })], {
+			width: 17,
+			height: 17
+		}),
+		reload: IC([(0, import_react.createElement)("path", { d: "M21 12a9 9 0 1 1-2.64-6.36" }), (0, import_react.createElement)("polyline", { points: "21 3 21 9 15 9" })], {
+			width: 17,
+			height: 17
+		}),
+		arrowUp: IC([(0, import_react.createElement)("polyline", { points: "18 15 12 9 6 15" })], {
+			width: 17,
+			height: 17
+		}),
+		arrowDown: IC([(0, import_react.createElement)("polyline", { points: "6 9 12 15 18 9" })], {
+			width: 17,
+			height: 17
+		}),
+		settings: IC([(0, import_react.createElement)("circle", {
+			cx: 12,
+			cy: 12,
+			r: 3
+		}), (0, import_react.createElement)("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.4 1.07V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6 1.65 1.65 0 0 0 .4-1.07V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.3.37.56.66.72.29.18.63.28.94.28h.09a2 2 0 1 1 0 4H21a1.65 1.65 0 0 0-1.6 1z" })], {
+			width: 18,
+			height: 18
+		}),
 		x: IC([(0, import_react.createElement)("line", {
 			x1: 18,
 			y1: 6,
@@ -20250,10 +20414,165 @@ ${h.join(`
 		})
 	};
 	var BASE = "";
+	var MOBILE_CLIENT_LOG_ENDPOINT = "/api/mobile/client/logs";
+	var POLLING_INTERVAL_KEY = "jon_ctrl_poll_ms";
+	var POLLING_INTERVAL_OPTIONS = [
+		{
+			label: "1 s live (défaut)",
+			value: 1e3
+		},
+		{
+			label: "2 s",
+			value: 2e3
+		},
+		{
+			label: "4 s",
+			value: 4e3
+		},
+		{
+			label: "8 s",
+			value: 8e3
+		},
+		{
+			label: "15 s",
+			value: 15e3
+		},
+		{
+			label: "30 s",
+			value: 3e4
+		}
+	];
+	function getStoredPollingInterval() {
+		try {
+			const v = Number(localStorage.getItem(POLLING_INTERVAL_KEY));
+			return POLLING_INTERVAL_OPTIONS.some((o) => o.value === v) ? v : 1e3;
+		} catch (_unused) {
+			return 1e3;
+		}
+	}
+	function savePollingInterval(ms) {
+		try {
+			localStorage.setItem(POLLING_INTERVAL_KEY, String(ms));
+		} catch (_unused2) {}
+	}
+	var MOBILE_CLIENT_LOG_MAX_QUEUE = 200;
+	var mobileLogToken = null;
+	var mobileLogDeviceId = null;
+	var mobileLogTimer = null;
+	var mobileLogInFlight = false;
+	var mobileLogCaptureInstalled = false;
+	var mobileLogQueue = [];
+	function serializeLogArg(arg) {
+		if (arg instanceof Error) {
+			var _arg$stack$slice, _arg$stack;
+			return {
+				name: arg.name,
+				message: arg.message,
+				stack: (_arg$stack$slice = (_arg$stack = arg.stack) === null || _arg$stack === void 0 ? void 0 : _arg$stack.slice(0, 1200)) !== null && _arg$stack$slice !== void 0 ? _arg$stack$slice : null
+			};
+		}
+		if (typeof arg === "string") return arg.length > 900 ? `${arg.slice(0, 900)}...[${arg.length}]` : arg;
+		if (arg == null || typeof arg === "number" || typeof arg === "boolean") return arg;
+		try {
+			return JSON.parse(JSON.stringify(arg, (key, value) => /password|secret|token|authorization|cookie|credential/i.test(key) ? "[redacted]" : value));
+		} catch (_unused3) {
+			return String(arg).slice(0, 900);
+		}
+	}
+	function setMobileLogSession(session) {
+		var _session$sessionToken, _session$deviceId;
+		mobileLogToken = (_session$sessionToken = session === null || session === void 0 ? void 0 : session.sessionToken) !== null && _session$sessionToken !== void 0 ? _session$sessionToken : null;
+		mobileLogDeviceId = (_session$deviceId = session === null || session === void 0 ? void 0 : session.deviceId) !== null && _session$deviceId !== void 0 ? _session$deviceId : null;
+	}
+	function queueMobileLog(level, event, message = "", details = null) {
+		const normalizedDetails = details ? serializeLogArg(details) : null;
+		mobileLogQueue.push({
+			level,
+			event,
+			message: String(message !== null && message !== void 0 ? message : "").slice(0, 900),
+			timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+			details: {
+				deviceId: mobileLogDeviceId,
+				path: window.location.pathname,
+				online: navigator.onLine,
+				userAgent: navigator.userAgent,
+				data: normalizedDetails
+			}
+		});
+		while (mobileLogQueue.length > MOBILE_CLIENT_LOG_MAX_QUEUE) mobileLogQueue.shift();
+		scheduleMobileLogFlush();
+	}
+	function scheduleMobileLogFlush(delayMs = 600) {
+		if (mobileLogTimer) return;
+		mobileLogTimer = setTimeout(() => {
+			mobileLogTimer = null;
+			flushMobileLogs();
+		}, delayMs);
+	}
+	async function flushMobileLogs({ keepalive = false } = {}) {
+		if (mobileLogInFlight || mobileLogQueue.length === 0) return;
+		mobileLogInFlight = true;
+		const entries = mobileLogQueue.splice(0, 50);
+		try {
+			await fetch(`${BASE}${MOBILE_CLIENT_LOG_ENDPOINT}`, {
+				method: "POST",
+				headers: apiHeaders(mobileLogToken),
+				body: JSON.stringify({ entries }),
+				keepalive
+			});
+		} catch (_unused4) {
+			mobileLogQueue.unshift(...entries.slice(-25));
+		} finally {
+			mobileLogInFlight = false;
+			if (mobileLogQueue.length > 0) scheduleMobileLogFlush(1200);
+		}
+	}
+	function installMobileClientLogCapture() {
+		if (mobileLogCaptureInstalled) return;
+		mobileLogCaptureInstalled = true;
+		const originalWarn = console.warn.bind(console);
+		const originalError = console.error.bind(console);
+		console.warn = (...args) => {
+			originalWarn(...args);
+			queueMobileLog("warn", "console.warn", args.map((arg) => {
+				var _arg$message;
+				return String((_arg$message = arg === null || arg === void 0 ? void 0 : arg.message) !== null && _arg$message !== void 0 ? _arg$message : arg);
+			}).join(" ").slice(0, 900), { args: args.map(serializeLogArg) });
+		};
+		console.error = (...args) => {
+			originalError(...args);
+			queueMobileLog("error", "console.error", args.map((arg) => {
+				var _arg$message2;
+				return String((_arg$message2 = arg === null || arg === void 0 ? void 0 : arg.message) !== null && _arg$message2 !== void 0 ? _arg$message2 : arg);
+			}).join(" ").slice(0, 900), { args: args.map(serializeLogArg) });
+		};
+		window.addEventListener("error", (event) => {
+			queueMobileLog("error", "window.error", event.message, {
+				filename: event.filename,
+				lineno: event.lineno,
+				colno: event.colno,
+				error: serializeLogArg(event.error)
+			});
+		});
+		window.addEventListener("unhandledrejection", (event) => {
+			var _event$reason$message, _event$reason;
+			queueMobileLog("error", "window.unhandledrejection", (_event$reason$message = (_event$reason = event.reason) === null || _event$reason === void 0 ? void 0 : _event$reason.message) !== null && _event$reason$message !== void 0 ? _event$reason$message : String(event.reason), { reason: serializeLogArg(event.reason) });
+		});
+		window.addEventListener("online", () => queueMobileLog("info", "network.online", "Mobile browser is online"));
+		window.addEventListener("offline", () => queueMobileLog("warn", "network.offline", "Mobile browser is offline"));
+		window.addEventListener("pagehide", () => {
+			flushMobileLogs({ keepalive: true });
+		});
+		queueMobileLog("info", "app.boot", "JON mobile booted", {
+			href: window.location.href,
+			hasStoredSession: Boolean(getStoredSession())
+		});
+	}
 	function getCodeFromUrl() {
 		try {
-			return new URLSearchParams(window.location.search).get("code") ?? null;
-		} catch {
+			var _URLSearchParams$get;
+			return (_URLSearchParams$get = new URLSearchParams(window.location.search).get("code")) !== null && _URLSearchParams$get !== void 0 ? _URLSearchParams$get : null;
+		} catch (_unused5) {
 			return null;
 		}
 	}
@@ -20262,7 +20581,7 @@ ${h.join(`
 			const u = new URL(window.location.href);
 			u.searchParams.delete("code");
 			window.history.replaceState({}, "", u.toString());
-		} catch {}
+		} catch (_unused6) {}
 	}
 	var SESSION_KEY = "jon.mobile.session.v2";
 	function getStoredSession() {
@@ -20270,35 +20589,106 @@ ${h.join(`
 			const raw = localStorage.getItem(SESSION_KEY);
 			if (!raw) return null;
 			const s = JSON.parse(raw);
-			if (s?.expiresAt && new Date(s.expiresAt) < /* @__PURE__ */ new Date()) {
+			if (!(s === null || s === void 0 ? void 0 : s.sessionToken)) {
+				localStorage.removeItem(SESSION_KEY);
+				return null;
+			}
+			if ((s === null || s === void 0 ? void 0 : s.expiresAt) && new Date(s.expiresAt) < /* @__PURE__ */ new Date()) {
 				localStorage.removeItem(SESSION_KEY);
 				return null;
 			}
 			return s;
-		} catch {
+		} catch (_unused7) {
 			return null;
 		}
 	}
 	function storeSession(s) {
 		try {
 			localStorage.setItem(SESSION_KEY, JSON.stringify(s));
-		} catch {}
+		} catch (_unused8) {}
 	}
 	function clearSession() {
 		try {
 			localStorage.removeItem(SESSION_KEY);
-		} catch {}
+		} catch (_unused9) {}
 	}
+	function normalizeApproval(raw) {
+		var _raw$id, _raw$runId, _raw$projectId, _raw$category, _ref, _ref2, _raw$actionLabel, _ref3, _raw$reason, _raw$riskLevel, _ref4, _raw$createdAt;
+		if (!raw) return null;
+		const id = (_raw$id = raw.id) !== null && _raw$id !== void 0 ? _raw$id : raw.approvalId;
+		if (!id) return null;
+		return {
+			id,
+			runId: (_raw$runId = raw.runId) !== null && _raw$runId !== void 0 ? _raw$runId : null,
+			projectId: (_raw$projectId = raw.projectId) !== null && _raw$projectId !== void 0 ? _raw$projectId : null,
+			category: (_raw$category = raw.category) !== null && _raw$category !== void 0 ? _raw$category : null,
+			actionLabel: (_ref = (_ref2 = (_raw$actionLabel = raw.actionLabel) !== null && _raw$actionLabel !== void 0 ? _raw$actionLabel : raw.label) !== null && _ref2 !== void 0 ? _ref2 : raw.category) !== null && _ref !== void 0 ? _ref : "Action",
+			reason: (_ref3 = (_raw$reason = raw.reason) !== null && _raw$reason !== void 0 ? _raw$reason : raw.summary) !== null && _ref3 !== void 0 ? _ref3 : "",
+			riskLevel: (_raw$riskLevel = raw.riskLevel) !== null && _raw$riskLevel !== void 0 ? _raw$riskLevel : "medium",
+			createdAt: (_ref4 = (_raw$createdAt = raw.createdAt) !== null && _raw$createdAt !== void 0 ? _raw$createdAt : raw.timestamp) !== null && _ref4 !== void 0 ? _ref4 : null
+		};
+	}
+	function normalizeApprovalList(items) {
+		return (Array.isArray(items) ? items : []).map(normalizeApproval).filter(Boolean);
+	}
+	function mergeApprovalLists(...lists) {
+		const byId = /* @__PURE__ */ new Map();
+		for (const list of lists) for (const approval of normalizeApprovalList(list)) {
+			var _byId$get;
+			byId.set(approval.id, {
+				...(_byId$get = byId.get(approval.id)) !== null && _byId$get !== void 0 ? _byId$get : {},
+				...approval
+			});
+		}
+		return Array.from(byId.values()).sort((a, b) => {
+			var _b$createdAt, _a$createdAt;
+			return String((_b$createdAt = b.createdAt) !== null && _b$createdAt !== void 0 ? _b$createdAt : "").localeCompare(String((_a$createdAt = a.createdAt) !== null && _a$createdAt !== void 0 ? _a$createdAt : ""));
+		});
+	}
+	function approvalsFromRuns(runs) {
+		return (Array.isArray(runs) ? runs : []).flatMap((run) => Array.isArray(run === null || run === void 0 ? void 0 : run.pendingApprovalItems) ? run.pendingApprovalItems : []);
+	}
+	installMobileClientLogCapture();
 	function apiHeaders(token) {
 		return {
 			"content-type": "application/json",
 			...token ? { authorization: `Bearer ${token}` } : {}
 		};
 	}
-	var FETCH_TIMEOUT_MS = 1e4;
+	var DEFAULT_FETCH_TIMEOUT_MS = 1e4;
+	var DESKTOP_FETCH_TIMEOUT_MS = 25e3;
+	var BROWSER_ACTION_FETCH_TIMEOUT_MS = 25e3;
+	var LLM_INLINE_FETCH_TIMEOUT_MS = 6e4;
+	function getFetchTimeoutMs(path) {
+		if (path.includes("/desktop/state") || path.includes("/desktop/action")) return DESKTOP_FETCH_TIMEOUT_MS;
+		if (path.includes("/browser/tabs/action")) return BROWSER_ACTION_FETCH_TIMEOUT_MS;
+		if (path.includes("/llm-inline-resolve")) return LLM_INLINE_FETCH_TIMEOUT_MS;
+		return DEFAULT_FETCH_TIMEOUT_MS;
+	}
+	function makeApiError(message, { status = 0, code = "API_ERROR", details = null, cause = null } = {}) {
+		const err = new Error(message);
+		err.status = status;
+		err.code = code;
+		err.details = details;
+		err.isApiError = true;
+		if (cause) err.cause = cause;
+		return err;
+	}
+	function apiErrorMessage(data, status) {
+		var _ref5, _ref6, _data$error$message, _data$error;
+		return (_ref5 = (_ref6 = (_data$error$message = data === null || data === void 0 || (_data$error = data.error) === null || _data$error === void 0 ? void 0 : _data$error.message) !== null && _data$error$message !== void 0 ? _data$error$message : data === null || data === void 0 ? void 0 : data.error) !== null && _ref6 !== void 0 ? _ref6 : data === null || data === void 0 ? void 0 : data.message) !== null && _ref5 !== void 0 ? _ref5 : `HTTP ${status}`;
+	}
+	function emitAuthInvalid(err) {
+		try {
+			window.dispatchEvent(new CustomEvent("jon-mobile-auth-invalid", { detail: { message: err.message } }));
+		} catch (_unused10) {}
+	}
+	function isAuthError(err) {
+		return (err === null || err === void 0 ? void 0 : err.status) === 401;
+	}
 	async function apiPost(path, body, token) {
 		const ac = new AbortController();
-		const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+		const timer = setTimeout(() => ac.abort(), getFetchTimeoutMs(path));
 		try {
 			const res = await fetch(`${BASE}${path}`, {
 				method: "POST",
@@ -20307,10 +20697,45 @@ ${h.join(`
 				signal: ac.signal
 			});
 			const data = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(data?.error?.message ?? `HTTP ${res.status}`);
+			if (!res.ok) {
+				var _ref7, _data$error$code, _data$error2;
+				const err = makeApiError(apiErrorMessage(data, res.status), {
+					status: res.status,
+					code: (_ref7 = (_data$error$code = data === null || data === void 0 || (_data$error2 = data.error) === null || _data$error2 === void 0 ? void 0 : _data$error2.code) !== null && _data$error$code !== void 0 ? _data$error$code : data === null || data === void 0 ? void 0 : data.code) !== null && _ref7 !== void 0 ? _ref7 : "HTTP_ERROR",
+					details: data
+				});
+				queueMobileLog(isAuthError(err) ? "warn" : "error", "api.error", err.message, {
+					method: "POST",
+					path,
+					status: res.status,
+					code: err.code
+				});
+				if (token && isAuthError(err)) emitAuthInvalid(err);
+				throw err;
+			}
 			return data;
 		} catch (err) {
-			if (err.name === "AbortError") throw new Error("Délai dépassé — vérifiez que vous êtes sur le même réseau Wi-Fi que le desktop");
+			if (err.name === "AbortError") {
+				const timeout = makeApiError("Délai dépassé — vérifiez que vous êtes sur le même réseau Wi-Fi que le desktop", { code: "TIMEOUT" });
+				queueMobileLog("error", "api.timeout", timeout.message, {
+					method: "POST",
+					path
+				});
+				throw timeout;
+			}
+			if (err === null || err === void 0 ? void 0 : err.isApiError) throw err;
+			if (err instanceof TypeError) {
+				const network = makeApiError("Connexion impossible — JON desktop ne répond pas depuis ce mobile", {
+					code: "NETWORK_ERROR",
+					cause: err
+				});
+				queueMobileLog("error", "api.network_error", network.message, {
+					method: "POST",
+					path,
+					error: serializeLogArg(err)
+				});
+				throw network;
+			}
 			throw err;
 		} finally {
 			clearTimeout(timer);
@@ -20318,36 +20743,231 @@ ${h.join(`
 	}
 	async function apiGet(path, token) {
 		const ac = new AbortController();
-		const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+		const timer = setTimeout(() => ac.abort(), getFetchTimeoutMs(path));
 		try {
 			const res = await fetch(`${BASE}${path}`, {
 				headers: apiHeaders(token),
 				signal: ac.signal
 			});
 			const data = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(data?.error?.message ?? `HTTP ${res.status}`);
+			if (!res.ok) {
+				var _ref8, _data$error$code2, _data$error3;
+				const err = makeApiError(apiErrorMessage(data, res.status), {
+					status: res.status,
+					code: (_ref8 = (_data$error$code2 = data === null || data === void 0 || (_data$error3 = data.error) === null || _data$error3 === void 0 ? void 0 : _data$error3.code) !== null && _data$error$code2 !== void 0 ? _data$error$code2 : data === null || data === void 0 ? void 0 : data.code) !== null && _ref8 !== void 0 ? _ref8 : "HTTP_ERROR",
+					details: data
+				});
+				queueMobileLog(isAuthError(err) ? "warn" : "error", "api.error", err.message, {
+					method: "GET",
+					path,
+					status: res.status,
+					code: err.code
+				});
+				if (token && isAuthError(err)) emitAuthInvalid(err);
+				throw err;
+			}
 			return data;
 		} catch (err) {
-			if (err.name === "AbortError") throw new Error("Délai dépassé");
+			if (err.name === "AbortError") {
+				const timeout = makeApiError("Délai dépassé — JON desktop ne répond pas", { code: "TIMEOUT" });
+				queueMobileLog("error", "api.timeout", timeout.message, {
+					method: "GET",
+					path
+				});
+				throw timeout;
+			}
+			if (err === null || err === void 0 ? void 0 : err.isApiError) throw err;
+			if (err instanceof TypeError) {
+				const network = makeApiError("Connexion impossible — JON desktop ne répond pas depuis ce mobile", {
+					code: "NETWORK_ERROR",
+					cause: err
+				});
+				queueMobileLog("error", "api.network_error", network.message, {
+					method: "GET",
+					path,
+					error: serializeLogArg(err)
+				});
+				throw network;
+			}
 			throw err;
 		} finally {
 			clearTimeout(timer);
 		}
 	}
-	function formatTime(ts) {
-		if (!ts) return "";
-		const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1e3);
-		if (diff < 30) return "";
-		if (diff < 90) return "à l'instant";
-		if (diff < 3600) return `${Math.floor(diff / 60)} min`;
-		return new Date(ts).toLocaleTimeString("fr-FR", {
-			hour: "2-digit",
-			minute: "2-digit"
-		});
+	function validateMobileSession(token) {
+		return apiGet("/api/mobile/session/status", token);
 	}
-	function PairingScreen({ onPaired }) {
+	var SLASH_COMMANDS = [{
+		cmd: "/llm{",
+		label: "/llm{…}",
+		description: "Générer du contenu avec l'IA"
+	}];
+	function getSlashSuggestion(text) {
+		if (typeof text !== "string" || !text) return [];
+		const m = text.match(/\/([a-z]*)$/i);
+		if (!m) return [];
+		const typed = m[0].toLowerCase();
+		return SLASH_COMMANDS.filter((c) => c.cmd.startsWith(typed));
+	}
+	function applySlashCommand(text, cmd) {
+		return text.replace(/\/([a-z]*)$/i, cmd);
+	}
+	function SlashSuggestion({ suggestions, onSelect }) {
+		if (!suggestions || suggestions.length === 0) return null;
+		return (0, import_react.createElement)("div", { className: "slash-suggestion-menu" }, suggestions.map((s) => (0, import_react.createElement)("button", {
+			key: s.cmd,
+			className: "slash-suggestion-item",
+			onMouseDown: (e) => {
+				e.preventDefault();
+				onSelect(s.cmd);
+			},
+			onTouchEnd: (e) => {
+				e.preventDefault();
+				onSelect(s.cmd);
+			}
+		}, (0, import_react.createElement)("span", { className: "slash-suggestion-cmd" }, s.label), (0, import_react.createElement)("span", { className: "slash-suggestion-desc" }, s.description))));
+	}
+	function _appIconSvg(text, bg, fg = "#fff") {
+		const fs = text.length > 2 ? 9 : text.length > 1 ? 11 : 15;
+		const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28"><rect width="28" height="28" rx="6" fill="${bg}"/><text x="14" y="${text.length > 1 ? 18 : 19}" font-family="ui-monospace,system-ui,sans-serif" font-size="${fs}" font-weight="bold" fill="${fg}" text-anchor="middle">${text}</text></svg>`;
+		return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+	}
+	var BUILTIN_APP_ICONS = [
+		{
+			re: /chrome/i,
+			icon: _appIconSvg("G", "#4285F4")
+		},
+		{
+			re: /msedge|edge/i,
+			icon: _appIconSvg("e", "#0067B8")
+		},
+		{
+			re: /firefox/i,
+			icon: _appIconSvg("F", "#FF7139")
+		},
+		{
+			re: /notepad\+\+/i,
+			icon: _appIconSvg("N+", "#3C9940")
+		},
+		{
+			re: /notepad/i,
+			icon: _appIconSvg("N", "#3C5A99")
+		},
+		{
+			re: /code|vscode/i,
+			icon: _appIconSvg("VS", "#007ACC")
+		},
+		{
+			re: /explorer/i,
+			icon: _appIconSvg("E", "#FABB00", "#333")
+		},
+		{
+			re: /powershell/i,
+			icon: _appIconSvg("PS", "#012456")
+		},
+		{
+			re: /windowsterminal|wt\.exe/i,
+			icon: _appIconSvg(">_", "#111")
+		},
+		{
+			re: /cmd|conhost/i,
+			icon: _appIconSvg(">_", "#222")
+		},
+		{
+			re: /winword/i,
+			icon: _appIconSvg("W", "#185ABD")
+		},
+		{
+			re: /excel/i,
+			icon: _appIconSvg("X", "#217346")
+		},
+		{
+			re: /powerpnt/i,
+			icon: _appIconSvg("P", "#B7472A")
+		},
+		{
+			re: /outlook/i,
+			icon: _appIconSvg("O", "#0078D4")
+		},
+		{
+			re: /teams/i,
+			icon: _appIconSvg("T", "#6264A7")
+		},
+		{
+			re: /slack/i,
+			icon: _appIconSvg("#", "#4A154B")
+		},
+		{
+			re: /discord/i,
+			icon: _appIconSvg("D", "#5865F2")
+		},
+		{
+			re: /spotify/i,
+			icon: _appIconSvg("♪", "#1DB954")
+		},
+		{
+			re: /vlc/i,
+			icon: _appIconSvg("▶", "#FF8800")
+		},
+		{
+			re: /zoom/i,
+			icon: _appIconSvg("Z", "#2D8CFF")
+		},
+		{
+			re: /obsidian/i,
+			icon: _appIconSvg("O", "#7C3AED")
+		},
+		{
+			re: /cursor/i,
+			icon: _appIconSvg("Cs", "#000")
+		},
+		{
+			re: /brave/i,
+			icon: _appIconSvg("B", "#FB542B")
+		},
+		{
+			re: /opera/i,
+			icon: _appIconSvg("O", "#FF1B2D")
+		}
+	];
+	function getBuiltinIcon(processName, title) {
+		const key = `${processName !== null && processName !== void 0 ? processName : ""} ${title !== null && title !== void 0 ? title : ""}`;
+		for (const { re, icon } of BUILTIN_APP_ICONS) if (re.test(key)) return icon;
+		return null;
+	}
+	function hasLlmDirective(text) {
+		return typeof text === "string" && text.includes("/llm{");
+	}
+	async function resolveLlmInlineInput(rawText, projectId, token, contextType = "type_text") {
+		if (!hasLlmDirective(rawText)) return {
+			text: rawText,
+			hadInlineLlm: false,
+			generations: []
+		};
+		return await apiPost(`/api/mobile/projects/${projectId}/llm-inline-resolve`, {
+			text: rawText,
+			contextType
+		}, token);
+	}
+	function firstLlmGeneration(result) {
+		var _result$generations$;
+		return Array.isArray(result === null || result === void 0 ? void 0 : result.generations) ? (_result$generations$ = result.generations[0]) !== null && _result$generations$ !== void 0 ? _result$generations$ : null : null;
+	}
+	function llmProviderLabel(generation) {
+		return `${(generation === null || generation === void 0 ? void 0 : generation.provider) || "LLM provider"}${(generation === null || generation === void 0 ? void 0 : generation.model) ? ` · ${generation.model}` : ""}`;
+	}
+	function normalizeBrowserUrlInput(input, { allowBlank = false } = {}) {
+		const raw = String(input !== null && input !== void 0 ? input : "").trim();
+		if (!raw) return allowBlank ? "about:blank" : "";
+		if (allowBlank && raw.toLowerCase() === "about:blank") return "about:blank";
+		if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return raw;
+		if (/^(localhost|(?:\d{1,3}\.){3}\d{1,3})(?::\d+)?(?:[/?#].*)?$/i.test(raw)) return `http://${raw}`;
+		if (/^[^\s/]+\.[^\s]+(?:[/?#].*)?$/i.test(raw)) return `https://${raw}`;
+		return `https://www.google.com/search?q=${encodeURIComponent(raw)}`;
+	}
+	function PairingScreen({ onPaired, notice = null }) {
 		const urlCode = getCodeFromUrl();
-		const [code, setCode] = (0, import_react.useState)(urlCode ?? "");
+		const [code, setCode] = (0, import_react.useState)(urlCode !== null && urlCode !== void 0 ? urlCode : "");
 		const [deviceName] = (0, import_react.useState)(() => {
 			const ua = navigator.userAgent;
 			if (/iPhone/i.test(ua)) return "iPhone";
@@ -20359,19 +20979,27 @@ ${h.join(`
 		const [loading, setLoading] = (0, import_react.useState)(false);
 		const [phase, setPhase] = (0, import_react.useState)(urlCode ? "qr-connecting" : "manual");
 		async function submit(overrideCode) {
-			const pairingCode = (overrideCode ?? code).trim().toUpperCase();
+			const pairingCode = (overrideCode !== null && overrideCode !== void 0 ? overrideCode : code).trim().toUpperCase();
 			if (!pairingCode) return;
 			setLoading(true);
 			setError(null);
 			try {
+				queueMobileLog("info", "pairing.confirm_attempt", "Mobile pairing confirm attempt", { hasQrCode: Boolean(overrideCode) });
 				const result = await apiPost("/api/mobile/pairing/confirm", {
 					pairingCode,
 					deviceName
 				});
 				cleanUrl();
-				storeSession(result);
+				queueMobileLog("info", "pairing.confirmed", "Mobile pairing confirmed", {
+					deviceId: result.deviceId,
+					deviceName: result.deviceName
+				});
 				onPaired(result);
 			} catch (err) {
+				queueMobileLog("warn", "pairing.failed", err.message, {
+					code: err.code,
+					status: err.status
+				});
 				setError(err.message);
 				setLoading(false);
 				setPhase("error");
@@ -20385,7 +21013,7 @@ ${h.join(`
 		}, []);
 		const showSpinner = phase === "qr-connecting";
 		const showError = phase === "error";
-		return (0, import_react.createElement)("div", { className: "pairing-screen" }, (0, import_react.createElement)("div", { className: "pairing-logo-wrap" }, (0, import_react.createElement)("span", { className: "pairing-logo" }, "JON"), (0, import_react.createElement)("span", { className: "pairing-logo-sub" }, "Workspace AI")), showSpinner ? (0, import_react.createElement)("div", { className: "pairing-auto" }, (0, import_react.createElement)("div", { className: "pairing-spinner" }), (0, import_react.createElement)("p", { className: "pairing-auto-text" }, "Connexion en cours…")) : (0, import_react.createElement)("div", { className: "pairing-form" }, showError ? (0, import_react.createElement)("div", { className: "pairing-error-banner" }, (0, import_react.createElement)("p", { className: "pairing-error-title" }, "Connexion impossible"), (0, import_react.createElement)("p", { className: "pairing-error-detail" }, error ?? "Erreur inconnue"), (0, import_react.createElement)("p", { className: "pairing-error-hint" }, "Vérifiez que le code n'a pas expiré (5 min) et que vous êtes sur le même réseau Wi-Fi.")) : null, (0, import_react.createElement)("input", {
+		return (0, import_react.createElement)("div", { className: "pairing-screen" }, (0, import_react.createElement)("div", { className: "pairing-logo-wrap" }, (0, import_react.createElement)("span", { className: "pairing-logo" }, "JON"), (0, import_react.createElement)("span", { className: "pairing-logo-sub" }, "Workspace AI")), showSpinner ? (0, import_react.createElement)("div", { className: "pairing-auto" }, (0, import_react.createElement)("div", { className: "pairing-spinner" }), (0, import_react.createElement)("p", { className: "pairing-auto-text" }, "Connexion en cours…")) : (0, import_react.createElement)("div", { className: "pairing-form" }, showError ? (0, import_react.createElement)("div", { className: "pairing-error-banner" }, (0, import_react.createElement)("p", { className: "pairing-error-title" }, "Connexion impossible"), (0, import_react.createElement)("p", { className: "pairing-error-detail" }, error !== null && error !== void 0 ? error : "Erreur inconnue"), (0, import_react.createElement)("p", { className: "pairing-error-hint" }, "Vérifiez que le code n'a pas expiré (5 min) et que vous êtes sur le même réseau Wi-Fi.")) : notice ? (0, import_react.createElement)("div", { className: "pairing-notice-banner" }, (0, import_react.createElement)("p", { className: "pairing-notice-title" }, "Session mobile à renouveler"), (0, import_react.createElement)("p", { className: "pairing-notice-detail" }, notice)) : null, (0, import_react.createElement)("input", {
 			className: "mobile-input pairing-code-input",
 			placeholder: "AB3F9K",
 			value: code,
@@ -20407,7 +21035,18 @@ ${h.join(`
 			disabled: loading || !code.trim()
 		}, loading ? "Connexion…" : "Connecter")), (0, import_react.createElement)("p", { className: "pairing-hint" }, "JON desktop → ", (0, import_react.createElement)("strong", null, "Admin → Pair mobile"), " pour obtenir un QR ou un code."));
 	}
+	function SessionCheckScreen({ state, error, onRetry, onReconnect }) {
+		const isOffline = state === "offline";
+		return (0, import_react.createElement)("div", { className: "pairing-screen" }, (0, import_react.createElement)("div", { className: "pairing-logo-wrap" }, (0, import_react.createElement)("span", { className: "pairing-logo" }, "JON"), (0, import_react.createElement)("span", { className: "pairing-logo-sub" }, "Mobile")), isOffline ? (0, import_react.createElement)("div", { className: "pairing-form" }, (0, import_react.createElement)("div", { className: "pairing-error-banner" }, (0, import_react.createElement)("p", { className: "pairing-error-title" }, "JON desktop introuvable"), (0, import_react.createElement)("p", { className: "pairing-error-detail" }, error !== null && error !== void 0 ? error : "La session existe, mais le serveur mobile ne répond pas."), (0, import_react.createElement)("p", { className: "pairing-error-hint" }, "Gardez le desktop ouvert, le mobile sur le même Wi-Fi, puis réessayez.")), (0, import_react.createElement)("div", { className: "pairing-status-actions" }, (0, import_react.createElement)("button", {
+			className: "mobile-btn primary",
+			onClick: onRetry
+		}, "Réessayer"), (0, import_react.createElement)("button", {
+			className: "mobile-btn ghost",
+			onClick: onReconnect
+		}, "Reconnecter"))) : (0, import_react.createElement)("div", { className: "pairing-auto" }, (0, import_react.createElement)("div", { className: "pairing-spinner" }), (0, import_react.createElement)("p", { className: "pairing-auto-text" }, "Vérification de la session mobile…")));
+	}
 	function ApprovalCard({ approval, token, onResolved }) {
+		var _approval$riskLevel, _approval$riskLevel2;
 		const [loading, setLoading] = (0, import_react.useState)(null);
 		const [error, setError] = (0, import_react.useState)(null);
 		async function respond(decision) {
@@ -20421,7 +21060,7 @@ ${h.join(`
 				setLoading(null);
 			}
 		}
-		return (0, import_react.createElement)("div", { className: "approval-card" }, (0, import_react.createElement)("div", { className: "approval-header" }, (0, import_react.createElement)("div", { className: "approval-icon-wrap" }, SVG.alert), (0, import_react.createElement)("div", { className: "approval-header-text" }, (0, import_react.createElement)("span", { className: "approval-title" }, "Approbation requise"), (0, import_react.createElement)("span", { className: `risk-pill risk-${approval.riskLevel ?? "medium"}` }, approval.riskLevel ?? "medium"))), (0, import_react.createElement)("p", { className: "approval-action" }, approval.actionLabel), approval.reason ? (0, import_react.createElement)("p", { className: "approval-reason" }, approval.reason) : null, error ? (0, import_react.createElement)("p", { className: "inline-error" }, error) : null, (0, import_react.createElement)("div", { className: "approval-actions" }, (0, import_react.createElement)("button", {
+		return (0, import_react.createElement)("div", { className: "approval-card" }, (0, import_react.createElement)("div", { className: "approval-header" }, (0, import_react.createElement)("div", { className: "approval-icon-wrap" }, SVG.alert), (0, import_react.createElement)("div", { className: "approval-header-text" }, (0, import_react.createElement)("span", { className: "approval-title" }, "Approbation requise"), (0, import_react.createElement)("span", { className: `risk-pill risk-${(_approval$riskLevel = approval.riskLevel) !== null && _approval$riskLevel !== void 0 ? _approval$riskLevel : "medium"}` }, (_approval$riskLevel2 = approval.riskLevel) !== null && _approval$riskLevel2 !== void 0 ? _approval$riskLevel2 : "medium"))), (0, import_react.createElement)("p", { className: "approval-action" }, approval.actionLabel), approval.reason ? (0, import_react.createElement)("p", { className: "approval-reason" }, approval.reason) : null, error ? (0, import_react.createElement)("p", { className: "inline-error" }, error) : null, (0, import_react.createElement)("div", { className: "approval-actions" }, (0, import_react.createElement)("button", {
 			className: "mobile-btn outline-danger",
 			onClick: () => respond("deny"),
 			disabled: loading !== null
@@ -20468,147 +21107,93 @@ ${h.join(`
 			disabled: sending || !answer.trim()
 		}, sending ? "Envoi…" : "Répondre")));
 	}
-	function ChatTab({ projectId, token, events }) {
-		const [message, setMessage] = (0, import_react.useState)("");
-		const [messages, setMessages] = (0, import_react.useState)([{
-			id: "welcome",
-			role: "jon",
-			text: "Bonjour, je suis JON. Dites-moi quoi faire.",
-			ts: (/* @__PURE__ */ new Date()).toISOString()
-		}]);
-		const [waiting, setWaiting] = (0, import_react.useState)(false);
-		const [showMission, setShowMission] = (0, import_react.useState)(false);
+	function DashboardTab({ projectId, token, events, session, onDisconnect, pollingInterval, onPollingIntervalChange }) {
+		var _status$devices$lengt, _status$devices;
+		const [status, setStatus] = (0, import_react.useState)(null);
+		const [runs, setRuns] = (0, import_react.useState)([]);
+		const [terminals, setTerminals] = (0, import_react.useState)([]);
+		const [control, setControl] = (0, import_react.useState)(null);
 		const [objective, setObjective] = (0, import_react.useState)("");
-		const listRef = (0, import_react.useRef)(null);
-		const inputRef = (0, import_react.useRef)(null);
-		(0, import_react.useEffect)(() => {
-			listRef.current?.scrollTo({
-				top: listRef.current.scrollHeight,
-				behavior: "smooth"
-			});
-		}, [messages]);
-		(0, import_react.useEffect)(() => {
-			const last = events[events.length - 1];
-			if (!last) return;
-			if (last.type === "jon.thinking") setWaiting(true);
-			if (last.type === "jon.reply") {
-				setWaiting(false);
-				const reply = last.payload?.reply || last.message || "";
-				if (reply) setMessages((m) => [...m.filter((x) => x.id !== "thinking"), {
-					id: `jon-${last.id ?? Date.now()}`,
-					role: "jon",
-					text: reply,
-					ts: last.timestamp ?? (/* @__PURE__ */ new Date()).toISOString()
-				}]);
+		const [busy, setBusy] = (0, import_react.useState)(false);
+		const [error, setError] = (0, import_react.useState)(null);
+		const [showSettings, setShowSettings] = (0, import_react.useState)(false);
+		async function refresh() {
+			try {
+				const [nextStatus, nextRuns, nextTerminals] = await Promise.all([
+					apiGet("/api/mobile/status", token),
+					apiGet(`/api/mobile/projects/${projectId}/runs`, token),
+					apiGet(`/api/mobile/projects/${projectId}/terminals`, token)
+				]);
+				setStatus(nextStatus);
+				setRuns(Array.isArray(nextRuns) ? nextRuns : []);
+				setTerminals(Array.isArray(nextTerminals) ? nextTerminals : []);
+				setError(null);
+				apiGet(`/api/mobile/projects/${projectId}/control/state`, token).then(setControl).catch(() => setControl((prev) => prev !== null && prev !== void 0 ? prev : { active: false }));
+			} catch (err) {
+				setError(err.message);
 			}
-		}, [events]);
-		async function send() {
-			if (!message.trim()) return;
-			const text = message.trim();
-			setMessage("");
-			setMessages((m) => [...m, {
-				id: `u-${Date.now()}`,
-				role: "user",
-				text,
-				ts: (/* @__PURE__ */ new Date()).toISOString()
-			}]);
-			setMessages((m) => [...m, {
-				id: "thinking",
-				role: "jon",
-				text: null
-			}]);
-			setWaiting(true);
+		}
+		(0, import_react.useEffect)(() => {
+			refresh();
+			const timer = setInterval(refresh, 5e3);
+			return () => clearInterval(timer);
+		}, [projectId, token]);
+		(0, import_react.useEffect)(() => {
+			if (events.length > 0) refresh();
+		}, [
+			events.length,
+			projectId,
+			token
+		]);
+		async function startTask() {
+			if (!objective.trim()) return;
+			setBusy(true);
+			setError(null);
 			try {
 				await apiPost(`/api/mobile/projects/${projectId}/commands`, {
-					command: "sendChatMessage",
-					params: { message: text }
-				}, token);
-				setTimeout(() => {
-					setWaiting((w) => {
-						if (w) setMessages((m) => m.filter((x) => x.id !== "thinking"));
-						return false;
-					});
-				}, 3e4);
-			} catch (err) {
-				setWaiting(false);
-				setMessages((m) => [...m.filter((x) => x.id !== "thinking"), {
-					id: `err-${Date.now()}`,
-					role: "error",
-					text: err.message,
-					ts: (/* @__PURE__ */ new Date()).toISOString()
-				}]);
-			}
-		}
-		async function launchMission() {
-			if (!objective.trim()) return;
-			const obj = objective.trim();
-			setObjective("");
-			setShowMission(false);
-			try {
-				const result = await apiPost(`/api/mobile/projects/${projectId}/commands`, {
 					command: "startMission",
-					params: { objective: obj }
+					params: { objective: objective.trim() }
 				}, token);
-				setMessages((m) => [...m, {
-					id: `jon-${Date.now()}`,
-					role: "jon",
-					text: `Mission lancée${result?.result?.runId ? ` (${result.result.runId.slice(0, 8)})` : ""}.`,
-					ts: (/* @__PURE__ */ new Date()).toISOString()
-				}]);
+				setObjective("");
+				await refresh();
 			} catch (err) {
-				setMessages((m) => [...m, {
-					id: `err-${Date.now()}`,
-					role: "error",
-					text: err.message,
-					ts: (/* @__PURE__ */ new Date()).toISOString()
-				}]);
+				setError(err.message);
+			} finally {
+				setBusy(false);
 			}
 		}
-		return (0, import_react.createElement)("div", { className: "tab-content chat-tab" }, (0, import_react.createElement)("div", {
-			className: "chat-messages",
-			ref: listRef
-		}, messages.map((msg) => msg.id === "thinking" ? (0, import_react.createElement)("div", {
-			key: "thinking",
-			className: "chat-msg chat-msg-jon chat-msg-thinking"
-		}, (0, import_react.createElement)("span", { className: "thinking-dots" }, (0, import_react.createElement)("span"), (0, import_react.createElement)("span"), (0, import_react.createElement)("span"))) : (0, import_react.createElement)("div", {
-			key: msg.id,
-			className: `chat-msg chat-msg-${msg.role}`
-		}, (0, import_react.createElement)("span", { className: "msg-text" }, msg.text), msg.ts && formatTime(msg.ts) ? (0, import_react.createElement)("span", { className: "msg-ts" }, formatTime(msg.ts)) : null)), waiting && !messages.find((m) => m.id === "thinking") ? (0, import_react.createElement)("div", { className: "chat-msg chat-msg-jon chat-msg-thinking" }, (0, import_react.createElement)("span", { className: "thinking-dots" }, (0, import_react.createElement)("span"), (0, import_react.createElement)("span"), (0, import_react.createElement)("span"))) : null), showMission ? (0, import_react.createElement)("div", { className: "mission-sheet" }, (0, import_react.createElement)("div", { className: "mission-sheet-header" }, (0, import_react.createElement)("span", { className: "mission-sheet-title" }, "Nouvelle mission"), (0, import_react.createElement)("button", {
-			className: "icon-close",
-			onClick: () => setShowMission(false),
-			"aria-label": "Fermer"
-		}, SVG.x)), (0, import_react.createElement)("textarea", {
-			className: "mobile-textarea mission-input",
-			placeholder: "Décrivez la mission à lancer…",
+		const activeRuns = runs.filter((run) => ["running", "paused"].includes(run.status));
+		const latestTasks = runs.slice(0, 4);
+		const activeTerminals = terminals.filter((t) => t.status !== "detached");
+		return (0, import_react.createElement)("div", { className: "tab-content dashboard-tab" }, (0, import_react.createElement)("div", { className: "dashboard-hero" }, (0, import_react.createElement)("div", null, (0, import_react.createElement)("p", { className: "eyebrow" }, "JON OS Agent"), (0, import_react.createElement)("h2", null, "Mon Ordinateur"), (0, import_react.createElement)("span", { className: "online-pill" }, (control === null || control === void 0 ? void 0 : control.active) ? "Browser actif" : "En ligne")), (0, import_react.createElement)("div", { className: "dashboard-hero-side" }, (0, import_react.createElement)("div", { className: "jon-orb-small" }, "JON"))), error ? (0, import_react.createElement)("div", { className: "inline-error" }, error) : null, (0, import_react.createElement)("div", { className: "dashboard-metrics" }, (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Sessions"), (0, import_react.createElement)("strong", null, String(activeTerminals.length + ((control === null || control === void 0 ? void 0 : control.active) ? 1 : 0)))), (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Tâches"), (0, import_react.createElement)("strong", null, String(activeRuns.length))), (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Appareils"), (0, import_react.createElement)("strong", null, String((_status$devices$lengt = status === null || status === void 0 || (_status$devices = status.devices) === null || _status$devices === void 0 ? void 0 : _status$devices.length) !== null && _status$devices$lengt !== void 0 ? _status$devices$lengt : 0)))), (0, import_react.createElement)("div", { className: "section dashboard-config-section" }, (0, import_react.createElement)("button", {
+			className: `dashboard-config-toggle ${showSettings ? "active" : ""}`,
+			onClick: () => setShowSettings((v) => !v),
+			"aria-label": "Configuration de l’agent"
+		}, SVG.settings, (0, import_react.createElement)("span", null, "Configuration"), (0, import_react.createElement)("span", { className: "dashboard-config-chevron" }, showSettings ? "▲" : "▼")), showSettings ? (0, import_react.createElement)("div", { className: "dashboard-settings-card" }, (0, import_react.createElement)(MoreTab, {
+			projectId,
+			token,
+			session,
+			events,
+			onDisconnect,
+			pollingInterval,
+			onPollingIntervalChange
+		})) : null), (0, import_react.createElement)("div", { className: "quick-command-card" }, (0, import_react.createElement)("textarea", {
+			className: "mobile-textarea",
+			placeholder: "Demander à JON d’agir sur ton ordinateur…",
 			value: objective,
-			onChange: (e) => setObjective(e.target.value),
-			rows: 4,
-			autoFocus: true
-		}), (0, import_react.createElement)("div", { className: "card-actions" }, (0, import_react.createElement)("button", {
-			className: "mobile-btn ghost",
-			onClick: () => setShowMission(false)
-		}, "Annuler"), (0, import_react.createElement)("button", {
-			className: "mobile-btn primary",
-			onClick: launchMission,
-			disabled: !objective.trim()
-		}, "Lancer la mission"))) : null, (0, import_react.createElement)("div", { className: "chat-input-row" }, (0, import_react.createElement)("button", {
-			className: "mission-trigger",
-			onClick: () => setShowMission(true),
-			title: "Lancer une mission",
-			"aria-label": "Lancer une mission"
-		}, SVG.rocket), (0, import_react.createElement)("input", {
-			ref: inputRef,
-			className: "mobile-input chat-input",
-			placeholder: "Message…",
-			value: message,
-			onChange: (e) => setMessage(e.target.value),
-			onKeyDown: (e) => e.key === "Enter" && !e.shiftKey && send()
+			rows: 3,
+			onChange: (e) => setObjective(e.target.value)
 		}), (0, import_react.createElement)("button", {
-			className: `send-trigger ${message.trim() ? "active" : ""}`,
-			onClick: send,
-			disabled: !message.trim(),
-			"aria-label": "Envoyer"
-		}, SVG.send)));
+			className: "mobile-btn primary full-width",
+			onClick: startTask,
+			disabled: busy || !objective.trim()
+		}, busy ? "Lancement…" : "+ Nouvelle tâche")), (0, import_react.createElement)("div", { className: "section" }, (0, import_react.createElement)("p", { className: "section-title" }, "Sessions actives"), (0, import_react.createElement)("div", { className: "session-list" }, (0, import_react.createElement)("div", { className: "session-row" }, (0, import_react.createElement)("span", { className: `status-dot ${(control === null || control === void 0 ? void 0 : control.active) ? "running" : "detached"}` }), (0, import_react.createElement)("strong", null, "Chrome / JON Browser"), (0, import_react.createElement)("em", null, (control === null || control === void 0 ? void 0 : control.active) ? "Actif" : "Prêt")), activeTerminals.slice(0, 3).map((terminal) => (0, import_react.createElement)("div", {
+			key: terminal.id,
+			className: "session-row"
+		}, (0, import_react.createElement)("span", { className: `status-dot ${terminal.status}` }), (0, import_react.createElement)("strong", null, terminal.label), (0, import_react.createElement)("em", null, terminal.status))))), (0, import_react.createElement)("div", { className: "section" }, (0, import_react.createElement)("p", { className: "section-title" }, "Tâches récentes"), latestTasks.length === 0 ? (0, import_react.createElement)("div", { className: "empty-mini" }, "Aucune tâche lancée") : latestTasks.map((run) => (0, import_react.createElement)("div", {
+			key: run.id,
+			className: "task-mini-row"
+		}, (0, import_react.createElement)("span", { className: `status-dot ${run.status}` }), (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, run.mission || "Mission"), (0, import_react.createElement)("small", null, run.naturalReply || run.summary || run.status))))));
 	}
 	var STATUS_FR = {
 		running: "En cours",
@@ -20617,38 +21202,1079 @@ ${h.join(`
 		failed: "Échoué",
 		stopped: "Arrêté"
 	};
-	function LiveTab({ projectId, token, events, approvals, onApprovalResolved }) {
+	function TasksTab({ projectId, token, events, approvals, onApprovalResolved }) {
 		const [runs, setRuns] = (0, import_react.useState)([]);
+		const [filter, setFilter] = (0, import_react.useState)("active");
+		const [objective, setObjective] = (0, import_react.useState)("");
+		const [busy, setBusy] = (0, import_react.useState)(false);
+		const [error, setError] = (0, import_react.useState)(null);
+		async function refresh() {
+			try {
+				const next = await apiGet(`/api/mobile/projects/${projectId}/runs`, token);
+				setRuns(Array.isArray(next) ? next : []);
+			} catch (err) {
+				setError(err.message);
+			}
+		}
 		(0, import_react.useEffect)(() => {
-			apiGet(`/api/mobile/projects/${projectId}/runs`, token).then(setRuns).catch(() => {});
+			refresh();
+			const timer = setInterval(refresh, 5e3);
+			return () => clearInterval(timer);
+		}, [projectId, token]);
+		(0, import_react.useEffect)(() => {
+			if (events.length > 0) refresh();
 		}, [
+			events.length,
 			projectId,
-			token,
-			events.length
+			token
 		]);
+		async function startTask() {
+			if (!objective.trim()) return;
+			setBusy(true);
+			setError(null);
+			try {
+				await apiPost(`/api/mobile/projects/${projectId}/commands`, {
+					command: "startMission",
+					params: { objective: objective.trim() }
+				}, token);
+				setObjective("");
+				setFilter("active");
+				await refresh();
+			} catch (err) {
+				setError(err.message);
+			} finally {
+				setBusy(false);
+			}
+		}
 		async function stopRun(runId) {
 			try {
 				await apiPost(`/api/mobile/projects/${projectId}/commands`, {
 					command: "stopRun",
 					params: { runId }
 				}, token);
-			} catch {}
+				await refresh();
+			} catch (_unused12) {}
 		}
-		return (0, import_react.createElement)("div", { className: "tab-content" }, approvals.length > 0 ? (0, import_react.createElement)("div", { className: "section" }, (0, import_react.createElement)("p", { className: "section-title" }, `${approvals.length} approbation${approvals.length > 1 ? "s" : ""} en attente`), approvals.map((a) => (0, import_react.createElement)(ApprovalCard, {
+		const visibleApprovals = mergeApprovalLists(approvals, approvalsFromRuns(runs));
+		const filtered = runs.filter((run) => {
+			if (filter === "active") return ["running", "paused"].includes(run.status);
+			if (filter === "planned") return run.status === "created" || run.status === "pending";
+			return [
+				"completed",
+				"failed",
+				"stopped"
+			].includes(run.status);
+		});
+		return (0, import_react.createElement)("div", { className: "tab-content tasks-tab" }, visibleApprovals.length > 0 ? (0, import_react.createElement)("div", { className: "section" }, (0, import_react.createElement)("p", { className: "section-title" }, `${visibleApprovals.length} validation${visibleApprovals.length > 1 ? "s" : ""} en attente`), visibleApprovals.map((a) => (0, import_react.createElement)(ApprovalCard, {
 			key: a.id,
 			approval: a,
 			token,
 			onResolved: onApprovalResolved
-		}))) : null, runs.length === 0 ? (0, import_react.createElement)("div", { className: "empty-state" }, (0, import_react.createElement)("div", { className: "empty-icon" }, IC([(0, import_react.createElement)("polygon", { points: "13 2 3 14 12 14 11 22 21 10 12 10 13 2" })], {
-			width: 40,
-			height: 40
-		})), (0, import_react.createElement)("p", { className: "empty-title" }, "Aucune mission en cours"), (0, import_react.createElement)("p", { className: "empty-sub" }, "Lancez une mission depuis l'onglet Chat")) : runs.map((run) => (0, import_react.createElement)("div", {
-			key: run.id,
-			className: `run-card status-${run.status}`
-		}, (0, import_react.createElement)("div", { className: "run-card-top" }, (0, import_react.createElement)("span", { className: `status-dot ${run.status}` }), (0, import_react.createElement)("span", { className: "run-status-label" }, STATUS_FR[run.status] ?? run.status), (0, import_react.createElement)("span", { className: "run-ts" }, run.updatedAt ? formatTime(run.updatedAt) : ""), ["running", "paused"].includes(run.status) ? (0, import_react.createElement)("button", {
+		}))) : null, error ? (0, import_react.createElement)("div", { className: "inline-error" }, error) : null, (0, import_react.createElement)("div", { className: "task-filter" }, [
+			"active",
+			"planned",
+			"done"
+		].map((item) => (0, import_react.createElement)("button", {
+			key: item,
+			className: filter === item ? "active" : "",
+			onClick: () => setFilter(item)
+		}, item === "active" ? "En cours" : item === "planned" ? "Planifiées" : "Terminées"))), filtered.length === 0 ? (0, import_react.createElement)("div", { className: "empty-state compact" }, (0, import_react.createElement)("p", { className: "empty-title" }, "Aucune tâche"), (0, import_react.createElement)("p", { className: "empty-sub" }, "Crée une tâche pour que JON agisse sur ton ordinateur.")) : filtered.map((run) => {
+			var _STATUS_FR$run$status2, _run$executionThread3;
+			return (0, import_react.createElement)("div", {
+				key: run.id,
+				className: `task-card status-${run.status}`
+			}, (0, import_react.createElement)("div", { className: "task-card-top" }, (0, import_react.createElement)("span", { className: `status-dot ${run.status}` }), (0, import_react.createElement)("strong", null, run.mission || "Mission JON"), (0, import_react.createElement)("span", { className: `task-status status-${run.status}` }, (_STATUS_FR$run$status2 = STATUS_FR[run.status]) !== null && _STATUS_FR$run$status2 !== void 0 ? _STATUS_FR$run$status2 : run.status)), run.naturalReply || run.summary ? (0, import_react.createElement)("p", null, run.naturalReply || run.summary) : null, ((_run$executionThread3 = run.executionThread) === null || _run$executionThread3 === void 0 ? void 0 : _run$executionThread3.activeStep) ? (0, import_react.createElement)("small", null, `Étape: ${run.executionThread.activeStep.label}`) : null, ["running", "paused"].includes(run.status) ? (0, import_react.createElement)("button", {
+				className: "mobile-btn outline-danger small",
+				onClick: () => stopRun(run.id)
+			}, "Stop") : null);
+		}), (0, import_react.createElement)("div", { className: "new-task-card" }, (0, import_react.createElement)("textarea", {
+			className: "mobile-textarea",
+			placeholder: "Nouvelle tâche ou automatisation…",
+			rows: 3,
+			value: objective,
+			onChange: (e) => setObjective(e.target.value)
+		}), (0, import_react.createElement)("button", {
+			className: "mobile-btn primary full-width",
+			onClick: startTask,
+			disabled: busy || !objective.trim()
+		}, busy ? "Lancement…" : "+ Nouvelle tâche")));
+	}
+	function mapClientPointToRemotePoint({ px, py, containerWidth, containerHeight, naturalWidth, naturalHeight, scale, translateX, translateY }) {
+		const imgX = (px - translateX) / scale;
+		const imgY = (py - translateY) / scale;
+		return {
+			x: Math.max(0, Math.min(naturalWidth - 1, Math.round(imgX * naturalWidth / containerWidth))),
+			y: Math.max(0, Math.min(naturalHeight - 1, Math.round(imgY * naturalHeight / containerHeight)))
+		};
+	}
+	function RemoteScreenViewport({ screenshot, screenshotMime, naturalWidth, naturalHeight, screenOffX, screenOffY, mode, onRemoteClick, onRemoteScroll, onOpenFullscreen, overrideWidth, overrideHeight }) {
+		const nw = naturalWidth || 1920;
+		const nh = naturalHeight || 1080;
+		const [scale, setScale] = (0, import_react.useState)(1);
+		const [tx, setTx] = (0, import_react.useState)(0);
+		const [ty, setTy] = (0, import_react.useState)(0);
+		const [tapFeedback, setTapFeedback] = (0, import_react.useState)(null);
+		const containerRef = (0, import_react.useRef)(null);
+		const gestureRef = (0, import_react.useRef)(null);
+		const liveRef = (0, import_react.useRef)({
+			scale: 1,
+			tx: 0,
+			ty: 0
+		});
+		const doubleTapTimerRef = (0, import_react.useRef)(null);
+		const lastTapRef = (0, import_react.useRef)({
+			time: 0,
+			px: 0,
+			py: 0
+		});
+		const propsRef = (0, import_react.useRef)({});
+		(0, import_react.useEffect)(() => {
+			propsRef.current = {
+				mode,
+				nw,
+				nh,
+				screenOffX,
+				screenOffY,
+				onRemoteClick,
+				onRemoteScroll,
+				onOpenFullscreen
+			};
+		});
+		function clampAndApply(s, newTx, newTy) {
+			const el = containerRef.current;
+			if (!el) return;
+			const r = el.getBoundingClientRect();
+			const cw = r.width;
+			const ch = r.height;
+			const cs = Math.max(1, Math.min(8, s));
+			const cTx = cs > 1 ? Math.min(0, Math.max(cw - cw * cs, newTx)) : 0;
+			const cTy = cs > 1 ? Math.min(0, Math.max(ch - ch * cs, newTy)) : 0;
+			liveRef.current = {
+				scale: cs,
+				tx: cTx,
+				ty: cTy
+			};
+			setScale(cs);
+			setTx(cTx);
+			setTy(cTy);
+		}
+		(0, import_react.useEffect)(() => {
+			clampAndApply(liveRef.current.scale, liveRef.current.tx, liveRef.current.ty);
+		}, [
+			nw,
+			nh,
+			overrideWidth,
+			overrideHeight,
+			screenshot
+		]);
+		(0, import_react.useEffect)(() => {
+			const el = containerRef.current;
+			if (!el) return;
+			function gPos(t) {
+				const r = el.getBoundingClientRect();
+				return {
+					px: t.clientX - r.left,
+					py: t.clientY - r.top
+				};
+			}
+			function gDist(a, b) {
+				return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+			}
+			function gMid(a, b) {
+				const r = el.getBoundingClientRect();
+				return {
+					px: (a.clientX + b.clientX) / 2 - r.left,
+					py: (a.clientY + b.clientY) / 2 - r.top
+				};
+			}
+			function onStart(e) {
+				e.preventDefault();
+				const { scale: s, tx: cTx, ty: cTy } = liveRef.current;
+				if (e.touches.length === 1) {
+					const p = gPos(e.touches[0]);
+					gestureRef.current = {
+						type: "potential",
+						startPx: p.px,
+						startPy: p.py,
+						startTx: cTx,
+						startTy: cTy,
+						moved: false
+					};
+				} else if (e.touches.length >= 2) {
+					if (doubleTapTimerRef.current) {
+						clearTimeout(doubleTapTimerRef.current);
+						doubleTapTimerRef.current = null;
+					}
+					const d = gDist(e.touches[0], e.touches[1]);
+					const m = gMid(e.touches[0], e.touches[1]);
+					gestureRef.current = {
+						type: "pinch",
+						startDist: d,
+						startMidX: m.px,
+						startMidY: m.py,
+						startScale: s,
+						startTx: cTx,
+						startTy: cTy
+					};
+				}
+			}
+			function onMove(e) {
+				e.preventDefault();
+				const g = gestureRef.current;
+				if (!g) return;
+				const { scale: s } = liveRef.current;
+				if ((g.type === "potential" || g.type === "pan") && e.touches.length === 1) {
+					const p = gPos(e.touches[0]);
+					const dx = p.px - g.startPx, dy = p.py - g.startPy;
+					if (!g.moved && Math.hypot(dx, dy) > 7) {
+						g.type = "pan";
+						g.moved = true;
+					}
+					if (g.type === "pan") clampAndApply(s, g.startTx + dx, g.startTy + dy);
+				} else if (g.type === "pinch" && e.touches.length >= 2) {
+					const d = gDist(e.touches[0], e.touches[1]);
+					const m = gMid(e.touches[0], e.touches[1]);
+					const ns = Math.max(1, Math.min(8, g.startScale * d / g.startDist));
+					const r = ns / g.startScale;
+					clampAndApply(ns, m.px - r * (g.startMidX - g.startTx), m.py - r * (g.startMidY - g.startTy));
+				}
+			}
+			function onEnd(e) {
+				e.preventDefault();
+				const g = gestureRef.current;
+				if (!g) return;
+				if (g.type === "pinch" && e.touches.length === 1) {
+					const p = gPos(e.touches[0]);
+					gestureRef.current = {
+						type: "pan",
+						startPx: p.px,
+						startPy: p.py,
+						startTx: liveRef.current.tx,
+						startTy: liveRef.current.ty,
+						moved: true
+					};
+					return;
+				}
+				if (g.type === "potential" && !g.moved && e.changedTouches.length === 1) {
+					const ct = e.changedTouches[0];
+					const cRect = el.getBoundingClientRect();
+					const px = ct.clientX - cRect.left;
+					const py = ct.clientY - cRect.top;
+					const now = Date.now();
+					const { mode: m, nw: nwP, nh: nhP, screenOffX: sox, screenOffY: soy, onRemoteClick: orc, onOpenFullscreen: oof } = propsRef.current;
+					if (m === "control" && orc) {
+						if (doubleTapTimerRef.current) {
+							clearTimeout(doubleTapTimerRef.current);
+							doubleTapTimerRef.current = null;
+						}
+						const { scale: s2, tx: tx2, ty: ty2 } = liveRef.current;
+						const remote = mapClientPointToRemotePoint({
+							px,
+							py,
+							containerWidth: cRect.width,
+							containerHeight: cRect.height,
+							naturalWidth: nwP,
+							naturalHeight: nhP,
+							scale: s2,
+							translateX: tx2,
+							translateY: ty2
+						});
+						setTapFeedback({
+							x: px,
+							y: py,
+							id: Date.now()
+						});
+						setTimeout(() => setTapFeedback(null), 500);
+						orc((sox || 0) + remote.x, (soy || 0) + remote.y);
+					} else {
+						const last = lastTapRef.current;
+						if (now - last.time < 350 && Math.hypot(px - last.px, py - last.py) < 50) {
+							if (doubleTapTimerRef.current) {
+								clearTimeout(doubleTapTimerRef.current);
+								doubleTapTimerRef.current = null;
+							}
+							lastTapRef.current = {
+								time: 0,
+								px: 0,
+								py: 0
+							};
+							const { scale: cs, tx: cTx, ty: cTy } = liveRef.current;
+							if (cs > 1.4) clampAndApply(1, 0, 0);
+							else {
+								const ns = 2.5, r = ns / cs;
+								clampAndApply(ns, px - r * (px - cTx), py - r * (py - cTy));
+							}
+						} else {
+							lastTapRef.current = {
+								time: now,
+								px,
+								py
+							};
+							doubleTapTimerRef.current = setTimeout(() => {
+								doubleTapTimerRef.current = null;
+								if (oof) oof();
+							}, 280);
+						}
+					}
+				}
+				if (e.touches.length === 0) gestureRef.current = null;
+			}
+			el.addEventListener("touchstart", onStart, { passive: false });
+			el.addEventListener("touchmove", onMove, { passive: false });
+			el.addEventListener("touchend", onEnd, { passive: false });
+			el.addEventListener("touchcancel", onEnd, { passive: false });
+			return () => {
+				el.removeEventListener("touchstart", onStart);
+				el.removeEventListener("touchmove", onMove);
+				el.removeEventListener("touchend", onEnd);
+				el.removeEventListener("touchcancel", onEnd);
+				if (doubleTapTimerRef.current) clearTimeout(doubleTapTimerRef.current);
+			};
+		}, []);
+		return (0, import_react.createElement)("div", { className: "remote-vp-wrap" }, (0, import_react.createElement)("div", {
+			ref: containerRef,
+			className: "remote-vp",
+			style: overrideWidth ? {
+				width: `${overrideWidth}px`,
+				height: `${overrideHeight}px`,
+				touchAction: "none"
+			} : {
+				paddingBottom: `${(nh / nw * 100).toFixed(3)}%`,
+				touchAction: "none"
+			},
+			onWheel: (e) => {
+				const { mode: m, onRemoteScroll: ors } = propsRef.current;
+				if (m === "control" && ors) {
+					e.preventDefault();
+					ors(e.deltaY > 0 ? 360 : -360);
+				}
+			}
+		}, (0, import_react.createElement)("div", { className: "remote-vp-inner" }, screenshot ? (0, import_react.createElement)("img", {
+			src: `data:${screenshotMime !== null && screenshotMime !== void 0 ? screenshotMime : "image/jpeg"};base64,${screenshot}`,
+			className: "remote-vp-img",
+			style: {
+				transform: `translate(${tx}px,${ty}px) scale(${scale})`,
+				transformOrigin: "0 0"
+			},
+			draggable: false,
+			alt: "Écran distant"
+		}) : (0, import_react.createElement)("div", { className: "remote-vp-empty" }, (0, import_react.createElement)("p", null, "Aucune capture")), tapFeedback ? (0, import_react.createElement)("div", {
+			key: tapFeedback.id,
+			className: "remote-tap-dot",
+			style: {
+				left: `${tapFeedback.x}px`,
+				top: `${tapFeedback.y}px`
+			}
+		}) : null, mode === "explore" && screenshot ? (0, import_react.createElement)("div", { className: "remote-explore-hint" }, "Explorer — tap pour plein écran") : null)), scale > 1 ? (0, import_react.createElement)("div", { className: "remote-vp-footer" }, (0, import_react.createElement)("span", { className: "remote-zoom-badge" }, `${Math.round(scale * 100)}%`), (0, import_react.createElement)("button", {
+			className: "remote-vp-reset",
+			onClick: () => clampAndApply(1, 0, 0)
+		}, "↺ Reset")) : null);
+	}
+	function RemoteKeyboardSheet({ onClose, onTypeText, onHotkey, onResolveLlmText }) {
+		const [text, setText] = (0, import_react.useState)("");
+		const [showAdv, setShowAdv] = (0, import_react.useState)(false);
+		const [sending, setSending] = (0, import_react.useState)(false);
+		const [llmStatus, setLlmStatus] = (0, import_react.useState)(null);
+		const hasLlm = hasLlmDirective(text);
+		const slashSuggestions = getSlashSuggestion(text);
+		const quickKeys = [
+			["Ctrl+C", "ctrl+c"],
+			["Ctrl+V", "ctrl+v"],
+			["Ctrl+A", "ctrl+a"],
+			["Entrée", "enter"],
+			["Échap", "esc"],
+			["Tab", "tab"]
+		];
+		const advKeys = [
+			["⌫", "backspace"],
+			["↑", "up"],
+			["↓", "down"],
+			["←", "left"],
+			["→", "right"],
+			["Ctrl+Z", "ctrl+z"],
+			["Ctrl+X", "ctrl+x"],
+			["Ctrl+S", "ctrl+s"],
+			["Ctrl+W", "ctrl+w"],
+			["Alt+Tab", "alt+tab"],
+			["Alt+F4", "alt+f4"]
+		];
+		async function submitText() {
+			const raw = text.trim();
+			if (!raw || sending) return;
+			if (hasLlm && onResolveLlmText) {
+				setSending(true);
+				setLlmStatus({
+					state: "resolving",
+					message: "Connexion au provider LLM…"
+				});
+				try {
+					var _ref9, _result$text, _generation$provider, _generation$model;
+					const result = await onResolveLlmText(raw);
+					const generation = firstLlmGeneration(result);
+					setText((_ref9 = (_result$text = result === null || result === void 0 ? void 0 : result.text) !== null && _result$text !== void 0 ? _result$text : generation === null || generation === void 0 ? void 0 : generation.output) !== null && _ref9 !== void 0 ? _ref9 : raw);
+					setLlmStatus({
+						state: "ready",
+						message: `Réponse insérée · ${llmProviderLabel(generation)}`,
+						provider: (_generation$provider = generation === null || generation === void 0 ? void 0 : generation.provider) !== null && _generation$provider !== void 0 ? _generation$provider : null,
+						model: (_generation$model = generation === null || generation === void 0 ? void 0 : generation.model) !== null && _generation$model !== void 0 ? _generation$model : null
+					});
+				} catch (err) {
+					var _err$message;
+					setLlmStatus({
+						state: "error",
+						message: (_err$message = err.message) !== null && _err$message !== void 0 ? _err$message : "Génération /llm impossible"
+					});
+				} finally {
+					setSending(false);
+				}
+				return;
+			}
+			setSending(true);
+			try {
+				await onTypeText(raw);
+				setText("");
+				setLlmStatus(null);
+			} finally {
+				setSending(false);
+			}
+		}
+		return (0, import_react.createElement)("div", {
+			className: "remote-kb-overlay",
+			onClick: (e) => {
+				if (e.target === e.currentTarget) onClose();
+			}
+		}, (0, import_react.createElement)("div", { className: "remote-kb-sheet" }, (0, import_react.createElement)("div", { className: "remote-kb-handle" }), (0, import_react.createElement)("div", { className: "remote-kb-header" }, (0, import_react.createElement)("span", { className: "remote-kb-title" }, "Clavier"), (0, import_react.createElement)("button", {
+			className: "remote-kb-close",
+			onClick: onClose
+		}, SVG.x)), (0, import_react.createElement)("div", { className: "remote-kb-input-row" }, (0, import_react.createElement)("input", {
+			className: `mobile-input${hasLlm ? " llm-active" : ""}`,
+			placeholder: "Texte à taper… ou /llm{prompt}",
+			value: text,
+			autoFocus: true,
+			onChange: (e) => {
+				setText(e.target.value);
+				if ((llmStatus === null || llmStatus === void 0 ? void 0 : llmStatus.state) !== "resolving") setLlmStatus(null);
+			},
+			onKeyDown: (e) => {
+				if (e.key === "Enter") submitText();
+			}
+		}), (0, import_react.createElement)("button", {
+			className: "ctrl-send-btn",
+			onClick: submitText,
+			disabled: !text.trim() || sending
+		}, sending ? "…" : SVG.send)), (0, import_react.createElement)(SlashSuggestion, {
+			suggestions: slashSuggestions,
+			onSelect: (cmd) => setText(applySlashCommand(text, cmd))
+		}), hasLlm && (llmStatus === null || llmStatus === void 0 ? void 0 : llmStatus.state) !== "resolving" ? (0, import_react.createElement)("div", { className: "llm-directive-hint active" }, "Directive /llm active — la réponse sera insérée dans ce champ") : null, (llmStatus === null || llmStatus === void 0 ? void 0 : llmStatus.state) === "resolving" ? (0, import_react.createElement)("div", { className: "llm-thinking-banner" }, (0, import_react.createElement)("div", { className: "llm-thinking-dots" }, (0, import_react.createElement)("span"), (0, import_react.createElement)("span"), (0, import_react.createElement)("span")), llmStatus.message) : llmStatus ? (0, import_react.createElement)("div", { className: `llm-field-status ${llmStatus.state}` }, llmStatus.message) : null, (0, import_react.createElement)("div", { className: "remote-kb-shortcuts" }, quickKeys.map(([l, k]) => (0, import_react.createElement)("button", {
+			key: k,
+			className: "remote-kb-key",
+			onClick: () => onHotkey(k)
+		}, l))), (0, import_react.createElement)("button", {
+			className: "ctrl-keyboard-toggle",
+			onClick: () => setShowAdv((v) => !v)
+		}, (0, import_react.createElement)("span", null, "Raccourcis avancés"), (0, import_react.createElement)("span", { className: `ctrl-chevron ${showAdv ? "open" : ""}` }, "▾")), showAdv ? (0, import_react.createElement)("div", { className: "remote-kb-shortcuts adv" }, advKeys.map(([l, k]) => (0, import_react.createElement)("button", {
+			key: k,
+			className: "remote-kb-key",
+			onClick: () => onHotkey(k)
+		}, l))) : null));
+	}
+	function RemoteScreenFullscreenModal({ screenshot, screenshotMime, naturalWidth, naturalHeight, screenOffX, screenOffY, mode, onModeChange, onClose, onRemoteClick, onRemoteScroll, onCapture, captureLoading, onTypeText, onHotkey, onResolveLlmText }) {
+		const [isKbOpen, setIsKbOpen] = (0, import_react.useState)(false);
+		const [vpSize, setVpSize] = (0, import_react.useState)(null);
+		const bodyRef = (0, import_react.useRef)(null);
+		(0, import_react.useEffect)(() => {
+			const prev = document.body.style.overflow;
+			document.body.style.overflow = "hidden";
+			return () => {
+				document.body.style.overflow = prev;
+			};
+		}, []);
+		(0, import_react.useEffect)(() => {
+			if (!bodyRef.current) return;
+			const ratio = (naturalWidth || 1920) / (naturalHeight || 1080);
+			function compute(w, h) {
+				if (w / h > ratio) setVpSize({
+					width: Math.floor(h * ratio),
+					height: Math.floor(h)
+				});
+				else {
+					const fh = Math.floor(w / ratio);
+					setVpSize({
+						width: Math.floor(w),
+						height: fh
+					});
+				}
+			}
+			const obs = new ResizeObserver(([entry]) => {
+				const { width, height } = entry.contentRect;
+				compute(width, height);
+			});
+			obs.observe(bodyRef.current);
+			const r = bodyRef.current.getBoundingClientRect();
+			compute(r.width, r.height);
+			return () => obs.disconnect();
+		}, [naturalWidth, naturalHeight]);
+		return (0, import_react.createElement)("div", { className: "remote-fs-modal" }, (0, import_react.createElement)("div", { className: "remote-fs-topbar" }, (0, import_react.createElement)("button", {
+			className: "remote-fs-btn close",
+			onClick: onClose
+		}, SVG.x), (0, import_react.createElement)("div", { className: "remote-fs-mode-toggle" }, (0, import_react.createElement)("button", {
+			className: `remote-fs-mode-btn ${mode === "explore" ? "active" : ""}`,
+			onClick: () => onModeChange("explore")
+		}, "Explorer"), (0, import_react.createElement)("button", {
+			className: `remote-fs-mode-btn ${mode === "control" ? "active" : ""}`,
+			onClick: () => onModeChange("control")
+		}, "Contrôler")), (0, import_react.createElement)("div", { className: "remote-fs-actions" }, (0, import_react.createElement)("button", {
+			className: "remote-fs-btn",
+			onClick: () => setIsKbOpen(true)
+		}, IC([(0, import_react.createElement)("rect", {
+			x: 2,
+			y: 6,
+			width: 20,
+			height: 12,
+			rx: 2
+		}), (0, import_react.createElement)("path", { d: "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12" })])), (0, import_react.createElement)("button", {
+			className: "remote-fs-btn",
+			onClick: onCapture,
+			disabled: captureLoading
+		}, IC([(0, import_react.createElement)("path", { d: "M21 12a9 9 0 1 1-2.64-6.36" }), (0, import_react.createElement)("polyline", { points: "21 3 21 9 15 9" })])))), (0, import_react.createElement)("div", {
+			className: "remote-fs-body",
+			ref: bodyRef
+		}, (0, import_react.createElement)(RemoteScreenViewport, {
+			screenshot,
+			screenshotMime,
+			naturalWidth,
+			naturalHeight,
+			screenOffX,
+			screenOffY,
+			mode,
+			onRemoteClick,
+			onRemoteScroll,
+			overrideWidth: vpSize === null || vpSize === void 0 ? void 0 : vpSize.width,
+			overrideHeight: vpSize === null || vpSize === void 0 ? void 0 : vpSize.height
+		})), isKbOpen ? (0, import_react.createElement)(RemoteKeyboardSheet, {
+			onClose: () => setIsKbOpen(false),
+			onTypeText,
+			onHotkey,
+			onResolveLlmText
+		}) : null);
+	}
+	function ControlTab({ projectId, token, events, pollingInterval = 2e3 }) {
+		var _state$windows, _state$screenshotBase, _state$screenshotMime, _ref11, _activeRun$mission, _ref12, _activeRun$naturalRep, _activeRun$executionT, _activeRun$executionT2, _completedRun$mission, _ref13, _completedRun$natural, _completedRun$executi, _ref14, _completedRun$executi2, _state$screenWidth, _state$screenHeight, _state$screenX, _state$screenY, _state$screenWidth2, _state$screenHeight2, _state$screenX2, _state$screenY2;
+		const [state, setState] = (0, import_react.useState)(null);
+		const [busy, setBusy] = (0, import_react.useState)(null);
+		const [error, setError] = (0, import_react.useState)(null);
+		const [mission, setMission] = (0, import_react.useState)("");
+		const [missionBusy, setMissionBusy] = (0, import_react.useState)(false);
+		const [missionError, setMissionError] = (0, import_react.useState)(null);
+		const [activeRun, setActiveRun] = (0, import_react.useState)(null);
+		const [completedRun, setCompletedRun] = (0, import_react.useState)(null);
+		const [showAllWindows, setShowAllWindows] = (0, import_react.useState)(false);
+		const [windowIcons, setWindowIcons] = (0, import_react.useState)({});
+		const [showMissionInput, setShowMissionInput] = (0, import_react.useState)(false);
+		const [viewportMode, setViewportMode] = (0, import_react.useState)("explore");
+		const [isFullscreen, setIsFullscreen] = (0, import_react.useState)(false);
+		const [isKeyboardOpen, setIsKeyboardOpen] = (0, import_react.useState)(false);
+		const [llmResolving, setLlmResolving] = (0, import_react.useState)(false);
+		const [llmPreview, setLlmPreview] = (0, import_react.useState)(null);
+		const refreshFailCount = (0, import_react.useRef)(0);
+		const refreshInFlight = (0, import_react.useRef)(false);
+		async function refresh() {
+			if (refreshInFlight.current) return;
+			refreshInFlight.current = true;
+			try {
+				const next = await apiGet(`/api/mobile/projects/${projectId}/desktop/state`, token);
+				refreshFailCount.current = 0;
+				setError(null);
+				setState(next);
+				apiGet(`/api/mobile/projects/${projectId}/runs`, token).then((runs) => {
+					var _allRuns$find, _allRuns$find2;
+					const allRuns = Array.isArray(runs) ? runs : [];
+					setActiveRun((_allRuns$find = allRuns.find((r) => r.status === "running" || r.status === "paused")) !== null && _allRuns$find !== void 0 ? _allRuns$find : null);
+					const DONE_STATUSES = [
+						"completed",
+						"partial_success",
+						"failed",
+						"stopped"
+					];
+					setCompletedRun((_allRuns$find2 = allRuns.find((r) => DONE_STATUSES.includes(r.status))) !== null && _allRuns$find2 !== void 0 ? _allRuns$find2 : null);
+				}).catch(() => {});
+			} catch (err) {
+				refreshFailCount.current += 1;
+				if (refreshFailCount.current >= 2) setError(err.message);
+			} finally {
+				refreshInFlight.current = false;
+			}
+		}
+		(0, import_react.useEffect)(() => {
+			refresh();
+			const timer = setInterval(refresh, pollingInterval);
+			return () => clearInterval(timer);
+		}, [
+			projectId,
+			token,
+			pollingInterval
+		]);
+		(0, import_react.useEffect)(() => {
+			if (events.length > 0) refresh();
+		}, [
+			events.length,
+			projectId,
+			token
+		]);
+		async function launchMission() {
+			const obj = mission.trim();
+			if (!obj) return;
+			setMissionError(null);
+			if (hasLlmDirective(obj)) {
+				setMissionBusy(true);
+				setLlmResolving(true);
+				setLlmPreview(null);
+				try {
+					var _ref10, _res$text, _generation$output;
+					const res = await resolveLlmInlineInput(obj, projectId, token, "mission");
+					const generation = firstLlmGeneration(res);
+					const resolvedText = (_ref10 = (_res$text = res.text) !== null && _res$text !== void 0 ? _res$text : generation === null || generation === void 0 ? void 0 : generation.output) !== null && _ref10 !== void 0 ? _ref10 : obj;
+					const generatedText = (_generation$output = generation === null || generation === void 0 ? void 0 : generation.output) !== null && _generation$output !== void 0 ? _generation$output : resolvedText;
+					setMission(resolvedText);
+					setLlmPreview({
+						resolvedText,
+						generatedText,
+						generation
+					});
+				} catch (err) {
+					setMissionError(err.message);
+				} finally {
+					setLlmResolving(false);
+					setMissionBusy(false);
+				}
+				return;
+			}
+			await doStartMission(obj);
+		}
+		async function doStartMission(objective) {
+			setMissionBusy(true);
+			setMissionError(null);
+			try {
+				await apiPost(`/api/mobile/projects/${projectId}/commands`, {
+					command: "startMission",
+					params: { objective }
+				}, token);
+				setMission("");
+				setShowMissionInput(false);
+				setLlmPreview(null);
+				await refresh();
+			} catch (err) {
+				setMissionError(err.message);
+			} finally {
+				setMissionBusy(false);
+			}
+		}
+		async function stopRun() {
+			if (!activeRun) return;
+			setMissionBusy(true);
+			try {
+				await apiPost(`/api/mobile/projects/${projectId}/commands`, {
+					command: "stopRun",
+					params: { runId: activeRun.id }
+				}, token);
+				await refresh();
+			} catch (err) {
+				setMissionError(err.message);
+			} finally {
+				setMissionBusy(false);
+			}
+		}
+		const windows = (_state$windows = state === null || state === void 0 ? void 0 : state.windows) !== null && _state$windows !== void 0 ? _state$windows : [];
+		(0, import_react.useEffect)(() => {
+			const uncached = windows.filter((w) => w.id && !(w.id in windowIcons));
+			if (uncached.length === 0) return;
+			let cancelled = false;
+			Promise.all(uncached.slice(0, 3).map(async (w) => {
+				try {
+					var _res$result$iconBase, _res$result;
+					const res = await apiPost(`/api/mobile/projects/${projectId}/desktop/action`, { action: {
+						type: "getWindowIcon",
+						handle: String(w.id)
+					} }, token);
+					const b64 = (_res$result$iconBase = res === null || res === void 0 || (_res$result = res.result) === null || _res$result === void 0 ? void 0 : _res$result.iconBase64) !== null && _res$result$iconBase !== void 0 ? _res$result$iconBase : null;
+					return [w.id, b64];
+				} catch (_unused13) {
+					return [w.id, void 0];
+				}
+			})).then((entries) => {
+				if (cancelled) return;
+				setWindowIcons((prev) => {
+					const next = { ...prev };
+					for (const [id, b64] of entries) if (b64 !== void 0) next[id] = b64;
+					return next;
+				});
+			});
+			return () => {
+				cancelled = true;
+			};
+		}, [windows.map((w) => w.id).join(",")]);
+		async function sendAction(action, label = action.type) {
+			setBusy(label);
+			setError(null);
+			try {
+				const response = await apiPost(`/api/mobile/projects/${projectId}/desktop/action`, { action }, token);
+				if (response.state) setState(response.state);
+				return response;
+			} catch (err) {
+				setError(err.message);
+				return null;
+			} finally {
+				setBusy(null);
+			}
+		}
+		function handleRemoteClick(x, y) {
+			apiPost(`/api/mobile/projects/${projectId}/desktop/action`, { action: {
+				type: "clickAt",
+				x,
+				y
+			} }, token).catch(() => {});
+		}
+		async function handleRemoteScroll(delta) {
+			await sendAction({
+				type: "scroll",
+				delta
+			}, "scroll");
+		}
+		async function resolveTypeTextLlm(t) {
+			setLlmResolving(true);
+			setError(null);
+			try {
+				return await resolveLlmInlineInput(t, projectId, token, "type_text");
+			} finally {
+				setLlmResolving(false);
+			}
+		}
+		async function handleTypeText(t) {
+			if (!(t === null || t === void 0 ? void 0 : t.trim())) return;
+			let resolved = t;
+			if (hasLlmDirective(t)) try {
+				resolved = (await resolveTypeTextLlm(t)).text;
+			} catch (err) {
+				setError(err.message);
+				return;
+			}
+			await sendAction({
+				type: "typeText",
+				text: resolved
+			}, "typeText");
+		}
+		async function handleHotkey(keys) {
+			await sendAction({
+				type: "hotkey",
+				keys
+			}, "hotkey");
+		}
+		const screenshot = (_state$screenshotBase = state === null || state === void 0 ? void 0 : state.screenshotBase64) !== null && _state$screenshotBase !== void 0 ? _state$screenshotBase : null;
+		const screenshotMime = (_state$screenshotMime = state === null || state === void 0 ? void 0 : state.screenshotMimeType) !== null && _state$screenshotMime !== void 0 ? _state$screenshotMime : "image/jpeg";
+		const disabled = busy !== null || (state === null || state === void 0 ? void 0 : state.enabled) === false;
+		const missionHasLlm = hasLlmDirective(mission);
+		const missionBadgeClass = activeRun ? activeRun.status === "running" ? "running" : activeRun.status === "paused" ? "paused" : "idle" : "idle";
+		return (0, import_react.createElement)("div", { className: "tab-content control-tab ctrl-cockpit" }, error ? (0, import_react.createElement)("div", { className: "inline-error ctrl-error" }, error) : null, missionError ? (0, import_react.createElement)("div", { className: "inline-error ctrl-error" }, missionError) : null, (state === null || state === void 0 ? void 0 : state.enabled) === false ? (0, import_react.createElement)("div", { className: "inline-error ctrl-error" }, "Contrôle mobile désactivé côté serveur.") : null, (0, import_react.createElement)("div", { className: "ctrl-card ctrl-mission-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("div", { className: "ctrl-mission-icon" }, IC([
+			(0, import_react.createElement)("circle", {
+				cx: 12,
+				cy: 12,
+				r: 9
+			}),
+			(0, import_react.createElement)("circle", {
+				cx: 12,
+				cy: 12,
+				r: 4
+			}),
+			(0, import_react.createElement)("line", {
+				x1: 12,
+				y1: 2,
+				x2: 12,
+				y2: 5
+			}),
+			(0, import_react.createElement)("line", {
+				x1: 12,
+				y1: 19,
+				x2: 12,
+				y2: 22
+			}),
+			(0, import_react.createElement)("line", {
+				x1: 2,
+				y1: 12,
+				x2: 5,
+				y2: 12
+			}),
+			(0, import_react.createElement)("line", {
+				x1: 19,
+				y1: 12,
+				x2: 22,
+				y2: 12
+			})
+		])), (0, import_react.createElement)("div", { className: "ctrl-card-title-group" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Mission en cours"), activeRun ? (0, import_react.createElement)("span", { className: `ctrl-mission-badge ${missionBadgeClass}` }, activeRun.status === "running" ? "Actif" : activeRun.status === "paused" ? "En pause" : activeRun.status) : (0, import_react.createElement)("span", { className: "ctrl-mission-badge idle" }, "Inactif"))), activeRun ? (0, import_react.createElement)("div", { className: "ctrl-mission-fields" }, (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Objectif"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref11 = (_activeRun$mission = activeRun.mission) !== null && _activeRun$mission !== void 0 ? _activeRun$mission : activeRun.objective) !== null && _ref11 !== void 0 ? _ref11 : "—").slice(0, 120))), activeRun.naturalReply || activeRun.summary ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Livrable attendu"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref12 = (_activeRun$naturalRep = activeRun.naturalReply) !== null && _activeRun$naturalRep !== void 0 ? _activeRun$naturalRep : activeRun.summary) !== null && _ref12 !== void 0 ? _ref12 : "—").slice(0, 100))) : null, ((_activeRun$executionT = activeRun.executionThread) === null || _activeRun$executionT === void 0 ? void 0 : _activeRun$executionT.activeStep) ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Prochaine action"), (0, import_react.createElement)("span", { className: "ctrl-field-value accent" }, String((_activeRun$executionT2 = activeRun.executionThread.activeStep.label) !== null && _activeRun$executionT2 !== void 0 ? _activeRun$executionT2 : "—").slice(0, 80))) : null) : (0, import_react.createElement)("div", { className: "ctrl-mission-empty" }, "Aucune mission active — lancez-en une ci-dessous"), (0, import_react.createElement)("div", { className: "ctrl-mission-actions" }, activeRun ? (0, import_react.createElement)("div", { className: "ctrl-mission-action-btns" }, (0, import_react.createElement)("button", {
+			className: "mobile-btn primary",
+			disabled: true
+		}, "Reprendre"), (0, import_react.createElement)("button", {
+			className: "mobile-btn outline-danger",
+			onClick: stopRun,
+			disabled: missionBusy
+		}, missionBusy ? "…" : "Arrêter")) : (0, import_react.createElement)("button", {
+			className: "mobile-btn primary",
+			onClick: () => setShowMissionInput((v) => !v)
+		}, showMissionInput ? "Annuler" : "+ Nouvelle mission")), showMissionInput ? (0, import_react.createElement)("div", { className: "ctrl-mission-input-wrap" }, (0, import_react.createElement)("div", null, (0, import_react.createElement)("textarea", {
+			className: `mobile-textarea${missionHasLlm ? " llm-active" : ""}`,
+			placeholder: "Ex: Ouvre Notepad++ et écris : /llm{CV de Clark Kent pour le Daily Planet}",
+			rows: 3,
+			value: mission,
+			onChange: (e) => {
+				setMission(e.target.value);
+				setLlmPreview(null);
+			},
+			autoFocus: true
+		}), (0, import_react.createElement)(SlashSuggestion, {
+			suggestions: getSlashSuggestion(mission),
+			onSelect: (cmd) => {
+				setMission(applySlashCommand(mission, cmd));
+				setLlmPreview(null);
+			}
+		}), missionHasLlm && !missionBusy && !llmResolving ? (0, import_react.createElement)("div", { className: "llm-directive-hint active" }, "Directive /llm — la réponse sera insérée dans ce champ avant lancement") : null, llmResolving ? (0, import_react.createElement)("div", { className: "llm-thinking-banner" }, (0, import_react.createElement)("div", { className: "llm-thinking-dots" }, (0, import_react.createElement)("span"), (0, import_react.createElement)("span"), (0, import_react.createElement)("span")), "Connexion au provider LLM…") : llmPreview ? (0, import_react.createElement)("div", { className: "llm-field-status ready" }, `Réponse /llm insérée · ${llmProviderLabel(llmPreview.generation)}`) : null, (0, import_react.createElement)("button", {
+			className: "mobile-btn primary full-width",
+			onClick: launchMission,
+			disabled: missionBusy || !mission.trim()
+		}, llmResolving ? "Génération en cours…" : missionBusy ? "Lancement…" : missionHasLlm ? "Générer /llm" : "▶ Lancer la mission"))) : null), completedRun && !activeRun ? (0, import_react.createElement)("div", { className: "ctrl-card ctrl-result-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Résultat de mission"), (0, import_react.createElement)("span", { className: `ctrl-mission-badge ${completedRun.status === "completed" || completedRun.status === "partial_success" ? "running" : "idle"}` }, completedRun.status === "completed" ? "Succès" : completedRun.status === "partial_success" ? "Partiel" : completedRun.status === "failed" ? "Échec" : "Arrêté")), (0, import_react.createElement)("div", { className: "ctrl-mission-fields" }, (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Objectif"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_completedRun$mission = completedRun.mission) !== null && _completedRun$mission !== void 0 ? _completedRun$mission : "—").slice(0, 120))), completedRun.naturalReply || completedRun.summary ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Réponse de JON"), (0, import_react.createElement)("span", { className: "ctrl-field-value ctrl-result-reply" }, String((_ref13 = (_completedRun$natural = completedRun.naturalReply) !== null && _completedRun$natural !== void 0 ? _completedRun$natural : completedRun.summary) !== null && _ref13 !== void 0 ? _ref13 : "—").slice(0, 400))) : null, ((_completedRun$executi = completedRun.executionThread) === null || _completedRun$executi === void 0 ? void 0 : _completedRun$executi.verification) ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Vérification"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref14 = (_completedRun$executi2 = completedRun.executionThread.verification.verdict) !== null && _completedRun$executi2 !== void 0 ? _completedRun$executi2 : completedRun.executionThread.verification.status) !== null && _ref14 !== void 0 ? _ref14 : "—") + (completedRun.executionThread.verification.confidence != null ? ` (${Math.round(Number(completedRun.executionThread.verification.confidence) * 100)}%)` : ""))) : null, completedRun.artifactCount > 0 || completedRun.evidenceCount > 0 ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Livrables"), (0, import_react.createElement)("span", { className: "ctrl-field-value accent" }, [completedRun.artifactCount > 0 ? `${completedRun.artifactCount} artefact(s)` : null, completedRun.evidenceCount > 0 ? `${completedRun.evidenceCount} capture(s)` : null].filter(Boolean).join(" · "))) : null)) : null, (0, import_react.createElement)("div", { className: "ctrl-card ctrl-screen-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Écran contrôlé"), (0, import_react.createElement)("div", { className: "remote-fs-mode-toggle sm" }, (0, import_react.createElement)("button", {
+			className: `remote-fs-mode-btn ${viewportMode === "explore" ? "active" : ""}`,
+			onClick: () => setViewportMode("explore")
+		}, "Explorer"), (0, import_react.createElement)("button", {
+			className: `remote-fs-mode-btn ${viewportMode === "control" ? "active" : ""}`,
+			onClick: () => setViewportMode("control")
+		}, "Contrôler")), (0, import_react.createElement)("button", {
+			className: "ctrl-pill-btn accent",
+			onClick: () => sendAction({ type: "captureScreen" }, "captureScreen"),
+			disabled
+		}, busy === "captureScreen" ? "…" : IC([(0, import_react.createElement)("path", { d: "M21 12a9 9 0 1 1-2.64-6.36" }), (0, import_react.createElement)("polyline", { points: "21 3 21 9 15 9" })], {
+			width: 14,
+			height: 14
+		})), (0, import_react.createElement)("button", {
+			className: "ctrl-pill-btn",
+			onClick: () => setIsFullscreen(true)
+		}, IC([(0, import_react.createElement)("path", { d: "M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" })], {
+			width: 14,
+			height: 14
+		}))), (0, import_react.createElement)(RemoteScreenViewport, {
+			screenshot,
+			screenshotMime,
+			naturalWidth: (_state$screenWidth = state === null || state === void 0 ? void 0 : state.screenWidth) !== null && _state$screenWidth !== void 0 ? _state$screenWidth : 1920,
+			naturalHeight: (_state$screenHeight = state === null || state === void 0 ? void 0 : state.screenHeight) !== null && _state$screenHeight !== void 0 ? _state$screenHeight : 1080,
+			screenOffX: (_state$screenX = state === null || state === void 0 ? void 0 : state.screenX) !== null && _state$screenX !== void 0 ? _state$screenX : 0,
+			screenOffY: (_state$screenY = state === null || state === void 0 ? void 0 : state.screenY) !== null && _state$screenY !== void 0 ? _state$screenY : 0,
+			mode: viewportMode,
+			onRemoteClick: handleRemoteClick,
+			onRemoteScroll: handleRemoteScroll,
+			onOpenFullscreen: () => setIsFullscreen(true)
+		}), !screenshot ? (0, import_react.createElement)("button", {
+			className: "mobile-btn primary full-width",
+			onClick: () => sendAction({ type: "captureScreen" }, "captureScreen"),
+			disabled
+		}, busy === "captureScreen" ? "Capture…" : "Capturer le bureau") : null, viewportMode === "control" ? (0, import_react.createElement)("button", {
+			className: "remote-kb-trigger",
+			onClick: () => setIsKeyboardOpen(true)
+		}, IC([(0, import_react.createElement)("rect", {
+			x: 2,
+			y: 6,
+			width: 20,
+			height: 12,
+			rx: 2
+		}), (0, import_react.createElement)("path", { d: "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12" })], {
+			width: 16,
+			height: 16
+		}), " Clavier") : null), isKeyboardOpen ? (0, import_react.createElement)(RemoteKeyboardSheet, {
+			onClose: () => setIsKeyboardOpen(false),
+			onTypeText: handleTypeText,
+			onHotkey: handleHotkey,
+			onResolveLlmText: resolveTypeTextLlm
+		}) : null, isFullscreen ? (0, import_react.createElement)(RemoteScreenFullscreenModal, {
+			screenshot,
+			screenshotMime,
+			naturalWidth: (_state$screenWidth2 = state === null || state === void 0 ? void 0 : state.screenWidth) !== null && _state$screenWidth2 !== void 0 ? _state$screenWidth2 : 1920,
+			naturalHeight: (_state$screenHeight2 = state === null || state === void 0 ? void 0 : state.screenHeight) !== null && _state$screenHeight2 !== void 0 ? _state$screenHeight2 : 1080,
+			screenOffX: (_state$screenX2 = state === null || state === void 0 ? void 0 : state.screenX) !== null && _state$screenX2 !== void 0 ? _state$screenX2 : 0,
+			screenOffY: (_state$screenY2 = state === null || state === void 0 ? void 0 : state.screenY) !== null && _state$screenY2 !== void 0 ? _state$screenY2 : 0,
+			mode: viewportMode,
+			onModeChange: setViewportMode,
+			onClose: () => setIsFullscreen(false),
+			onRemoteClick: handleRemoteClick,
+			onRemoteScroll: handleRemoteScroll,
+			onCapture: () => sendAction({ type: "captureScreen" }, "captureScreen"),
+			captureLoading: busy === "captureScreen",
+			onTypeText: handleTypeText,
+			onHotkey: handleHotkey,
+			onResolveLlmText: resolveTypeTextLlm
+		}) : null, windows.length > 0 ? (0, import_react.createElement)("div", { className: "ctrl-card ctrl-windows-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Fenêtres ouvertes"), (0, import_react.createElement)("span", { className: "ctrl-windows-count" }, String(windows.length))), (0, import_react.createElement)("div", { className: "ctrl-windows-list" }, (showAllWindows ? windows : windows.slice(0, 5)).map((win) => {
+			var _ref15, _win$title, _windowIcons$win$id, _win$id, _win$id2, _win$processName, _win$processName2, _win$processName3;
+			const title = String((_ref15 = (_win$title = win.title) !== null && _win$title !== void 0 ? _win$title : win.id) !== null && _ref15 !== void 0 ? _ref15 : "Fenêtre").slice(0, 50);
+			const initial = title.replace(/\s+/g, "").slice(0, 1).toUpperCase() || "?";
+			const iconB64 = (_windowIcons$win$id = windowIcons[win.id]) !== null && _windowIcons$win$id !== void 0 ? _windowIcons$win$id : null;
+			const builtinSrc = !iconB64 ? getBuiltinIcon(win.processName, win.title) : null;
+			const isFocusing = busy === `focus-${(_win$id = win.id) !== null && _win$id !== void 0 ? _win$id : win.handle}`;
+			return (0, import_react.createElement)("button", {
+				key: (_win$id2 = win.id) !== null && _win$id2 !== void 0 ? _win$id2 : win.handle,
+				className: "ctrl-window-row",
+				onClick: () => {
+					var _win$id3, _win$id4;
+					return sendAction({
+						type: "focusWindow",
+						handle: String((_win$id3 = win.id) !== null && _win$id3 !== void 0 ? _win$id3 : win.handle)
+					}, `focus-${(_win$id4 = win.id) !== null && _win$id4 !== void 0 ? _win$id4 : win.handle}`);
+				},
+				disabled
+			}, (0, import_react.createElement)("div", { className: "ctrl-window-icon" }, iconB64 ? (0, import_react.createElement)("img", {
+				src: `data:image/png;base64,${iconB64}`,
+				className: "ctrl-window-icon-img",
+				alt: (_win$processName = win.processName) !== null && _win$processName !== void 0 ? _win$processName : "icon"
+			}) : builtinSrc ? (0, import_react.createElement)("img", {
+				src: builtinSrc,
+				className: "ctrl-window-icon-img",
+				alt: (_win$processName2 = win.processName) !== null && _win$processName2 !== void 0 ? _win$processName2 : "icon"
+			}) : initial), (0, import_react.createElement)("div", { className: "ctrl-window-info" }, (0, import_react.createElement)("span", { className: "ctrl-window-title" }, title), (0, import_react.createElement)("span", { className: "ctrl-window-type" }, (_win$processName3 = win.processName) !== null && _win$processName3 !== void 0 ? _win$processName3 : "Application")), (0, import_react.createElement)("span", { className: "ctrl-window-chevron" }, isFocusing ? "…" : "›"));
+		})), windows.length > 5 ? (0, import_react.createElement)("button", {
+			className: "ctrl-windows-toggle",
+			onClick: () => setShowAllWindows((v) => !v)
+		}, showAllWindows ? "Réduire ▲" : `Voir tout (${windows.length}) ▼`) : null) : null);
+	}
+	function BrowserTabsTab({ projectId, token, events }) {
+		var _tabsState$tabs, _observation$url, _observation$interact, _observation$bodyText, _observation$blocker;
+		const [tabsState, setTabsState] = (0, import_react.useState)({
+			active: false,
+			tabs: []
+		});
+		const [newUrl, setNewUrl] = (0, import_react.useState)("");
+		const [navigateUrl, setNavigateUrl] = (0, import_react.useState)("");
+		const [busy, setBusy] = (0, import_react.useState)(null);
+		const [error, setError] = (0, import_react.useState)(null);
+		const [observation, setObservation] = (0, import_react.useState)(null);
+		const refreshInFlight = (0, import_react.useRef)(false);
+		async function refresh() {
+			if (refreshInFlight.current) return;
+			refreshInFlight.current = true;
+			try {
+				const next = await apiGet(`/api/mobile/projects/${projectId}/browser/tabs`, token);
+				setTabsState(next !== null && next !== void 0 ? next : {
+					active: false,
+					tabs: []
+				});
+				setError(null);
+			} catch (err) {
+				setError(err.message);
+			} finally {
+				refreshInFlight.current = false;
+			}
+		}
+		(0, import_react.useEffect)(() => {
+			refresh();
+			const t = setInterval(refresh, 6e3);
+			return () => clearInterval(t);
+		}, [projectId, token]);
+		(0, import_react.useEffect)(() => {
+			if (events.length > 0) refresh();
+		}, [
+			events.length,
+			projectId,
+			token
+		]);
+		async function tabAction(action, label = action.type) {
+			setBusy(label);
+			setError(null);
+			try {
+				const response = await apiPost(`/api/mobile/projects/${projectId}/browser/tabs/action`, { action }, token);
+				if (response.state) setTabsState(response.state);
+				if (action.type === "observeTab" && response.result) setObservation(response.result);
+				return response;
+			} catch (err) {
+				setError(err.message);
+			} finally {
+				setBusy(null);
+			}
+		}
+		async function openTab(urlOverride = null) {
+			if (await tabAction({
+				type: "openTab",
+				url: normalizeBrowserUrlInput(urlOverride !== null && urlOverride !== void 0 ? urlOverride : newUrl, { allowBlank: true })
+			}, "openTab")) setNewUrl("");
+		}
+		async function navigateActiveTab(tabId) {
+			const url = normalizeBrowserUrlInput(navigateUrl, { allowBlank: false });
+			if (!url) return;
+			if (await tabAction({
+				type: "navigateTab",
+				targetId: tabId,
+				url
+			}, `navigate-${tabId}`)) setNavigateUrl("");
+		}
+		const tabs = (_tabsState$tabs = tabsState === null || tabsState === void 0 ? void 0 : tabsState.tabs) !== null && _tabsState$tabs !== void 0 ? _tabsState$tabs : [];
+		const sessionActive = Boolean(tabsState === null || tabsState === void 0 ? void 0 : tabsState.active);
+		tabs.find((t) => t.active);
+		return (0, import_react.createElement)("div", { className: "tab-content browser-tabs-tab" }, (0, import_react.createElement)("div", { className: "section" }, (0, import_react.createElement)("div", { className: "browser-tabs-header" }, (0, import_react.createElement)("p", { className: "section-title" }, "Onglets JON"), (0, import_react.createElement)("span", { className: `browser-cdp-badge ${sessionActive ? "connected" : "disconnected"}` }, sessionActive ? "● Session active" : "○ Aucune session"), (0, import_react.createElement)("button", {
+			className: `mobile-btn ${sessionActive ? "ghost" : "primary"} small`,
+			onClick: () => sessionActive ? refresh() : openTab("about:blank"),
+			disabled: busy !== null
+		}, busy === "openTab" ? "…" : sessionActive ? "↺" : "Ouvrir")), error ? (0, import_react.createElement)("div", { className: "inline-error" }, error) : null, (0, import_react.createElement)("div", { className: "new-tab-card browser-new-tab-card" }, (0, import_react.createElement)("input", {
+			className: "mobile-input",
+			placeholder: "URL ou recherche",
+			value: newUrl,
+			onChange: (e) => setNewUrl(e.target.value),
+			onKeyDown: (e) => e.key === "Enter" && openTab()
+		}), (0, import_react.createElement)("button", {
+			className: "mobile-btn primary full-width",
+			onClick: () => openTab(),
+			disabled: busy !== null
+		}, busy === "openTab" ? "Ouverture…" : "+ Nouvel onglet")), tabs.length === 0 ? (0, import_react.createElement)("div", { className: "empty-state compact" }, (0, import_react.createElement)("p", { className: "empty-title" }, "Aucun onglet JON"), (0, import_react.createElement)("p", { className: "empty-sub" }, "Ouvre une session ou saisis une URL/recherche ci-dessus.")) : tabs.map((tab) => (0, import_react.createElement)("div", {
+			key: tab.id,
+			className: `browser-tab-card ${tab.active ? "active" : ""}`
+		}, (0, import_react.createElement)("div", { className: "browser-tab-icon" }, (tab.title || tab.url || "?").slice(0, 1).toUpperCase()), (0, import_react.createElement)("div", { className: "browser-tab-info" }, (0, import_react.createElement)("strong", null, (tab.title || "Nouvel onglet").slice(0, 40)), (0, import_react.createElement)("span", null, (tab.url || "about:blank").slice(0, 60))), (0, import_react.createElement)("div", { className: "browser-tab-actions" }, !tab.active ? (0, import_react.createElement)("button", {
+			className: "mobile-btn ghost small",
+			onClick: () => tabAction({
+				type: "focusTab",
+				targetId: tab.id
+			}, `focus-${tab.id}`),
+			disabled: busy !== null
+		}, "Focus") : (0, import_react.createElement)("span", { className: "tab-active-pill" }, "Actif"), (0, import_react.createElement)("button", {
+			className: "mobile-btn ghost small",
+			onClick: () => tabAction({
+				type: "observeTab",
+				targetId: tab.id
+			}, `observe-${tab.id}`),
+			disabled: busy !== null,
+			title: "Observer — extrait DOM + screenshot"
+		}, busy === `observe-${tab.id}` ? "…" : "👁"), (0, import_react.createElement)("button", {
+			className: "mobile-btn ghost small",
+			onClick: () => tabAction({
+				type: "reloadTab",
+				targetId: tab.id
+			}, `reload-${tab.id}`),
+			disabled: busy !== null
+		}, "↺"), (0, import_react.createElement)("button", {
 			className: "mobile-btn outline-danger small",
-			onClick: () => stopRun(run.id)
-		}, "Stop") : null), (0, import_react.createElement)("p", { className: "run-mission" }, run.mission), run.summary ? (0, import_react.createElement)("p", { className: "run-summary" }, run.summary) : null)));
+			onClick: () => tabAction({
+				type: "closeTab",
+				targetId: tab.id
+			}, `close-${tab.id}`),
+			disabled: busy !== null
+		}, "×")), tab.active && (0, import_react.createElement)("div", { className: "browser-tab-nav-row" }, (0, import_react.createElement)("input", {
+			className: "mobile-input small",
+			placeholder: "Naviguer vers…",
+			value: navigateUrl,
+			onChange: (e) => setNavigateUrl(e.target.value),
+			onKeyDown: (e) => e.key === "Enter" && navigateActiveTab(tab.id)
+		}), (0, import_react.createElement)("button", {
+			className: "mobile-btn primary small",
+			onClick: () => navigateActiveTab(tab.id),
+			disabled: busy !== null || !navigateUrl.trim()
+		}, busy === `navigate-${tab.id}` ? "…" : "→"))))), observation && (0, import_react.createElement)("div", { className: "browser-observation-card" }, (0, import_react.createElement)("div", { className: "browser-obs-header" }, (0, import_react.createElement)("span", { className: "browser-obs-title" }, "Dernière observation"), (0, import_react.createElement)("span", { className: "browser-obs-url" }, ((_observation$url = observation.url) !== null && _observation$url !== void 0 ? _observation$url : "").slice(0, 60)), (0, import_react.createElement)("button", {
+			className: "mobile-btn ghost small",
+			onClick: () => setObservation(null)
+		}, "×")), observation.screenshotBase64 && (0, import_react.createElement)("img", {
+			src: `data:image/png;base64,${observation.screenshotBase64}`,
+			className: "browser-obs-screenshot",
+			alt: "Screenshot"
+		}), (0, import_react.createElement)("div", { className: "browser-obs-meta" }, (0, import_react.createElement)("span", null, `${(_observation$interact = observation.interactiveElementCount) !== null && _observation$interact !== void 0 ? _observation$interact : 0} élts interactifs`), (0, import_react.createElement)("span", null, `${(_observation$bodyText = observation.bodyTextLength) !== null && _observation$bodyText !== void 0 ? _observation$bodyText : 0} chars`), ((_observation$blocker = observation.blocker) === null || _observation$blocker === void 0 ? void 0 : _observation$blocker.blocked) && (0, import_react.createElement)("span", { className: "browser-obs-blocked" }, "⚠ bloqué")), observation.bodyText && (0, import_react.createElement)("pre", { className: "browser-obs-text" }, observation.bodyText.slice(0, 400) + (observation.bodyText.length > 400 ? "…" : ""))));
 	}
 	function TerminalShellOverlay({ token, onClose }) {
 		const containerRef = (0, import_react.useRef)(null);
@@ -20697,52 +22323,68 @@ ${h.join(`
 				if (disposed) return;
 				try {
 					fit.fit();
-				} catch {}
+				} catch (_unused14) {}
 				const { cols, rows } = term;
 				const url = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/mobile/terminal/ws?token=${encodeURIComponent(token)}&cols=${cols}&rows=${rows}`;
+				queueMobileLog("info", "ws.connecting", "Opening mobile terminal WebSocket", {
+					cols,
+					rows
+				});
 				ws = new WebSocket(url);
+				ws.onopen = () => {
+					queueMobileLog("info", "ws.open", "Mobile terminal WebSocket connected", {
+						cols,
+						rows
+					});
+				};
 				ws.onmessage = (e) => {
 					if (disposed) return;
 					try {
 						term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data));
-					} catch {}
+					} catch (_unused15) {}
 				};
-				ws.onclose = () => {
+				ws.onclose = (event) => {
+					queueMobileLog(event.wasClean ? "info" : "warn", "ws.close", "Mobile terminal WebSocket closed", {
+						code: event.code,
+						reason: event.reason,
+						wasClean: event.wasClean
+					});
 					if (!disposed) try {
 						term.write("\r\n\x1B[90m[Session terminée]\x1B[0m\r\n");
-					} catch {}
+					} catch (_unused16) {}
 				};
 				ws.onerror = () => {
+					queueMobileLog("error", "ws.error", "Mobile terminal WebSocket error");
 					if (!disposed) try {
 						term.write("\r\n\x1B[31m[Erreur de connexion WebSocket]\x1B[0m\r\n");
-					} catch {}
+					} catch (_unused17) {}
 				};
 				term.onData((data) => {
-					if (ws?.readyState === 1) ws.send(data);
+					if ((ws === null || ws === void 0 ? void 0 : ws.readyState) === 1) ws.send(data);
 				});
 				ro = new ResizeObserver(() => {
 					if (disposed) return;
 					try {
 						fit.fit();
-						if (ws?.readyState === 1) ws.send(JSON.stringify({
+						if ((ws === null || ws === void 0 ? void 0 : ws.readyState) === 1) ws.send(JSON.stringify({
 							type: "resize",
 							cols: term.cols,
 							rows: term.rows
 						}));
-					} catch {}
+					} catch (_unused18) {}
 				});
 				ro.observe(el);
 			});
 			return () => {
 				disposed = true;
 				cancelAnimationFrame(rafId);
-				ro?.disconnect();
+				ro === null || ro === void 0 || ro.disconnect();
 				try {
-					ws?.close();
-				} catch {}
+					ws === null || ws === void 0 || ws.close();
+				} catch (_unused19) {}
 				try {
 					term.dispose();
-				} catch {}
+				} catch (_unused20) {}
 			};
 		}, []);
 		return (0, import_react.createElement)("div", { className: "terminal-shell-overlay" }, (0, import_react.createElement)("div", { className: "terminal-shell-bar" }, (0, import_react.createElement)("span", { className: "terminal-shell-bar-title" }, "Shell"), (0, import_react.createElement)("button", {
@@ -20769,19 +22411,28 @@ ${h.join(`
 		const [screenshotState, setScreenshotState] = (0, import_react.useState)("idle");
 		const [shellOpen, setShellOpen] = (0, import_react.useState)(false);
 		(0, import_react.useEffect)(() => {
-			apiGet(`/api/mobile/projects/${projectId}/terminals`, token).then(setTerminals).catch(() => {});
+			function refreshTerminals() {
+				apiGet(`/api/mobile/projects/${projectId}/terminals`, token).then(setTerminals).catch(() => {});
+			}
+			refreshTerminals();
+			const timer = setInterval(refreshTerminals, 5e3);
+			return () => clearInterval(timer);
+		}, [projectId, token]);
+		(0, import_react.useEffect)(() => {
+			if (events.length > 0) apiGet(`/api/mobile/projects/${projectId}/terminals`, token).then(setTerminals).catch(() => {});
 		}, [
+			events.length,
 			projectId,
-			token,
-			events.length
+			token
 		]);
 		async function fetchScreenshot() {
 			setScreenshotState("loading");
 			try {
+				var _data$screenshotBase;
 				const data = await apiGet(`/api/mobile/projects/${projectId}/screenshot`, token);
-				setScreenshot(data?.screenshotBase64 ?? null);
-				setScreenshotState(data?.screenshotBase64 ? "ok" : "empty");
-			} catch {
+				setScreenshot((_data$screenshotBase = data === null || data === void 0 ? void 0 : data.screenshotBase64) !== null && _data$screenshotBase !== void 0 ? _data$screenshotBase : null);
+				setScreenshotState((data === null || data === void 0 ? void 0 : data.screenshotBase64) ? "ok" : "empty");
+			} catch (_unused21) {
 				setScreenshotState("error");
 				setScreenshot(null);
 			}
@@ -20808,10 +22459,13 @@ ${h.join(`
 			src: `data:image/png;base64,${screenshot}`,
 			className: "mobile-screenshot",
 			alt: "Surface"
-		}) : screenshotState === "error" ? (0, import_react.createElement)("p", { className: "card-hint error" }, "Capture indisponible") : (0, import_react.createElement)("p", { className: "card-hint" }, "Appuyez sur Capturer pour voir le bureau")), others.length > 0 ? (0, import_react.createElement)("div", { className: "section" }, (0, import_react.createElement)("p", { className: "section-title" }, "Terminaux"), others.map((t) => (0, import_react.createElement)("div", {
-			key: t.id,
-			className: "terminal-card"
-		}, (0, import_react.createElement)("div", { className: "terminal-card-row" }, (0, import_react.createElement)("span", { className: `status-dot ${t.status}` }), (0, import_react.createElement)("span", { className: "terminal-name" }, t.label), (0, import_react.createElement)("span", { className: "terminal-status-text" }, TERM_STATUS_FR[t.status] ?? t.status)), t.recentOutput ? (0, import_react.createElement)("pre", { className: "terminal-output-preview" }, String(t.recentOutput).split("\n").slice(-3).join("\n")) : null))) : waiting.length === 0 ? (0, import_react.createElement)("div", { className: "empty-state" }, (0, import_react.createElement)("div", { className: "empty-icon" }, IC([(0, import_react.createElement)("polyline", { points: "4 17 10 11 4 5" }), (0, import_react.createElement)("line", {
+		}) : screenshotState === "error" ? (0, import_react.createElement)("p", { className: "card-hint error" }, "Capture indisponible") : (0, import_react.createElement)("p", { className: "card-hint" }, "Appuyez sur Capturer pour voir le bureau")), others.length > 0 ? (0, import_react.createElement)("div", { className: "section" }, (0, import_react.createElement)("p", { className: "section-title" }, "Terminaux"), others.map((t) => {
+			var _TERM_STATUS_FR$t$sta;
+			return (0, import_react.createElement)("div", {
+				key: t.id,
+				className: "terminal-card"
+			}, (0, import_react.createElement)("div", { className: "terminal-card-row" }, (0, import_react.createElement)("span", { className: `status-dot ${t.status}` }), (0, import_react.createElement)("span", { className: "terminal-name" }, t.label), (0, import_react.createElement)("span", { className: "terminal-status-text" }, (_TERM_STATUS_FR$t$sta = TERM_STATUS_FR[t.status]) !== null && _TERM_STATUS_FR$t$sta !== void 0 ? _TERM_STATUS_FR$t$sta : t.status)), t.recentOutput ? (0, import_react.createElement)("pre", { className: "terminal-output-preview" }, String(t.recentOutput).split("\n").slice(-3).join("\n")) : null);
+		})) : waiting.length === 0 ? (0, import_react.createElement)("div", { className: "empty-state" }, (0, import_react.createElement)("div", { className: "empty-icon" }, IC([(0, import_react.createElement)("polyline", { points: "4 17 10 11 4 5" }), (0, import_react.createElement)("line", {
 			x1: 12,
 			y1: 19,
 			x2: 20,
@@ -20821,25 +22475,8 @@ ${h.join(`
 			height: 40
 		})), (0, import_react.createElement)("p", { className: "empty-title" }, "Aucun terminal actif")) : null);
 	}
-	function ResultatsTab({ projectId, token, events }) {
-		const [runs, setRuns] = (0, import_react.useState)([]);
-		(0, import_react.useEffect)(() => {
-			apiGet(`/api/mobile/projects/${projectId}/runs`, token).then(setRuns).catch(() => {});
-		}, [
-			projectId,
-			token,
-			events.length
-		]);
-		const done = runs.filter((r) => r.status === "completed" || r.status === "failed" || r.summary);
-		return (0, import_react.createElement)("div", { className: "tab-content" }, done.length === 0 ? (0, import_react.createElement)("div", { className: "empty-state" }, (0, import_react.createElement)("div", { className: "empty-icon" }, IC([(0, import_react.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), (0, import_react.createElement)("polyline", { points: "14 2 14 8 20 8" })], {
-			width: 40,
-			height: 40
-		})), (0, import_react.createElement)("p", { className: "empty-title" }, "Aucun résultat"), (0, import_react.createElement)("p", { className: "empty-sub" }, "Les résultats apparaissent une fois les missions terminées")) : done.map((run) => (0, import_react.createElement)("div", {
-			key: run.id,
-			className: `run-card status-${run.status}`
-		}, (0, import_react.createElement)("div", { className: "run-card-top" }, (0, import_react.createElement)("span", { className: `status-dot ${run.status}` }), (0, import_react.createElement)("span", { className: "run-status-label" }, STATUS_FR[run.status] ?? run.status), (0, import_react.createElement)("span", { className: "run-ts" }, run.updatedAt ? formatTime(run.updatedAt) : "")), (0, import_react.createElement)("p", { className: "run-mission" }, run.mission), run.summary ? (0, import_react.createElement)("p", { className: "run-summary" }, run.summary) : null)));
-	}
 	function AdminTab({ token, session, onDisconnect }) {
+		var _session$deviceName, _session$expiresAt$sl, _session$expiresAt, _status$devices2;
 		const [status, setStatus] = (0, import_react.useState)(null);
 		const [auditLog, setAuditLog] = (0, import_react.useState)([]);
 		const [confirmDisconnect, setConfirmDisconnect] = (0, import_react.useState)(false);
@@ -20850,11 +22487,11 @@ ${h.join(`
 		async function disconnect() {
 			try {
 				await apiPost("/api/mobile/session/revoke", {}, token);
-			} catch {}
+			} catch (_unused22) {}
 			clearSession();
 			onDisconnect();
 		}
-		return (0, import_react.createElement)("div", { className: "tab-content admin-tab" }, (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Session"), (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("span", { className: "card-label" }, "Appareil"), (0, import_react.createElement)("span", { className: "card-value" }, session?.deviceName ?? "—")), (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("span", { className: "card-label" }, "Expire le"), (0, import_react.createElement)("span", { className: "card-value" }, session?.expiresAt?.slice(0, 16).replace("T", " ") ?? "—"))), confirmDisconnect ? (0, import_react.createElement)("div", { className: "confirm-card" }, (0, import_react.createElement)("p", { className: "confirm-title" }, "Déconnecter cet appareil ?"), (0, import_react.createElement)("p", { className: "confirm-sub" }, "Il faudra rescanner le QR ou entrer un nouveau code."), (0, import_react.createElement)("div", { className: "card-actions" }, (0, import_react.createElement)("button", {
+		return (0, import_react.createElement)("div", { className: "tab-content admin-tab" }, (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Session"), (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("span", { className: "card-label" }, "Appareil"), (0, import_react.createElement)("span", { className: "card-value" }, (_session$deviceName = session === null || session === void 0 ? void 0 : session.deviceName) !== null && _session$deviceName !== void 0 ? _session$deviceName : "—")), (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("span", { className: "card-label" }, "Expire le"), (0, import_react.createElement)("span", { className: "card-value" }, (_session$expiresAt$sl = session === null || session === void 0 || (_session$expiresAt = session.expiresAt) === null || _session$expiresAt === void 0 ? void 0 : _session$expiresAt.slice(0, 16).replace("T", " ")) !== null && _session$expiresAt$sl !== void 0 ? _session$expiresAt$sl : "—"))), confirmDisconnect ? (0, import_react.createElement)("div", { className: "confirm-card" }, (0, import_react.createElement)("p", { className: "confirm-title" }, "Déconnecter cet appareil ?"), (0, import_react.createElement)("p", { className: "confirm-sub" }, "Il faudra rescanner le QR ou entrer un nouveau code."), (0, import_react.createElement)("div", { className: "card-actions" }, (0, import_react.createElement)("button", {
 			className: "mobile-btn ghost",
 			onClick: () => setConfirmDisconnect(false)
 		}, "Annuler"), (0, import_react.createElement)("button", {
@@ -20863,27 +22500,157 @@ ${h.join(`
 		}, "Déconnecter"))) : (0, import_react.createElement)("button", {
 			className: "mobile-btn outline-danger full-width",
 			onClick: () => setConfirmDisconnect(true)
-		}, "Déconnecter cet appareil"), status?.devices?.length > 0 ? (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Appareils pairés"), status.devices.map((d) => (0, import_react.createElement)("div", {
-			key: d.id,
-			className: "device-row"
-		}, (0, import_react.createElement)("span", { className: "device-name" }, d.name), (0, import_react.createElement)("span", { className: `status-pill status-${d.status}` }, d.status), (0, import_react.createElement)("span", { className: "device-ts" }, d.lastSeenAt?.slice(0, 10) ?? "")))) : null, auditLog.length > 0 ? (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Dernières commandes"), auditLog.map((entry, i) => (0, import_react.createElement)("div", {
-			key: i,
-			className: `audit-row audit-${entry.status}`
-		}, (0, import_react.createElement)("span", { className: "audit-cmd" }, entry.commandType), (0, import_react.createElement)("span", { className: "audit-status-pill" }, entry.status), (0, import_react.createElement)("span", { className: "audit-ts" }, entry.createdAt?.slice(11, 16) ?? "")))) : null);
+		}, "Déconnecter cet appareil"), (status === null || status === void 0 || (_status$devices2 = status.devices) === null || _status$devices2 === void 0 ? void 0 : _status$devices2.length) > 0 ? (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Appareils pairés"), status.devices.map((d) => {
+			var _d$lastSeenAt$slice, _d$lastSeenAt;
+			return (0, import_react.createElement)("div", {
+				key: d.id,
+				className: "device-row"
+			}, (0, import_react.createElement)("span", { className: "device-name" }, d.name), (0, import_react.createElement)("span", { className: `status-pill status-${d.status}` }, d.status), (0, import_react.createElement)("span", { className: "device-ts" }, (_d$lastSeenAt$slice = (_d$lastSeenAt = d.lastSeenAt) === null || _d$lastSeenAt === void 0 ? void 0 : _d$lastSeenAt.slice(0, 10)) !== null && _d$lastSeenAt$slice !== void 0 ? _d$lastSeenAt$slice : ""));
+		})) : null, auditLog.length > 0 ? (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Dernières commandes"), auditLog.map((entry, i) => {
+			var _entry$createdAt$slic, _entry$createdAt;
+			return (0, import_react.createElement)("div", {
+				key: i,
+				className: `audit-row audit-${entry.status}`
+			}, (0, import_react.createElement)("span", { className: "audit-cmd" }, entry.commandType), (0, import_react.createElement)("span", { className: "audit-status-pill" }, entry.status), (0, import_react.createElement)("span", { className: "audit-ts" }, (_entry$createdAt$slic = (_entry$createdAt = entry.createdAt) === null || _entry$createdAt === void 0 ? void 0 : _entry$createdAt.slice(11, 16)) !== null && _entry$createdAt$slic !== void 0 ? _entry$createdAt$slic : ""));
+		})) : null);
+	}
+	function ParametresTab({ pollingInterval, onPollingIntervalChange }) {
+		return (0, import_react.createElement)("div", { className: "tab-content" }, (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Rafraîchissement de l'écran"), (0, import_react.createElement)("p", { className: "card-hint" }, "Fréquence de mise à jour de la vue Contrôle (capture + fenêtres)"), (0, import_react.createElement)("div", { className: "polling-options" }, POLLING_INTERVAL_OPTIONS.map((opt) => (0, import_react.createElement)("button", {
+			key: opt.value,
+			className: `polling-option-btn ${pollingInterval === opt.value ? "active" : ""}`,
+			onClick: () => onPollingIntervalChange(opt.value)
+		}, opt.label)))));
+	}
+	function ConnecteursTab({ token }) {
+		const [connectors, setConnectors] = (0, import_react.useState)([]);
+		const [name, setName] = (0, import_react.useState)("");
+		const [command, setCommand] = (0, import_react.useState)("");
+		const [url, setUrl] = (0, import_react.useState)("");
+		const [toolsText, setToolsText] = (0, import_react.useState)("[{\"name\":\"send_email\",\"description\":\"Envoyer un email avec approbation explicite.\"}]");
+		const [busy, setBusy] = (0, import_react.useState)(false);
+		const [error, setError] = (0, import_react.useState)(null);
+		const [saved, setSaved] = (0, import_react.useState)(false);
+		async function refresh() {
+			try {
+				const data = await apiGet("/api/mobile/connectors", token);
+				setConnectors(Array.isArray(data === null || data === void 0 ? void 0 : data.connectors) ? data.connectors : []);
+			} catch (err) {
+				setError(err.message);
+			}
+		}
+		(0, import_react.useEffect)(() => {
+			refresh();
+		}, [token]);
+		async function addConnector() {
+			const connectorName = name.trim();
+			if (!connectorName) return;
+			setBusy(true);
+			setSaved(false);
+			setError(null);
+			try {
+				let tools = [];
+				if (toolsText.trim()) {
+					const parsed = JSON.parse(toolsText);
+					tools = Array.isArray(parsed) ? parsed : [parsed];
+				}
+				await apiPost("/api/mobile/connectors", {
+					type: "mcp",
+					name: connectorName,
+					command: command.trim(),
+					url: url.trim(),
+					tools
+				}, token);
+				setName("");
+				setCommand("");
+				setUrl("");
+				setSaved(true);
+				await refresh();
+			} catch (err) {
+				setError(err.message);
+			} finally {
+				setBusy(false);
+			}
+		}
+		return (0, import_react.createElement)("div", { className: "tab-content connectors-tab" }, (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Connecteurs"), (0, import_react.createElement)("p", { className: "card-hint" }, "Ajoute un serveur MCP ou un connecteur externe pour que JON puisse le sélectionner comme outil agentique."), connectors.length === 0 ? (0, import_react.createElement)("div", { className: "empty-mini" }, "Aucun connecteur") : connectors.map((connector) => {
+			var _ref16, _connector$type, _connector$capabiliti;
+			return (0, import_react.createElement)("div", {
+				key: connector.connectorId,
+				className: "connector-row"
+			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, connector.name), (0, import_react.createElement)("small", null, `${(_ref16 = (_connector$type = connector.type) !== null && _connector$type !== void 0 ? _connector$type : connector.category) !== null && _ref16 !== void 0 ? _ref16 : "builtin"} · ${((_connector$capabiliti = connector.capabilities) !== null && _connector$capabiliti !== void 0 ? _connector$capabiliti : []).slice(0, 3).join(", ") || "outil"}`)), (0, import_react.createElement)("span", { className: `status-pill status-${connector.status}` }, connector.status === "connected" ? "Connecté" : "À configurer"));
+		})), (0, import_react.createElement)("div", { className: "card connector-form-card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Ajouter MCP"), (0, import_react.createElement)("input", {
+			className: "mobile-input",
+			value: name,
+			onChange: (e) => setName(e.target.value),
+			placeholder: "Nom du connecteur"
+		}), (0, import_react.createElement)("input", {
+			className: "mobile-input",
+			value: command,
+			onChange: (e) => setCommand(e.target.value),
+			placeholder: "Commande stdio, ex: npx mon-mcp"
+		}), (0, import_react.createElement)("input", {
+			className: "mobile-input",
+			value: url,
+			onChange: (e) => setUrl(e.target.value),
+			placeholder: "URL HTTP/SSE optionnelle"
+		}), (0, import_react.createElement)("textarea", {
+			className: "mobile-textarea connector-tools-textarea",
+			value: toolsText,
+			onChange: (e) => setToolsText(e.target.value),
+			rows: 4,
+			placeholder: "[{\"name\":\"tool_name\",\"description\":\"Ce que fait le tool\"}]"
+		}), (0, import_react.createElement)("button", {
+			className: "mobile-btn primary full-width",
+			onClick: addConnector,
+			disabled: busy || !name.trim()
+		}, busy ? "Ajout…" : "Ajouter le connecteur"), error ? (0, import_react.createElement)("div", { className: "inline-error" }, error) : null, saved ? (0, import_react.createElement)("div", { className: "llm-field-status ready" }, "Connecteur ajouté au graphe de capacités") : null));
+	}
+	function MoreTab({ projectId, token, session, events, onDisconnect, pollingInterval, onPollingIntervalChange }) {
+		const [view, setView] = (0, import_react.useState)("params");
+		return (0, import_react.createElement)("div", { className: "more-tab-wrap" }, (0, import_react.createElement)("div", { className: "more-segment" }, (0, import_react.createElement)("button", {
+			className: view === "params" ? "active" : "",
+			onClick: () => setView("params")
+		}, "Paramètres"), (0, import_react.createElement)("button", {
+			className: view === "connectors" ? "active" : "",
+			onClick: () => setView("connectors")
+		}, "Connecteurs"), (0, import_react.createElement)("button", {
+			className: view === "admin" ? "active" : "",
+			onClick: () => setView("admin")
+		}, "Admin")), view === "params" ? (0, import_react.createElement)(ParametresTab, {
+			pollingInterval,
+			onPollingIntervalChange
+		}) : view === "connectors" ? (0, import_react.createElement)(ConnecteursTab, { token }) : (0, import_react.createElement)(AdminTab, {
+			token,
+			session,
+			onDisconnect
+		}));
 	}
 	function useEventStream(token, onEvent, onStatus) {
+		const onEventRef = (0, import_react.useRef)(onEvent);
+		const onStatusRef = (0, import_react.useRef)(onStatus);
+		(0, import_react.useEffect)(() => {
+			onEventRef.current = onEvent;
+			onStatusRef.current = onStatus;
+		});
 		(0, import_react.useEffect)(() => {
 			if (!token) return;
-			onStatus("connecting");
+			onStatusRef.current("connecting");
+			queueMobileLog("info", "sse.connecting", "Opening mobile event stream");
 			const es = new EventSource(`/api/mobile/events?token=${encodeURIComponent(token)}&since=`);
-			es.addEventListener("open", () => onStatus("connected"));
-			es.addEventListener("error", () => onStatus("reconnecting"));
+			es.addEventListener("open", () => {
+				queueMobileLog("info", "sse.open", "Mobile event stream connected");
+				onStatusRef.current("connected");
+			});
+			es.addEventListener("error", () => {
+				queueMobileLog("warn", "sse.error", "Mobile event stream disconnected or retrying", { readyState: es.readyState });
+				onStatusRef.current("reconnecting");
+			});
 			es.addEventListener("mobile.event", (e) => {
 				try {
-					onEvent(JSON.parse(e.data));
-				} catch {}
+					onEventRef.current(JSON.parse(e.data));
+				} catch (_unused23) {}
 			});
 			return () => {
+				queueMobileLog("info", "sse.close", "Mobile event stream closed");
 				es.close();
 			};
 		}, [token]);
@@ -20895,7 +22662,8 @@ ${h.join(`
 		disconnected: "Hors ligne"
 	};
 	function AppHeader({ connStatus }) {
-		return (0, import_react.createElement)("div", { className: "app-header" }, (0, import_react.createElement)("span", { className: "app-header-brand" }, "JON"), (0, import_react.createElement)("div", { className: `app-header-status conn-${connStatus}` }, (0, import_react.createElement)("span", { className: "conn-dot" }), (0, import_react.createElement)("span", { className: "conn-label" }, CONN_LABELS[connStatus] ?? "…")));
+		var _CONN_LABELS$connStat;
+		return (0, import_react.createElement)("div", { className: "app-header" }, (0, import_react.createElement)("span", { className: "app-header-brand" }, "JON"), (0, import_react.createElement)("div", { className: `app-header-status conn-${connStatus}` }, (0, import_react.createElement)("span", { className: "conn-dot" }), (0, import_react.createElement)("span", { className: "conn-label" }, (_CONN_LABELS$connStat = CONN_LABELS[connStatus]) !== null && _CONN_LABELS$connStat !== void 0 ? _CONN_LABELS$connStat : "…")));
 	}
 	function AlertBanner({ event, onDismiss }) {
 		if (!event) return null;
@@ -20906,34 +22674,161 @@ ${h.join(`
 		}, SVG.x));
 	}
 	function App() {
+		var _session$sessionToken2;
 		const [session, setSession] = (0, import_react.useState)(() => getStoredSession());
-		const [activeTab, setActiveTab] = (0, import_react.useState)("chat");
+		const [authState, setAuthState] = (0, import_react.useState)(() => getStoredSession() ? "checking" : "none");
+		const [authError, setAuthError] = (0, import_react.useState)(null);
+		const [authRetryTick, setAuthRetryTick] = (0, import_react.useState)(0);
+		const [pairingNotice, setPairingNotice] = (0, import_react.useState)(null);
+		const [activeTab, setActiveTab] = (0, import_react.useState)("dashboard");
 		const [events, setEvents] = (0, import_react.useState)([]);
 		const [pendingApprovals, setPendingApprovals] = (0, import_react.useState)([]);
 		const [connStatus, setConnStatus] = (0, import_react.useState)("connecting");
 		const [chatUnread, setChatUnread] = (0, import_react.useState)(0);
 		const [alertEvent, setAlertEvent] = (0, import_react.useState)(null);
+		const [pollingInterval, setPollingInterval] = (0, import_react.useState)(getStoredPollingInterval);
 		const projectId = "default";
+		const sessionToken = (_session$sessionToken2 = session === null || session === void 0 ? void 0 : session.sessionToken) !== null && _session$sessionToken2 !== void 0 ? _session$sessionToken2 : null;
+		const dropSessionToPairing = (0, import_react.useCallback)((notice = null) => {
+			queueMobileLog("warn", "session.dropped", notice !== null && notice !== void 0 ? notice : "Mobile session cleared");
+			clearSession();
+			setMobileLogSession(null);
+			setSession(null);
+			setAuthState("none");
+			setAuthError(null);
+			setConnStatus("disconnected");
+			setEvents([]);
+			setPendingApprovals([]);
+			setPairingNotice(notice);
+		}, []);
+		const acceptSession = (0, import_react.useCallback)((nextSession) => {
+			setMobileLogSession(nextSession);
+			queueMobileLog("info", "session.accepted", "Mobile session stored", { deviceId: nextSession.deviceId });
+			storeSession(nextSession);
+			setSession(nextSession);
+			setAuthState("valid");
+			setAuthError(null);
+			setPairingNotice(null);
+			setConnStatus("connecting");
+		}, []);
+		const refreshPendingApprovals = (0, import_react.useCallback)(async () => {
+			if (!sessionToken) return;
+			try {
+				setPendingApprovals(normalizeApprovalList(await apiGet(`/api/mobile/projects/${projectId}/approvals`, sessionToken)));
+			} catch (err) {
+				queueMobileLog("warn", "approvals.refresh_failed", err.message, {
+					code: err.code,
+					status: err.status
+				});
+			}
+		}, [projectId, sessionToken]);
 		function onEvent(ev) {
+			var _ev$payload;
 			setEvents((prev) => [...prev.slice(-99), ev]);
-			if (ev.type === "approval.required" && ev.payload?.approvalId) setPendingApprovals((prev) => [...prev, {
+			if (ev.type === "approval.required" && ((_ev$payload = ev.payload) === null || _ev$payload === void 0 ? void 0 : _ev$payload.approvalId)) setPendingApprovals((prev) => mergeApprovalLists(prev, [{
+				...ev.payload,
 				id: ev.payload.approvalId,
-				actionLabel: ev.payload.actionLabel ?? "Action",
-				reason: ev.payload.reason ?? "",
-				riskLevel: ev.payload.riskLevel ?? "medium"
-			}]);
+				createdAt: ev.timestamp
+			}]));
+			if ([
+				"approval.granted",
+				"approval.denied",
+				"approval.auto_resolved",
+				"approval.policy_blocked"
+			].includes(ev.type)) {
+				var _ref17, _ev$payload$approvalI, _ev$payload2;
+				const approvalId = (_ref17 = (_ev$payload$approvalI = (_ev$payload2 = ev.payload) === null || _ev$payload2 === void 0 ? void 0 : _ev$payload2.approvalId) !== null && _ev$payload$approvalI !== void 0 ? _ev$payload$approvalI : ev.approvalId) !== null && _ref17 !== void 0 ? _ref17 : null;
+				if (approvalId) setPendingApprovals((prev) => prev.filter((a) => a.id !== approvalId));
+			}
 			if (ev.severity === "high") setAlertEvent(ev);
-			if ((ev.type === "jon.reply" || ev.type === "jon.needs_user") && activeTab !== "chat") setChatUnread((n) => n + 1);
+			if ((ev.type === "jon.reply" || ev.type === "jon.needs_user") && activeTab !== "dashboard") setChatUnread((n) => n + 1);
 		}
 		function handleApprovalResolved(id) {
 			setPendingApprovals((prev) => prev.filter((a) => a.id !== id));
+			setTimeout(refreshPendingApprovals, 250);
 		}
-		useEventStream(session?.sessionToken ?? null, onEvent, setConnStatus);
-		if (!session) return (0, import_react.createElement)(PairingScreen, { onPaired: (s) => setSession(s) });
+		(0, import_react.useEffect)(() => {
+			setMobileLogSession(session);
+		}, [sessionToken]);
+		(0, import_react.useEffect)(() => {
+			if (!sessionToken) return;
+			let disposed = false;
+			let timer = null;
+			async function verifySession({ silent = false } = {}) {
+				if (!silent) {
+					setAuthState("checking");
+					setAuthError(null);
+					setConnStatus("connecting");
+				}
+				try {
+					await validateMobileSession(sessionToken);
+					if (disposed) return;
+					if (!silent) queueMobileLog("info", "session.validated", "Mobile session validated");
+					setAuthState("valid");
+					setAuthError(null);
+				} catch (err) {
+					var _err$message2;
+					if (disposed) return;
+					if (isAuthError(err)) {
+						queueMobileLog("warn", "session.invalid", err.message, {
+							status: err.status,
+							code: err.code
+						});
+						dropSessionToPairing("La session enregistrée n'est plus acceptée par JON desktop. Scannez un nouveau QR ou entrez un nouveau code.");
+						return;
+					}
+					if (!silent) queueMobileLog("warn", "session.validation_failed", err.message, {
+						code: err.code,
+						status: err.status
+					});
+					setAuthState((current) => current === "valid" ? "valid" : "offline");
+					setAuthError((_err$message2 = err.message) !== null && _err$message2 !== void 0 ? _err$message2 : "Connexion impossible");
+					setConnStatus("reconnecting");
+				}
+			}
+			verifySession();
+			timer = setInterval(() => verifySession({ silent: true }), 15e3);
+			return () => {
+				disposed = true;
+				if (timer) clearInterval(timer);
+			};
+		}, [
+			sessionToken,
+			authRetryTick,
+			dropSessionToPairing
+		]);
+		(0, import_react.useEffect)(() => {
+			const onInvalidAuth = () => {
+				dropSessionToPairing("La session mobile a expiré ou le serveur JON a redémarré. Reconnectez ce mobile depuis JON desktop.");
+			};
+			window.addEventListener("jon-mobile-auth-invalid", onInvalidAuth);
+			return () => window.removeEventListener("jon-mobile-auth-invalid", onInvalidAuth);
+		}, [dropSessionToPairing]);
+		(0, import_react.useEffect)(() => {
+			if (authState !== "valid" || !sessionToken) return;
+			refreshPendingApprovals();
+			const timer = setInterval(refreshPendingApprovals, 5e3);
+			return () => clearInterval(timer);
+		}, [
+			authState,
+			sessionToken,
+			refreshPendingApprovals
+		]);
+		useEventStream(authState === "valid" ? sessionToken : null, onEvent, setConnStatus);
+		if (!session) return (0, import_react.createElement)(PairingScreen, {
+			notice: pairingNotice,
+			onPaired: acceptSession
+		});
+		if (authState !== "valid") return (0, import_react.createElement)(SessionCheckScreen, {
+			state: authState,
+			error: authError,
+			onRetry: () => setAuthRetryTick((n) => n + 1),
+			onReconnect: () => dropSessionToPairing("Session locale effacée. Entrez un nouveau code depuis JON desktop.")
+		});
 		const tabBadge = {
-			chat: chatUnread || 0,
-			live: pendingApprovals.length,
-			terminals: events.filter((e) => e.type === "terminal.waiting_for_input").slice(-20).filter((e) => !events.find((x) => x.type === "terminal.completed" && x.terminalId === e.terminalId && x.timestamp > e.timestamp)).length
+			dashboard: chatUnread || 0,
+			tasks: pendingApprovals.length,
+			terminal: events.filter((e) => e.type === "terminal.waiting_for_input").slice(-20).filter((e) => !events.find((x) => x.type === "terminal.completed" && x.terminalId === e.terminalId && x.timestamp > e.timestamp)).length
 		};
 		({
 			connected: "green",
@@ -20944,34 +22839,42 @@ ${h.join(`
 		return (0, import_react.createElement)("div", { className: "mobile-app" }, (0, import_react.createElement)(AppHeader, { connStatus }), (0, import_react.createElement)(AlertBanner, {
 			event: alertEvent,
 			onDismiss: () => setAlertEvent(null)
-		}), (0, import_react.createElement)("div", { className: "mobile-content" }, activeTab === "chat" && (0, import_react.createElement)(ChatTab, {
+		}), (0, import_react.createElement)("div", { className: "mobile-content" }, activeTab === "dashboard" && (0, import_react.createElement)(DashboardTab, {
 			projectId,
-			token: session.sessionToken,
+			token: sessionToken,
+			events,
+			session,
+			onDisconnect: () => dropSessionToPairing(null),
+			pollingInterval,
+			onPollingIntervalChange: (v) => {
+				setPollingInterval(v);
+				savePollingInterval(v);
+			}
+		}), activeTab === "control" && (0, import_react.createElement)(ControlTab, {
+			projectId,
+			token: sessionToken,
+			events,
+			pollingInterval
+		}), activeTab === "tabs" && (0, import_react.createElement)(BrowserTabsTab, {
+			projectId,
+			token: sessionToken,
 			events
-		}), activeTab === "live" && (0, import_react.createElement)(LiveTab, {
+		}), activeTab === "terminal" && (0, import_react.createElement)(TerminalsTab, {
 			projectId,
-			token: session.sessionToken,
+			token: sessionToken,
+			events
+		}), activeTab === "tasks" && (0, import_react.createElement)(TasksTab, {
+			projectId,
+			token: sessionToken,
 			events,
 			approvals: pendingApprovals,
 			onApprovalResolved: handleApprovalResolved
-		}), activeTab === "terminals" && (0, import_react.createElement)(TerminalsTab, {
-			projectId,
-			token: session.sessionToken,
-			events
-		}), activeTab === "resultats" && (0, import_react.createElement)(ResultatsTab, {
-			projectId,
-			token: session.sessionToken,
-			events
-		}), activeTab === "admin" && (0, import_react.createElement)(AdminTab, {
-			token: session.sessionToken,
-			session,
-			onDisconnect: () => setSession(null)
 		})), (0, import_react.createElement)("nav", { className: "mobile-tabs" }, TABS.map((tab) => (0, import_react.createElement)("button", {
 			key: tab,
 			className: `mobile-tab ${activeTab === tab ? "active" : ""}`,
 			onClick: () => {
 				setActiveTab(tab);
-				if (tab === "chat") setChatUnread(0);
+				if (tab === "dashboard") setChatUnread(0);
 			}
 		}, (0, import_react.createElement)("div", { className: "tab-icon-wrap" }, (0, import_react.createElement)("span", { className: "tab-icon" }, TAB_ICONS[tab]), tabBadge[tab] ? (0, import_react.createElement)("span", { className: "tab-badge" }, tabBadge[tab]) : null), (0, import_react.createElement)("span", { className: "tab-label" }, TAB_LABELS[tab])))));
 	}
@@ -20981,6 +22884,7 @@ ${h.join(`
 		try {
 			(0, import_client.createRoot)(root).render((0, import_react.createElement)(App));
 		} catch (err) {
+			queueMobileLog("error", "app.mount_failed", err.message, { error: serializeLogArg(err) });
 			root.innerHTML = `<div style="color:#f06060;padding:2rem;font-family:monospace;font-size:14px">JON Mobile failed to start: ${err.message}</div>`;
 		}
 	}

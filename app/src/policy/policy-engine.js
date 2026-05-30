@@ -11,6 +11,21 @@ export class PolicyEngine {
     this.approvalResolver = approvalResolver;
     this.onApprovalRequested = onApprovalRequested;
     this.onApprovalResolved = onApprovalResolved;
+    // Dedup cache: key → resolved approvalRecord (per run lifecycle)
+    this._approvedCache = new Map();
+  }
+
+  // Dedup key: category + actionLabel + targetLabel (same action on same target)
+  #dedupKey(action) {
+    return `${action.runId ?? ""}|${action.category}|${String(action.actionLabel ?? "").trim().toLowerCase()}|${String(action.targetLabel ?? "").trim().toLowerCase()}`;
+  }
+
+  clearRunCache(runId) {
+    for (const key of this._approvedCache.keys()) {
+      if (key.startsWith(`${runId}|`)) {
+        this._approvedCache.delete(key);
+      }
+    }
   }
 
   evaluate(action) {
@@ -79,6 +94,18 @@ export class PolicyEngine {
       throw new PolicyViolationError(`No approval resolver configured for ${action.actionLabel}`);
     }
 
+    // Dedup: if an identical approval was already granted in this run, reuse it silently
+    const key = this.#dedupKey(action);
+    const cached = this._approvedCache.get(key);
+    if (cached) {
+      return {
+        allowed: cached.decision === APPROVAL_DECISION.APPROVED_ONCE,
+        approvalRecord: { ...cached, id: createId("apr"), createdAt: nowIso(), reusedFrom: cached.id },
+        evaluation,
+        reused: true
+      };
+    }
+
     approvalRecord.decision = "pending";
     await this.onApprovalRequested?.(approvalRecord, action);
 
@@ -99,10 +126,16 @@ export class PolicyEngine {
     approvalRecord.decision = resolution.decision;
     approvalRecord.metadata = {
       ...approvalRecord.metadata,
+      ...(resolution.metadata ?? {}),
       decisionAt: nowIso(),
       operatorRationale: resolution.rationale ?? null
     };
     await this.onApprovalResolved?.(approvalRecord, action);
+
+    // Cache approved decisions for dedup within this run
+    if (resolution.decision === APPROVAL_DECISION.APPROVED_ONCE) {
+      this._approvedCache.set(key, approvalRecord);
+    }
 
     return {
       allowed: resolution.decision === APPROVAL_DECISION.APPROVED_ONCE,

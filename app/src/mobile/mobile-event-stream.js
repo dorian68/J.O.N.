@@ -10,6 +10,14 @@ const MOBILE_EVENT_TYPES = new Set([
   "approval.required",
   "approval.granted",
   "approval.denied",
+  "approval.auto_resolved",
+  "approval.policy_blocked",
+  "tool.planned",
+  "tool.running",
+  "tool.succeeded",
+  "tool.failed",
+  "tool.skipped",
+  "tool.blocked",
   "terminal.waiting_for_input",
   "terminal.completed",
   "terminal.error",
@@ -39,6 +47,14 @@ const SEVERITY_MAP = {
   "run.stopped": "low",
   "approval.granted": "low",
   "approval.denied": "low",
+  "approval.auto_resolved": "low",
+  "approval.policy_blocked": "high",
+  "tool.planned": "info",
+  "tool.running": "low",
+  "tool.succeeded": "low",
+  "tool.failed": "medium",
+  "tool.skipped": "medium",
+  "tool.blocked": "medium",
   "terminal.started": "low",
   "terminal.completed": "low",
   "browser.navigated": "low",
@@ -69,6 +85,14 @@ function buildUserMessage(type, payload) {
   case "approval.required": return `Approbation requise : ${payload?.actionLabel ?? "action en attente"}`;
   case "approval.granted": return "Action approuvée";
   case "approval.denied": return "Action refusée";
+  case "approval.auto_resolved": return `Approbation résolue automatiquement : ${payload?.actionLabel ?? payload?.approvalId ?? ""}`;
+  case "approval.policy_blocked": return `Action bloquée par la policy : ${payload?.actionLabel ?? payload?.approvalId ?? ""}`;
+  case "tool.planned": return `Tool prévu : ${payload?.toolName ?? payload?.tool ?? ""}`;
+  case "tool.running": return `Tool en cours : ${payload?.toolName ?? payload?.tool ?? ""}`;
+  case "tool.succeeded": return `Tool terminé : ${payload?.toolName ?? payload?.tool ?? ""}`;
+  case "tool.failed": return `Tool échoué : ${payload?.toolName ?? payload?.tool ?? ""}`;
+  case "tool.skipped": return `Tool ignoré : ${payload?.toolName ?? payload?.tool ?? ""}`;
+  case "tool.blocked": return `Tool bloqué : ${payload?.toolName ?? payload?.tool ?? ""}`;
   case "terminal.waiting_for_input": return `Terminal en attente : ${payload?.label ?? payload?.terminalId ?? "unknown"}`;
   case "terminal.completed": return `Terminal terminé : ${payload?.label ?? ""}`;
   case "terminal.error": return `Erreur terminal : ${payload?.label ?? ""}`;
@@ -128,6 +152,8 @@ export function buildMobileEvent(rawType, rawPayload) {
 
 function mapToMobileEventType(rawType, payload) {
   if (MOBILE_EVENT_TYPES.has(rawType)) return rawType;
+  if (rawType === "approval.requested") return "approval.required";
+  if (rawType === "approval.resolved") return payload?.decision === "approved_once" ? "approval.granted" : "approval.denied";
   if (rawType === "workspace.browser.navigated") return "browser.navigated";
   if (rawType === "workspace.browser.session.opened") return "browser.session.opened";
   if (rawType === "workspace.browser.session.closed") return "browser.session.closed";

@@ -131,6 +131,8 @@ export async function run() {
 
   const report = await buildReadinessReport({
     proofArtifacts: baseProofArtifacts(),
+    doctorReport: baseDoctorReport(),
+    validationSummary: baseValidationSummary(),
     operationalDeep: {
       classification: {
         implementationStatus: "operational_deep_contract",

@@ -3,25 +3,79 @@ import path from "node:path";
 import { chromium } from "playwright";
 import {
   DEFAULT_BROWSER_CHANNEL,
+  DEFAULT_BROWSER_STEALTH,
   DEFAULT_HEADLESS,
   DEFAULT_TIMEOUT_MS,
   EVIDENCE_TYPE
 } from "../config.js";
 import { createId, nowIso } from "../utils/ids.js";
 import { captureDomSnapshot, inspectLocator, listInteractiveElements, rankCandidates } from "./dom-strategy.js";
+import { classifyBrowserBlockerSignal } from "./browser-blockers.js";
 
 const INTERACTIVE_SELECTOR = "a[href], button, input, select, textarea, [role='button'], [role='link']";
+
+const BLOCKED_SCHEMES = new Set(["javascript", "data", "file", "vbscript", "blob"]);
+
+const STEALTH_ARGS = [
+  "--disable-blink-features=AutomationControlled",
+  "--disable-dev-shm-usage",
+];
+
+// Injected before any page script — masks the CDP automation fingerprint
+const STEALTH_INIT_SCRIPT = `
+  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  if (!window.chrome) { window.chrome = { runtime: {} }; }
+  const _plugins = [1, 2, 3]; _plugins.item = i => _plugins[i];
+  Object.defineProperty(navigator, 'plugins', { get: () => _plugins });
+  Object.defineProperty(navigator, 'languages', { get: () => ['fr-FR', 'fr', 'en-US', 'en'] });
+`;
+
+const STEALTH_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
 
 function hostnameFor(url) {
   const parsed = new URL(url);
   return parsed.hostname;
 }
 
+function normalizeHost(host) {
+  return String(host ?? "").toLowerCase().replace(/^www\./, "").trim();
+}
+
+// Returns true if url is allowed by the allowlistedHosts policy.
+// If allowlistedHosts is empty, all https/http URLs are allowed (open mode).
+// Blocked schemes (javascript:, data:, file:, etc.) are always refused.
 function ensureAllowlisted(url, allowlistedHosts = []) {
-  if (url.startsWith("about:blank")) {
-    return true;
+  let parsed;
+  try {
+    parsed = new URL(String(url ?? ""));
+  } catch {
+    return false; // unparseable URL always blocked
   }
-  return allowlistedHosts.includes(hostnameFor(url));
+
+  const scheme = parsed.protocol.replace(/:$/, "").toLowerCase();
+  if (BLOCKED_SCHEMES.has(scheme)) {
+    return false;
+  }
+
+  if (!["http", "https"].includes(scheme)) {
+    return false;
+  }
+
+  if (!Array.isArray(allowlistedHosts) || allowlistedHosts.length === 0) {
+    return true; // open mode — no allowlist configured
+  }
+
+  const urlHost = normalizeHost(parsed.hostname);
+  for (const entry of allowlistedHosts) {
+    const allowed = normalizeHost(entry);
+    if (!allowed) continue;
+    // Exact match or subdomain match (e.g. allowed=google.com matches maps.google.com)
+    if (urlHost === allowed || urlHost.endsWith(`.${allowed}`)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function compactValue(value, maxLength = 900) {
@@ -53,6 +107,7 @@ export class BrowserController {
     this.channel = options.channel ?? DEFAULT_BROWSER_CHANNEL;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.userDataDir = options.userDataDir ?? null;
+    this.stealth = options.stealth ?? DEFAULT_BROWSER_STEALTH;
     this.browser = null;
     this.context = null;
     this.targets = new Map();
@@ -60,18 +115,55 @@ export class BrowserController {
     this.allowlistedHosts = [];
     this.sessionId = null;
     this.recentActions = [];
+    this.persistentFallbackReason = null;
   }
 
   async openBrowserSession({ allowlistedHosts = [], headless = this.headless } = {}) {
     this.allowlistedHosts = allowlistedHosts;
-    this.sessionId = createId("browser_session");
-    if (this.userDataDir) {
-      await this.#launchPersistentContext(headless);
-    } else {
-      this.browser = await this.#launchBrowser(headless);
-      this.context = await this.browser.newContext({
-        viewport: { width: 1440, height: 980 }
+    if (this.isOpen()) {
+      const targetId = this.activeTargetId ?? this.targets.keys().next().value ?? null;
+      if (!targetId) {
+        throw new Error("Browser session is open but no target is attached.");
+      }
+      this.sessionId = this.sessionId ?? createId("browser_session");
+      this.activeTargetId = targetId;
+      const page = this.#getPage(targetId);
+      this.#recordTargetAction(targetId, "reuse_browser_session", {
+        headless,
+        allowlistedHosts,
+        persistent: Boolean(this.userDataDir)
+      }, {
+        url: page.url(),
+        reused: true
       });
+      return {
+        sessionId: this.sessionId,
+        targetId,
+        headless,
+        allowlistedHosts,
+        persistent: Boolean(this.userDataDir),
+        reused: true
+      };
+    }
+    this.sessionId = createId("browser_session");
+    this.targets.clear();
+    this.activeTargetId = null;
+    if (this.userDataDir) {
+      try {
+        await this.#launchPersistentContext(headless);
+        this.persistentFallbackReason = null;
+      } catch (error) {
+        this.persistentFallbackReason = error.message;
+        this.userDataDir = null;
+        await this.#launchEphemeralContext(headless).catch((fallbackError) => {
+          throw new Error(`${error.message}; fallback browser launch also failed: ${fallbackError.message}`);
+        });
+      }
+    } else {
+      await this.#launchEphemeralContext(headless);
+    }
+    if (this.stealth) {
+      await this.context.addInitScript(STEALTH_INIT_SCRIPT);
     }
     const existingPages = this.context.pages();
     const page = existingPages[0] ?? await this.context.newPage();
@@ -83,7 +175,8 @@ export class BrowserController {
     this.#recordTargetAction(targetId, "open_browser_session", {
       headless,
       allowlistedHosts,
-      persistent: Boolean(this.userDataDir)
+      persistent: Boolean(this.userDataDir),
+      persistentFallbackReason: this.persistentFallbackReason
     }, {
       url: page.url()
     });
@@ -92,7 +185,8 @@ export class BrowserController {
       targetId,
       headless,
       allowlistedHosts,
-      persistent: Boolean(this.userDataDir)
+      persistent: Boolean(this.userDataDir),
+      persistentFallbackReason: this.persistentFallbackReason
     };
   }
 
@@ -106,10 +200,23 @@ export class BrowserController {
   }
 
   isOpen() {
-    return Boolean(this.context) && this.targets.size > 0;
+    if (!this.context || this.targets.size === 0) return false;
+    try {
+      if (typeof this.context.isClosed === "function" && this.context.isClosed()) {
+        return false;
+      }
+      if (this.browser && typeof this.browser.isConnected === "function" && !this.browser.isConnected()) {
+        return false;
+      }
+      this.#pruneClosedTargets();
+      return this.targets.size > 0;
+    } catch {
+      return false;
+    }
   }
 
   listTargets() {
+    this.#pruneClosedTargets();
     return Array.from(this.targets.values()).map(({ id, page, state }) => ({
       id,
       url: page.url(),
@@ -147,6 +254,9 @@ export class BrowserController {
   }
 
   async openTab(url = "about:blank") {
+    if (!this.isOpen()) {
+      throw new Error("Browser context is not open.");
+    }
     const page = await this.context.newPage();
     const targetId = this.#attachPage(page);
     if (url !== "about:blank") {
@@ -357,6 +467,180 @@ export class BrowserController {
     return result;
   }
 
+  async clickAt(targetId, { x, y, normalized = true } = {}) {
+    const page = this.#getPage(targetId);
+    const point = await this.#resolveViewportPoint(page, { x, y, normalized });
+    await page.mouse.click(point.x, point.y);
+    const result = {
+      targetId,
+      x: point.x,
+      y: point.y,
+      normalizedX: point.normalizedX,
+      normalizedY: point.normalizedY,
+      url: page.url()
+    };
+    await this.#refreshTargetMeta(targetId, {
+      viewport: point.viewport,
+      lastResult: result,
+      lastError: null
+    });
+    this.#recordTargetAction(targetId, "click_at", {
+      normalizedX: point.normalizedX,
+      normalizedY: point.normalizedY
+    }, result);
+    return result;
+  }
+
+  async typeIntoActive(targetId, value) {
+    const page = this.#getPage(targetId);
+    const text = String(value ?? "");
+    await page.keyboard.type(text, { delay: 12 });
+    const result = {
+      targetId,
+      valueLength: text.length,
+      url: page.url()
+    };
+    await this.#refreshTargetMeta(targetId, {
+      lastResult: result,
+      lastError: null
+    });
+    this.#recordTargetAction(targetId, "type_into_active", {
+      valueLength: text.length
+    }, result);
+    return result;
+  }
+
+  async pressKey(targetId, key) {
+    const page = this.#getPage(targetId);
+    const normalizedKey = String(key ?? "").trim();
+    if (!normalizedKey) {
+      throw new Error("pressKey requires a key.");
+    }
+    await page.keyboard.press(normalizedKey);
+    const result = {
+      targetId,
+      key: normalizedKey,
+      url: page.url()
+    };
+    await this.#refreshTargetMeta(targetId, {
+      lastResult: result,
+      lastError: null
+    });
+    this.#recordTargetAction(targetId, "press_key", { key: normalizedKey }, result);
+    return result;
+  }
+
+  async goBack(targetId) {
+    const page = this.#getPage(targetId);
+    const response = await page.goBack({ waitUntil: "domcontentloaded", timeout: this.timeoutMs }).catch(() => null);
+    const result = {
+      targetId,
+      url: page.url(),
+      status: response?.status?.() ?? null
+    };
+    await this.#refreshTargetMeta(targetId, {
+      loadingState: "domcontentloaded",
+      lastResult: result,
+      lastError: null
+    });
+    this.#appendNavigation(targetId, result);
+    this.#recordTargetAction(targetId, "go_back", {}, result);
+    return result;
+  }
+
+  async goForward(targetId) {
+    const page = this.#getPage(targetId);
+    const response = await page.goForward({ waitUntil: "domcontentloaded", timeout: this.timeoutMs }).catch(() => null);
+    const result = {
+      targetId,
+      url: page.url(),
+      status: response?.status?.() ?? null
+    };
+    await this.#refreshTargetMeta(targetId, {
+      loadingState: "domcontentloaded",
+      lastResult: result,
+      lastError: null
+    });
+    this.#appendNavigation(targetId, result);
+    this.#recordTargetAction(targetId, "go_forward", {}, result);
+    return result;
+  }
+
+  async reload(targetId) {
+    const page = this.#getPage(targetId);
+    const response = await page.reload({ waitUntil: "domcontentloaded", timeout: this.timeoutMs });
+    const result = {
+      targetId,
+      url: page.url(),
+      status: response?.status() ?? null
+    };
+    await this.#refreshTargetMeta(targetId, {
+      loadingState: "domcontentloaded",
+      lastResult: result,
+      lastError: null
+    });
+    this.#recordTargetAction(targetId, "reload", {}, result);
+    return result;
+  }
+
+  async evaluateScript(targetId, { expression, arg = null } = {}) {
+    const page = this.#getPage(targetId);
+    const source = String(expression ?? "").trim();
+    if (!source) {
+      throw new Error("evaluateScript requires a JavaScript expression.");
+    }
+    const value = await page.evaluate(async ({ source: scriptSource, arg: scriptArg }) => {
+      const evaluated = (0, eval)(scriptSource);
+      if (typeof evaluated === "function") {
+        return await evaluated(scriptArg);
+      }
+      return evaluated;
+    }, { source, arg });
+    const result = {
+      targetId,
+      value: compactValue(value, 3000),
+      url: page.url()
+    };
+    await this.#refreshTargetMeta(targetId, {
+      lastResult: result,
+      lastError: null
+    });
+    this.#recordTargetAction(targetId, "evaluate_script", {
+      expressionLength: source.length,
+      hasArg: arg != null
+    }, result);
+    return result;
+  }
+
+  async dispatchCdpCommand(targetId, { method, params = {} } = {}) {
+    const page = this.#getPage(targetId);
+    const cdpMethod = String(method ?? "").trim();
+    if (!cdpMethod) {
+      throw new Error("dispatchCdpCommand requires a CDP method.");
+    }
+    const session = await this.context.newCDPSession(page);
+    try {
+      const value = await session.send(cdpMethod, params && typeof params === "object" ? params : {});
+      const result = {
+        targetId,
+        method: cdpMethod,
+        value: compactValue(value, 3000),
+        url: page.url()
+      };
+      await this.#refreshTargetMeta(targetId, {
+        lastResult: result,
+        lastError: null
+      });
+      this.#recordTargetAction(targetId, "cdp_command", {
+        method: cdpMethod,
+        paramKeys: Object.keys(params ?? {}).slice(0, 20)
+      }, result);
+      return result;
+    } finally {
+      await session.detach().catch(() => {});
+    }
+  }
+
   async scrollIntoView(targetId, selectorSpec) {
     const page = this.#getPage(targetId);
     const locator = this.#locator(page, selectorSpec).first();
@@ -480,6 +764,42 @@ export class BrowserController {
     return result;
   }
 
+  // Clears stale blocker state from a previous run and navigates to about:blank if
+  // the current page URL is not on the new run's allowlistedHosts. Call before
+  // re-using a persistent session for a different mission.
+  async softResetForRun(targetId, newAllowlistedHosts = []) {
+    const target = this.targets.get(targetId);
+    if (!target) return;
+    // Always clear the in-memory blocker state from the previous run
+    target.state.blocker = null;
+    target.state.lastResult = null;
+    target.state.lastError = null;
+    // Navigate to blank only if the current page is off the new allowlist
+    const currentUrl = target.page.url();
+    if (currentUrl && currentUrl !== "about:blank") {
+      let shouldReset = false;
+      try {
+        const hostname = new URL(currentUrl).hostname.toLowerCase().replace(/^www\./, "");
+        shouldReset = newAllowlistedHosts.length > 0 && !newAllowlistedHosts.some((h) => {
+          const norm = String(h).toLowerCase().replace(/^www\./, "").replace(/\s+/g, "-");
+          return hostname === norm || hostname.endsWith(`.${norm}`) ||
+            hostname.replace(/\.[^.]+$/, "") === norm;
+        });
+      } catch {
+        shouldReset = true;
+      }
+      if (shouldReset) {
+        try {
+          await target.page.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 4000 });
+          target.state.blocker = null;
+          target.state.url = "about:blank";
+        } catch {
+          // soft reset — ignore navigation errors
+        }
+      }
+    }
+  }
+
   async detectBlockers(targetId) {
     const page = this.#getPage(targetId);
     const result = await page.evaluate(() => {
@@ -489,24 +809,23 @@ export class BrowserController {
         const rect = element.getBoundingClientRect();
         return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
       });
-      if (!dialog) {
-        return {
-          blocked: false,
-          reason: null
-        };
-      }
       return {
-        blocked: true,
-        reason: (dialog.getAttribute("data-testid") || dialog.getAttribute("aria-label") || dialog.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160)
+        url: window.location.href,
+        title: document.title,
+        bodyText: (document.body?.innerText || "").replace(/\s+/g, " ").trim().slice(0, 5000),
+        dialogText: dialog
+          ? (dialog.getAttribute("data-testid") || dialog.getAttribute("aria-label") || dialog.textContent || "").replace(/\s+/g, " ").trim().slice(0, 500)
+          : ""
       };
     });
+    const classified = classifyBrowserBlockerSignal(result);
     await this.#refreshTargetMeta(targetId, {
-      blocker: result,
-      lastResult: result,
+      blocker: classified,
+      lastResult: classified,
       lastError: null
     });
-    this.#recordTargetAction(targetId, "detect_blockers", {}, result);
-    return result;
+    this.#recordTargetAction(targetId, "detect_blockers", {}, classified);
+    return classified;
   }
 
   async handleModal(targetId, selectorSpec) {
@@ -741,26 +1060,40 @@ export class BrowserController {
 
   async #launchBrowser(headless) {
     const executablePath = chromium.executablePath();
+    const args = ["--no-sandbox", ...(this.stealth ? STEALTH_ARGS : [])];
     try {
-      return await chromium.launch({
-        headless,
-        executablePath,
-        args: ["--no-sandbox"]
-      });
+      return await chromium.launch({ headless, executablePath, args });
     } catch (error) {
       const message = error?.message ?? "Unknown launch error";
       throw new Error(`Failed to launch bundled Chromium: ${message}`);
     }
   }
 
+  async #launchEphemeralContext(headless) {
+    const browser = await this.#launchBrowser(headless);
+    try {
+      const context = await browser.newContext({
+        viewport: { width: 1440, height: 980 },
+        ...(this.stealth ? { userAgent: STEALTH_USER_AGENT } : {})
+      });
+      this.browser = browser;
+      this.context = context;
+    } catch (error) {
+      await browser.close().catch(() => {});
+      throw error;
+    }
+  }
+
   async #launchPersistentContext(headless) {
     const executablePath = chromium.executablePath();
+    const args = ["--no-sandbox", ...(this.stealth ? STEALTH_ARGS : [])];
     try {
       this.context = await chromium.launchPersistentContext(this.userDataDir, {
         headless,
         executablePath,
-        args: ["--no-sandbox"],
-        viewport: { width: 1440, height: 980 }
+        args,
+        viewport: { width: 1440, height: 980 },
+        ...(this.stealth ? { userAgent: STEALTH_USER_AGENT } : {})
       });
     } catch (error) {
       const message = error?.message ?? "Unknown launch error";
@@ -791,8 +1124,26 @@ export class BrowserController {
         lastSnapshotSummary: null
       }
     });
+    page.on?.("close", () => {
+      this.targets.delete(id);
+      if (this.activeTargetId === id) {
+        this.activeTargetId = this.targets.keys().next().value ?? null;
+      }
+      this.#recordSessionAction("target_closed", { targetId: id }, { activeTargetId: this.activeTargetId });
+    });
     this.#recordSessionAction("attach_page", { targetId: id }, { url: page.url() });
     return id;
+  }
+
+  #pruneClosedTargets() {
+    for (const [id, target] of this.targets.entries()) {
+      if (target.page?.isClosed?.()) {
+        this.targets.delete(id);
+        if (this.activeTargetId === id) {
+          this.activeTargetId = this.targets.keys().next().value ?? null;
+        }
+      }
+    }
   }
 
   #getTarget(targetId) {
@@ -886,6 +1237,31 @@ export class BrowserController {
       return page.locator(selectorSpec.css);
     }
     throw new Error(`Unsupported selector specification: ${JSON.stringify(selectorSpec)}`);
+  }
+
+  async #resolveViewportPoint(page, { x, y, normalized = true } = {}) {
+    const viewport = await page.evaluate(() => ({
+      width: window.innerWidth || document.documentElement.clientWidth || 1,
+      height: window.innerHeight || document.documentElement.clientHeight || 1,
+      scrollX: window.scrollX || 0,
+      scrollY: window.scrollY || 0
+    }));
+    const rawX = Number(x);
+    const rawY = Number(y);
+    if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
+      throw new Error("clickAt requires numeric x and y.");
+    }
+    const resolvedX = normalized ? rawX * viewport.width : rawX;
+    const resolvedY = normalized ? rawY * viewport.height : rawY;
+    const clampedX = Math.max(0, Math.min(viewport.width - 1, resolvedX));
+    const clampedY = Math.max(0, Math.min(viewport.height - 1, resolvedY));
+    return {
+      x: clampedX,
+      y: clampedY,
+      normalizedX: viewport.width > 0 ? clampedX / viewport.width : 0,
+      normalizedY: viewport.height > 0 ? clampedY / viewport.height : 0,
+      viewport
+    };
   }
 
   async #findSystemBrowser() {

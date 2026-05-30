@@ -136,11 +136,11 @@ export async function run() {
     assert.equal(processResult.terminal.status, TERMINAL_STATUS.RUNNING);
     const waitingTerminal = await waitForTerminalStatus(service, project.id, processResult.terminal.id, TERMINAL_STATUS.WAITING_FOR_INPUT);
     assert.equal(waitingTerminal.recentOutput.includes("Approve this command?"), true);
-    assert.throws(
+    await assert.rejects(
       () => service.writeWorkspaceTerminalInput(project.id, processResult.terminal.id, { input: "y" }),
       /requires explicit approval/
     );
-    service.writeWorkspaceTerminalInput(project.id, processResult.terminal.id, {
+    await service.writeWorkspaceTerminalInput(project.id, processResult.terminal.id, {
       input: "y",
       approved: true
     });

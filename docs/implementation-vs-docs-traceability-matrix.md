@@ -100,3 +100,29 @@ It should still be described as:
 - `internally demoable`
 - `credible local cowork pilot surface, but still below production posture`
 - `not production ready`
+
+## 2026-05-07 Agentic Traceability Addendum
+
+| Target component | Status after update | Implementation | Tests | Remaining gap |
+|---|---|---|---|---|
+| MissionExecutionLoop | Covered as testable runtime abstraction | `app/src/runtime/mission-execution-loop.js` | `mission-execution-loop.test.js` | Production still flows through `PrototypeAgent`; full migration pending |
+| WorkspaceStateSnapshot | Partially covered | `app/src/runtime/workspace-state-snapshot.js`, progress API | existing API tests | Not yet the central state store for every path |
+| MissionProgressTracker | Partially covered | `app/src/runtime/mission-progress-tracker.js` | `mission-progress-tracker.test.js` | Step log still not persisted per step for every path |
+| SemanticOutcomeVerifier | Strengthened | `app/src/runtime/semantic-outcome-verifier.js`, central completion guard in `app/src/runtime/prototype-agent.js` | `semantic-outcome-verifier.test.js`, `run-completion-guard.test.js` | Heuristic verification; arbitrary real surfaces still need more perception proof |
+| EvidenceAlignmentGuard | Covered for deterministic target checks | `app/src/runtime/evidence-alignment-guard.js` | `evidence-alignment-guard.test.js` | Heuristic target extraction; not full visual/DOM semantic matching |
+| RecoveryPlanner | Covered as deterministic planner | `app/src/runtime/recovery-planner.js` | `recovery-planner.test.js` | Not fully wired into every execution failure path |
+| LlmOutputRecovery | Covered | `app/src/llm/output-recovery.js`, provider parse path, malformed mission-understanding fallback in `PrototypeAgent` | `llm-output-recovery.test.js`, `npm test` | Provider retry still owns most live repair behavior, but malformed mission-understanding no longer crashes the browser acceptance run |
+| Mission Acceptance Harness | Covered as definitions/runner | `app/src/scripts/mission-acceptance-harness.js` | script `--list`, `--id=1`, `--id=2` | Missions 1 and 2 now pass locally against real desktop/browser surfaces; broader missions remain environment-dependent |
+| UX/API mission status | Partially covered | run progress endpoint, audit `missionStatusSurface` | operator tests indirectly | UI presentation still minimal |
+## 2026-05-07 Traceability Update
+
+| Requirement | Implementation | Status |
+| --- | --- | --- |
+| Central surface routing | `app/src/runtime/surface-router.js`, wired in `OperatorService.startMission` | Implemented V1 |
+| Harness approval auto-resolution | `app/src/policy/approval-resolution-policy.js`, harness parameters in `mission-acceptance-harness.js` | Implemented V1 |
+| User-mode approvals remain explicit | `shouldUseInteractiveApproval`, broker fallback | Implemented |
+| Tool lifecycle events | `app/src/runtime/tool-call-lifecycle.js`, desktop autonomy/browser launch integrations | Partial |
+| Execution Thread dedupe | `ConversationResponsePlanner` dedupes by `toolCallId` | Implemented V1 |
+| Mobile cockpit run state | `getMobileRuns`, `app/ui/mobile/app.js`, `styles.css` | Implemented V1 |
+| Mission 1 Notepad benchmark | Router + harness approvals + desktop text extraction fix + focus-window approval envelope | Passed locally via `mission-acceptance-harness --id=1` |
+| Mission 2 browser benchmark | Router + harness approvals + browser lifecycle + malformed LLM fallback + browser alternative evidence alignment | Passed locally via `mission-acceptance-harness --id=2` |

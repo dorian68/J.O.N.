@@ -163,3 +163,20 @@ Step 2: surface=desktop → focusWindow(Notepad) → typeText(extracted)
 | Recovery: terminal prompt miss | PARTIAL | Retry with \n signal |
 | Proof capture per surface | NO | DB write + format standardized |
 | Multi-surface mission orchestration | NO | Tested/wired in loop |
+
+## 2026-05-07 Implementation Update
+
+Implemented/strengthened:
+
+- Browser autonomy path gates completion through `SemanticOutcomeVerifier`.
+- Desktop autonomy path gates completion through `SemanticOutcomeVerifier`.
+- Browser launch/search and window capture paths now persist compact semantic verification metadata before marking completion.
+- Terminal orchestration has explicit `waiting_for_input`, `needs_attention`, `error`, `auto_inject_context`, and human approval decisions.
+- `EvidenceAlignmentGuard` prevents unrelated evidence from satisfying a site/app-specific mission.
+
+Still missing:
+
+- A single production `SurfaceRouter` that owns cross-surface planning.
+- Full multi-surface execution inside one continuous run. Current orchestration is strongest for one bounded surface per run plus limited chain continuation.
+- Real browser DOM extraction from arbitrary websites into a guaranteed artifact path for every prompt shape.
+- Deeper semantic verification for arbitrary real surfaces beyond current deterministic evidence/target heuristics.

@@ -393,6 +393,47 @@ export class PrototypeDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_mobile_audit_log_device_created
       ON mobile_audit_log(device_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS workspace_plans (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        conversation_id TEXT,
+        objective TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'draft',
+        stages_json TEXT NOT NULL DEFAULT '[]',
+        metadata_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workspace_plans_project_updated
+      ON workspace_plans(project_id, updated_at DESC);
+
+      CREATE TABLE IF NOT EXISTS workspace_plan_verifications (
+        id TEXT PRIMARY KEY,
+        plan_id TEXT NOT NULL,
+        stage_id TEXT,
+        terminal_id TEXT,
+        project_id TEXT NOT NULL,
+        verdict TEXT NOT NULL,
+        confidence REAL,
+        summary TEXT,
+        criteria_results_json TEXT,
+        observed_evidence_json TEXT,
+        modified_files_json TEXT,
+        tests_run_json TEXT,
+        tests_passed_json TEXT,
+        tests_failed_json TEXT,
+        risks_json TEXT,
+        recommended_next_action TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(plan_id) REFERENCES workspace_plans(id) ON DELETE CASCADE,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workspace_plan_verifications_plan_created
+      ON workspace_plan_verifications(plan_id, created_at ASC);
     `);
     this.migrateConversationSchema();
   }
@@ -1054,6 +1095,121 @@ export class PrototypeDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };
+  }
+
+  // ── Workspace Plans ──────────────────────────────────────────────────────────
+
+  upsertWorkspacePlan(plan) {
+    const now = plan.updatedAt ?? new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO workspace_plans (id, project_id, conversation_id, objective, status, stages_json, metadata_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        conversation_id = excluded.conversation_id,
+        objective = excluded.objective,
+        status = excluded.status,
+        stages_json = excluded.stages_json,
+        metadata_json = excluded.metadata_json,
+        updated_at = excluded.updated_at
+    `).run(
+      plan.id,
+      plan.projectId,
+      plan.conversationId ?? null,
+      plan.objective,
+      plan.status ?? "draft",
+      stringifyJson(plan.stages ?? []),
+      stringifyJson(plan.metadata ?? {}),
+      plan.createdAt ?? now,
+      now
+    );
+    return this.getWorkspacePlan(plan.id);
+  }
+
+  getWorkspacePlan(planId) {
+    const row = this.db.prepare(`SELECT * FROM workspace_plans WHERE id = ?`).get(planId);
+    return row ? this.#workspacePlanFromRow(row) : null;
+  }
+
+  listWorkspacePlans(projectId, { conversationId = null, status = null, limit = 20 } = {}) {
+    let query = `SELECT * FROM workspace_plans WHERE project_id = ?`;
+    const params = [projectId];
+    if (conversationId) { query += ` AND conversation_id = ?`; params.push(conversationId); }
+    if (status) { query += ` AND status = ?`; params.push(status); }
+    query += ` ORDER BY updated_at DESC, rowid DESC LIMIT ?`;
+    params.push(limit);
+    return this.db.prepare(query).all(...params).map(row => this.#workspacePlanFromRow(row));
+  }
+
+  getLatestActiveWorkspacePlan(projectId, { conversationId = null } = {}) {
+    const plans = this.listWorkspacePlans(projectId, { conversationId, limit: 10 });
+    return plans.find(p => ["active", "draft", "paused", "needs_user_decision"].includes(p.status)) ?? null;
+  }
+
+  #workspacePlanFromRow(row) {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      conversationId: row.conversation_id ?? null,
+      objective: row.objective,
+      status: row.status,
+      stages: parseJson(row.stages_json, []),
+      metadata: parseJson(row.metadata_json, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  // ── Workspace Plan Verifications ──────────────────────────────────────────────
+
+  insertWorkspacePlanVerification(v) {
+    this.db.prepare(`
+      INSERT INTO workspace_plan_verifications (
+        id, plan_id, stage_id, terminal_id, project_id, verdict, confidence, summary,
+        criteria_results_json, observed_evidence_json, modified_files_json,
+        tests_run_json, tests_passed_json, tests_failed_json, risks_json,
+        recommended_next_action, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      v.id,
+      v.planId,
+      v.stageId ?? null,
+      v.terminalId ?? null,
+      v.projectId,
+      v.verdict,
+      v.confidence ?? null,
+      v.summary ?? null,
+      stringifyJson(v.criteriaResults ?? []),
+      stringifyJson(v.observedEvidence ?? []),
+      stringifyJson(v.modifiedFiles ?? []),
+      stringifyJson(v.testsRun ?? []),
+      stringifyJson(v.testsPassed ?? []),
+      stringifyJson(v.testsFailed ?? []),
+      stringifyJson(v.risks ?? []),
+      v.recommendedNextAction ?? null,
+      v.createdAt ?? new Date().toISOString()
+    );
+    return v;
+  }
+
+  listWorkspacePlanVerifications(planId, { stageId = null, limit = 50 } = {}) {
+    const rows = stageId
+      ? this.db.prepare(`SELECT * FROM workspace_plan_verifications WHERE plan_id = ? AND stage_id = ? ORDER BY created_at ASC LIMIT ?`).all(planId, stageId, limit)
+      : this.db.prepare(`SELECT * FROM workspace_plan_verifications WHERE plan_id = ? ORDER BY created_at ASC LIMIT ?`).all(planId, limit);
+    return rows.map(row => ({
+      id: row.id, planId: row.plan_id, stageId: row.stage_id ?? null,
+      terminalId: row.terminal_id ?? null, projectId: row.project_id,
+      verdict: row.verdict, confidence: row.confidence ?? null,
+      summary: row.summary ?? null,
+      criteriaResults: parseJson(row.criteria_results_json, []),
+      observedEvidence: parseJson(row.observed_evidence_json, []),
+      modifiedFiles: parseJson(row.modified_files_json, []),
+      testsRun: parseJson(row.tests_run_json, []),
+      testsPassed: parseJson(row.tests_passed_json, []),
+      testsFailed: parseJson(row.tests_failed_json, []),
+      risks: parseJson(row.risks_json, []),
+      recommendedNextAction: row.recommended_next_action ?? null,
+      createdAt: row.created_at
+    }));
   }
 
   insertEvent(runId, event) {

@@ -1,0 +1,36 @@
+{
+  "prompt_id": "recovery.escalation_message",
+  "family": "recovery",
+  "purpose": "Generate a clear, human-friendly escalation message for the user when JON cannot automatically recover from a failed run. Presents the diagnosis and the best alternative action.",
+  "owner": "runtime",
+  "status": "active",
+  "environment": "prototype",
+  "version": "1.0.0",
+  "compatible_model_aliases": ["utility_structuring", "primary_reasoning", "mock_offline"],
+  "input_contract": {
+    "mission": "string",
+    "failureCause": "string",
+    "whatFailed": "string",
+    "whyFailed": "string",
+    "bestAlternativeDescription": "string",
+    "bestAlternativeApproach": "string",
+    "requiresUserInput": "string",
+    "allAlternativesCount": "string"
+  },
+  "output_contract": {
+    "type": "structured",
+    "schema": "recovery_escalation_message_v1"
+  },
+  "benchmark_links": [],
+  "change_notes": "Initial version: human-friendly escalation messages for all JON run types.",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are JON, an autonomous desktop AI agent. When you cannot complete a mission automatically, you must explain clearly and concisely what happened and what you propose to do next.\n\nTone: direct, honest, collaborative. Never apologetic or verbose. No jargon.\nFormat: plain conversational message, 2-4 sentences max.\nLanguage: match the user's likely language (infer from mission text).\n\nDo NOT:\n- Suggest bypassing security, CAPTCHAs, or bot protection\n- Claim you can do something you can't\n- Be vague about what failed"
+    },
+    {
+      "role": "user",
+      "content": "Mission: {{mission}}\n\nWhat happened: {{whatFailed}}\nRoot cause: {{whyFailed}}\nFailure category: {{failureCause}}\n\nBest recovery option identified:\n- Action: {{bestAlternativeDescription}}\n- Approach type: {{bestAlternativeApproach}}\n- Requires your input: {{requiresUserInput}}\n\nTotal alternatives considered: {{allAlternativesCount}}\n\nWrite a short message to the user explaining what happened and proposing the best next step. If requiresUserInput is true, ask the user to take that action. If false, tell the user you are going to retry automatically with the alternative approach.\n\nRespond with JSON:\n{\n  \"message\": \"Your conversational message here.\"\n}"
+    }
+  ]
+}

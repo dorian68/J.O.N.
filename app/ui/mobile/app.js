@@ -3,6 +3,16 @@ import { createRoot } from "react-dom/client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+function stripAnsi(text) {
+  return String(text ?? "")
+    .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "")
+    .replace(/\x1b[()][A-Z0-9]/g, "")
+    .replace(/\x1b[^[\]()\\]/g, "")
+    .replace(/\[[\d;?]{1,12}[A-Za-z]/g, "");
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const TABS = ["dashboard", "control", "tabs", "terminal", "tasks"];
@@ -681,7 +691,7 @@ function TerminalAlertCard({ terminal, projectId, token, onAnswered }) {
     ),
     terminal.recentOutput
       ? h("pre", { className: "terminal-output-preview" },
-          String(terminal.recentOutput).split("\n").slice(-4).join("\n"))
+          stripAnsi(terminal.recentOutput).split("\n").filter((l) => l.trim()).slice(-4).join("\n"))
       : null,
     h("textarea", {
       className: "mobile-textarea",
@@ -2353,7 +2363,7 @@ function TerminalsTab({ projectId, token, events }) {
               ),
               t.recentOutput
                 ? h("pre", { className: "terminal-output-preview" },
-                    String(t.recentOutput).split("\n").slice(-3).join("\n"))
+                    stripAnsi(t.recentOutput).split("\n").filter((l) => l.trim()).slice(-3).join("\n"))
                 : null
             )
           )

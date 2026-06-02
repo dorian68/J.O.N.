@@ -20259,6 +20259,9 @@ ${h.join(`
 	};
 	//#endregion
 	//#region ui/mobile/app.js
+	function stripAnsi(text) {
+		return String(text !== null && text !== void 0 ? text : "").replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\x1b[()][A-Z0-9]/g, "").replace(/\x1b[^[\]()\\]/g, "").replace(/\[[\d;?]{1,12}[A-Za-z]/g, "");
+	}
 	var TABS = [
 		"dashboard",
 		"control",
@@ -21091,7 +21094,7 @@ ${h.join(`
 				setSending(false);
 			}
 		}
-		return (0, import_react.createElement)("div", { className: "terminal-alert-card" }, (0, import_react.createElement)("div", { className: "terminal-alert-header" }, (0, import_react.createElement)("span", { className: "terminal-icon" }, SVG.terminal), (0, import_react.createElement)("span", { className: "terminal-label" }, terminal.label), (0, import_react.createElement)("span", { className: "terminal-badge" }, "INPUT")), terminal.recentOutput ? (0, import_react.createElement)("pre", { className: "terminal-output-preview" }, String(terminal.recentOutput).split("\n").slice(-4).join("\n")) : null, (0, import_react.createElement)("textarea", {
+		return (0, import_react.createElement)("div", { className: "terminal-alert-card" }, (0, import_react.createElement)("div", { className: "terminal-alert-header" }, (0, import_react.createElement)("span", { className: "terminal-icon" }, SVG.terminal), (0, import_react.createElement)("span", { className: "terminal-label" }, terminal.label), (0, import_react.createElement)("span", { className: "terminal-badge" }, "INPUT")), terminal.recentOutput ? (0, import_react.createElement)("pre", { className: "terminal-output-preview" }, stripAnsi(terminal.recentOutput).split("\n").filter((l) => l.trim()).slice(-4).join("\n")) : null, (0, import_react.createElement)("textarea", {
 			className: "mobile-textarea",
 			placeholder: "Votre réponse…",
 			value: answer,
@@ -22464,7 +22467,7 @@ ${h.join(`
 			return (0, import_react.createElement)("div", {
 				key: t.id,
 				className: "terminal-card"
-			}, (0, import_react.createElement)("div", { className: "terminal-card-row" }, (0, import_react.createElement)("span", { className: `status-dot ${t.status}` }), (0, import_react.createElement)("span", { className: "terminal-name" }, t.label), (0, import_react.createElement)("span", { className: "terminal-status-text" }, (_TERM_STATUS_FR$t$sta = TERM_STATUS_FR[t.status]) !== null && _TERM_STATUS_FR$t$sta !== void 0 ? _TERM_STATUS_FR$t$sta : t.status)), t.recentOutput ? (0, import_react.createElement)("pre", { className: "terminal-output-preview" }, String(t.recentOutput).split("\n").slice(-3).join("\n")) : null);
+			}, (0, import_react.createElement)("div", { className: "terminal-card-row" }, (0, import_react.createElement)("span", { className: `status-dot ${t.status}` }), (0, import_react.createElement)("span", { className: "terminal-name" }, t.label), (0, import_react.createElement)("span", { className: "terminal-status-text" }, (_TERM_STATUS_FR$t$sta = TERM_STATUS_FR[t.status]) !== null && _TERM_STATUS_FR$t$sta !== void 0 ? _TERM_STATUS_FR$t$sta : t.status)), t.recentOutput ? (0, import_react.createElement)("pre", { className: "terminal-output-preview" }, stripAnsi(t.recentOutput).split("\n").filter((l) => l.trim()).slice(-3).join("\n")) : null);
 		})) : waiting.length === 0 ? (0, import_react.createElement)("div", { className: "empty-state" }, (0, import_react.createElement)("div", { className: "empty-icon" }, IC([(0, import_react.createElement)("polyline", { points: "4 17 10 11 4 5" }), (0, import_react.createElement)("line", {
 			x1: 12,
 			y1: 19,

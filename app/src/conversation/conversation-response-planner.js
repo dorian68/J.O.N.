@@ -64,7 +64,12 @@ function localeCopy(locale) {
 }
 
 function cleanText(value, maxLength = 600) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") {
+    const extracted = value?.message ?? value?.reason ?? value?.summary ?? value?.text ?? null;
+    return extracted != null ? cleanText(String(extracted), maxLength) : "";
+  }
+  return String(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
 function asArray(value) {

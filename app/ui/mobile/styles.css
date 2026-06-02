@@ -1955,6 +1955,20 @@ html, body {
   gap: 8px;
 }
 
+.ctrl-resume-hint {
+  font-size: 12px;
+  color: var(--accent, #f59e0b);
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.terminal-error-hint {
+  font-size: 11px;
+  color: var(--danger, #ef4444);
+  margin: 4px 0 0;
+  padding: 4px 8px;
+}
+
 .ctrl-mission-input-wrap {
   display: flex;
   flex-direction: column;

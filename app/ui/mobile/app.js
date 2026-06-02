@@ -1172,7 +1172,7 @@ function TasksTab({ projectId, token, events, approvals, onApprovalResolved }) {
             run.naturalReply || run.summary
               ? h("p", null, run.naturalReply || run.summary)
               : null,
-            run.executionThread?.activeStep
+            run.executionThread?.activeStep?.label && !/^(act on|execute the plan|needed workspace|workspace surface)/i.test(run.executionThread.activeStep.label)
               ? h("small", null, `Étape: ${run.executionThread.activeStep.label}`)
               : null,
             ["running", "paused"].includes(run.status)
@@ -1789,16 +1789,24 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
 
       h("div", { className: "ctrl-mission-actions" },
         activeRun
-          ? h("div", { className: "ctrl-mission-action-btns" },
-              h("button", {
-                className: "mobile-btn primary",
-                disabled: true
-              }, "Reprendre"),
-              h("button", {
-                className: "mobile-btn outline-danger",
-                onClick: stopRun,
-                disabled: missionBusy
-              }, missionBusy ? "…" : "Arrêter")
+          ? h("div", null,
+              h("div", { className: "ctrl-mission-action-btns" },
+                h("button", {
+                  className: "mobile-btn primary",
+                  disabled: true
+                }, "Reprendre"),
+                h("button", {
+                  className: "mobile-btn outline-danger",
+                  onClick: stopRun,
+                  disabled: missionBusy
+                }, missionBusy ? "…" : "Arrêter")
+              ),
+              activeRun.status === "paused"
+                ? h("p", { className: "ctrl-resume-hint" },
+                    activeRun.pendingApprovals > 0
+                      ? "⚠ Validation requise — approuve l'action dans l'onglet Tâches."
+                      : "Mission en pause — va dans Tâches pour reprendre ou arrêter.")
+                : null
             )
           : h("button", {
               className: "mobile-btn primary",
@@ -2364,7 +2372,9 @@ function TerminalsTab({ projectId, token, events }) {
               t.recentOutput
                 ? h("pre", { className: "terminal-output-preview" },
                     stripAnsi(t.recentOutput).split("\n").filter((l) => l.trim()).slice(-3).join("\n"))
-                : null
+                : t.status === "error"
+                  ? h("p", { className: "terminal-error-hint" }, "Terminal terminé avec une erreur. Vérifiez les logs ou relancez.")
+                  : null
             )
           )
         )
@@ -2429,7 +2439,7 @@ function AdminTab({ token, session, onDisconnect }) {
     onDisconnect();
   }
 
-  return h("div", { className: "tab-content admin-tab" },
+  return h("div", { className: "admin-tab" },
 
     h("div", { className: "card" },
       h("p", { className: "card-section-title" }, "Session"),

@@ -4418,6 +4418,34 @@ export class OperatorService extends EventEmitter {
     }
   }
 
+  // Single binary screen frame for the WebSocket stream. Returns the raw JPEG
+  // buffer + source bounds + the governor's next cadence. Lighter than
+  // getMobileDesktopState (no base64, no windows list).
+  async captureScreenFrame() {
+    if (!this.#mobileRemoteControlEnabled()) {
+      return { buffer: null, intervalMs: 2000 };
+    }
+    const realProvider = this.externalTerminalProvider;
+    const t0 = Date.now();
+    const plannedWidth = this.bandwidthGovernor.snapshot().recommendedMaxWidth;
+    const capture = await realProvider.captureScreen({ maxWidth: plannedWidth });
+    const buffer = capture?.outputPath ? await fs.readFile(capture.outputPath).catch(() => null) : null;
+    const totalMs = Date.now() - t0;
+    const adaptive = this.bandwidthGovernor.observe({ bytes: buffer?.length ?? 0, durationMs: Math.max(1, totalMs) });
+    const vs = capture?.virtualScreen ?? {};
+    return {
+      buffer,
+      mime: "image/jpeg",
+      screenX: vs.x ?? 0,
+      screenY: vs.y ?? 0,
+      screenWidth: vs.width ?? 1920,
+      screenHeight: vs.height ?? 1080,
+      mode: adaptive.mode,
+      throughputKbps: adaptive.throughputKbps,
+      intervalMs: adaptive.recommendedIntervalMs
+    };
+  }
+
   async dispatchMobileDesktopAction(projectId, rawAction, sessionContext = {}) {
     if (!this.#mobileRemoteControlEnabled()) {
       throw Object.assign(new Error("Mobile remote control is disabled."), { code: "MOBILE_CONTROL_DISABLED" });

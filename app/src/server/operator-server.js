@@ -1390,6 +1390,19 @@ export async function createOperatorServer({
         sendJson(response, 200, { catalog: operatorService.listMcpCatalog() });
         return;
       }
+
+      // Mobile: preview a mission plan before executing ("propose plan first").
+      const mobilePreflightRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/missions\/preflight$/);
+      if (mobilePreflightRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.previewMission(mobilePreflightRoute.projectId, body));
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
       if (pathname === "/api/mobile/mcp/remote/connect" && request.method === "POST") {
         if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
         const body = await readJsonBody(request);
@@ -1787,7 +1800,10 @@ export async function createOperatorServer({
     ? "0.0.0.0"
     : (process.env.COWORK_BIND_HOST ?? "0.0.0.0");
   await new Promise((resolve) => server.listen(port, bindHost, resolve));
-  attachMobileTerminalWs(server, { validateSession: (token) => operatorService.validateMobileSession(token) });
+  attachMobileTerminalWs(server, {
+    validateSession: (token) => operatorService.validateMobileSession(token),
+    screenStream: { captureFrame: () => operatorService.captureScreenFrame() }
+  });
   const address = server.address();
   const actualPort = typeof address === "object" && address ? address.port : port;
   const actualHost = typeof address === "object" && address ? address.address : bindHost;

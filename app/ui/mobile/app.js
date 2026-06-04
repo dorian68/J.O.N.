@@ -1380,7 +1380,7 @@ function RemoteScreenViewport({ screenshot, screenshotMime, naturalWidth, natura
     },
       h("div", { className: "remote-vp-inner" },
         screenshot
-          ? h("img", { src: `data:${screenshotMime ?? "image/jpeg"};base64,${screenshot}`, className: "remote-vp-img", style: { transform: `translate(${tx}px,${ty}px) scale(${scale})`, transformOrigin: "0 0" }, draggable: false, alt: "Écran distant" })
+          ? h("img", { src: (typeof screenshot === "string" && (screenshot.startsWith("blob:") || screenshot.startsWith("data:"))) ? screenshot : `data:${screenshotMime ?? "image/jpeg"};base64,${screenshot}`, className: "remote-vp-img", style: { transform: `translate(${tx}px,${ty}px) scale(${scale})`, transformOrigin: "0 0" }, draggable: false, alt: "Écran distant" })
           : h("div", { className: "remote-vp-empty" }, h("p", null, "Aucune capture")),
         tapFeedback ? h("div", { key: tapFeedback.id, className: "remote-tap-dot", style: { left: `${tapFeedback.x}px`, top: `${tapFeedback.y}px` } }) : null,
         mode === "explore" && screenshot ? h("div", { className: "remote-explore-hint" }, "Explorer — tap pour plein écran") : null
@@ -1559,6 +1559,10 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [llmResolving, setLlmResolving] = useState(false);
   const [llmPreview, setLlmPreview] = useState(null); // { resolvedText, generatedText }
+  const [planFirst, setPlanFirst] = useState(false);
+  const [planPreview, setPlanPreview] = useState(null); // preflight understanding
+  const [streamUrl, setStreamUrl] = useState(null);     // live WS frame (object URL)
+  const [streamMeta, setStreamMeta] = useState(null);   // { screenWidth/Height/X/Y, mode, throughputKbps }
   const refreshFailCount = useRef(0);
   const refreshInFlight = useRef(false);
   const adaptiveMsRef = useRef(pollingInterval);
@@ -1612,6 +1616,38 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
     if (events.length > 0) refresh();
   }, [events.length, projectId, token]);
 
+  // Live screen streaming over WebSocket (real-time). Falls back silently to the
+  // adaptive polling above if the socket can't be established.
+  useEffect(() => {
+    if (!token || typeof WebSocket === "undefined") return undefined;
+    let ws = null;
+    let lastUrl = null;
+    let closedByUs = false;
+    try {
+      const scheme = location.protocol === "https:" ? "wss" : "ws";
+      ws = new WebSocket(`${scheme}://${location.host}/api/mobile/screen/ws?token=${encodeURIComponent(token)}`);
+      ws.binaryType = "blob";
+      ws.onmessage = (ev) => {
+        if (typeof ev.data === "string") {
+          try { setStreamMeta(JSON.parse(ev.data)); } catch { /* ignore */ }
+          return;
+        }
+        const url = URL.createObjectURL(ev.data);
+        setStreamUrl(url);
+        if (lastUrl) { const prev = lastUrl; setTimeout(() => URL.revokeObjectURL(prev), 1500); }
+        lastUrl = url;
+      };
+      ws.onerror = () => { /* fallback to polling */ };
+      ws.onclose = () => { if (!closedByUs) setStreamUrl(null); };
+    } catch { /* fallback to polling */ }
+    return () => {
+      closedByUs = true;
+      try { ws && ws.close(); } catch { /* ignore */ }
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      setStreamUrl(null);
+    };
+  }, [token]);
+
   async function launchMission() {
     const obj = mission.trim();
     if (!obj) return;
@@ -1632,6 +1668,19 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
         setMissionError(err.message);
       } finally {
         setLlmResolving(false);
+        setMissionBusy(false);
+      }
+      return;
+    }
+
+    if (planFirst) {
+      setMissionBusy(true);
+      try {
+        const preview = await apiPost(`/api/mobile/projects/${projectId}/missions/preflight`, { missionSpec: { objective: obj } }, token);
+        setPlanPreview(preview?.preflight?.understanding ?? preview?.preflight ?? { note: "Plan indisponible" });
+      } catch (err) {
+        setMissionError(err.message);
+      } finally {
         setMissionBusy(false);
       }
       return;
@@ -1756,8 +1805,13 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
     await sendAction({ type: "hotkey", keys }, "hotkey");
   }
 
-  const screenshot = state?.screenshotBase64 ?? null;
-  const screenshotMime = state?.screenshotMimeType ?? "image/jpeg";
+  // Prefer the live WS stream frame; fall back to the polled base64 capture.
+  const screenshot = streamUrl ?? state?.screenshotBase64 ?? null;
+  const screenshotMime = streamUrl ? "image/jpeg" : (state?.screenshotMimeType ?? "image/jpeg");
+  const liveScreenW = streamMeta?.screenWidth ?? state?.screenWidth ?? 1920;
+  const liveScreenH = streamMeta?.screenHeight ?? state?.screenHeight ?? 1080;
+  const liveScreenX = streamMeta?.screenX ?? state?.screenX ?? 0;
+  const liveScreenY = streamMeta?.screenY ?? state?.screenY ?? 0;
   const disabled = busy !== null || state?.enabled === false;
   const missionHasLlm = hasLlmDirective(mission);
 
@@ -1818,6 +1872,8 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
           )
         : h("div", { className: "ctrl-mission-empty" }, "Aucune mission active — lancez-en une ci-dessous"),
 
+      activeRun ? h(AgenticLog, { events }) : null,
+
       h("div", { className: "ctrl-mission-actions" },
         activeRun
           ? h("div", null,
@@ -1875,6 +1931,10 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
                       `Réponse /llm insérée · ${llmProviderLabel(llmPreview.generation)}`
                     )
                   : null,
+              h("label", { className: "ctrl-plan-toggle" },
+                h("input", { type: "checkbox", checked: planFirst, onChange: (e) => { setPlanFirst(e.target.checked); setPlanPreview(null); } }),
+                " Proposer un plan avant exécution"
+              ),
               h("button", {
                 className: "mobile-btn primary full-width",
                 onClick: launchMission,
@@ -1882,10 +1942,25 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
               }, llmResolving
                 ? "Génération en cours…"
                 : missionBusy
-                  ? "Lancement…"
+                  ? (planFirst ? "Planification…" : "Lancement…")
                   : missionHasLlm
                     ? "Générer /llm"
-                    : "▶ Lancer la mission")
+                    : planFirst
+                      ? "Proposer un plan"
+                      : "▶ Lancer la mission"),
+              planPreview
+                ? h("div", { className: "ctrl-plan-card" },
+                    h("p", { className: "card-section-title" }, "Plan proposé"),
+                    planPreview.clarifiedObjective ? h("p", null, planPreview.clarifiedObjective) : null,
+                    Array.isArray(planPreview.runNowPlan)
+                      ? h("ol", { className: "ctrl-plan-steps" }, planPreview.runNowPlan.slice(0, 8).map((s, i) => h("li", { key: i }, String(s).slice(0, 120))))
+                      : (planPreview.note ? h("p", { className: "card-sub" }, planPreview.note) : null),
+                    h("div", { className: "card-actions" },
+                      h("button", { className: "mobile-btn ghost", onClick: () => setPlanPreview(null) }, "Modifier"),
+                      h("button", { className: "mobile-btn primary", onClick: () => { setPlanPreview(null); doStartMission(mission.trim()); } }, "Confirmer & lancer")
+                    )
+                  )
+                : null
             )
           )
         : null
@@ -1958,10 +2033,10 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
       h(RemoteScreenViewport, {
         screenshot,
         screenshotMime,
-        naturalWidth: state?.screenWidth ?? 1920,
-        naturalHeight: state?.screenHeight ?? 1080,
-        screenOffX: state?.screenX ?? 0,
-        screenOffY: state?.screenY ?? 0,
+        naturalWidth: liveScreenW,
+        naturalHeight: liveScreenH,
+        screenOffX: liveScreenX,
+        screenOffY: liveScreenY,
         mode: viewportMode,
         onRemoteClick: handleRemoteClick,
         onRemoteScroll: handleRemoteScroll,
@@ -1987,10 +2062,10 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
     isFullscreen ? h(RemoteScreenFullscreenModal, {
       screenshot,
       screenshotMime,
-      naturalWidth: state?.screenWidth ?? 1920,
-      naturalHeight: state?.screenHeight ?? 1080,
-      screenOffX: state?.screenX ?? 0,
-      screenOffY: state?.screenY ?? 0,
+      naturalWidth: liveScreenW,
+      naturalHeight: liveScreenH,
+      screenOffX: liveScreenX,
+      screenOffY: liveScreenY,
       mode: viewportMode,
       onModeChange: setViewportMode,
       onClose: () => setIsFullscreen(false),

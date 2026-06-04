@@ -15,25 +15,28 @@ function getShell() {
   return process.platform === "win32" ? "powershell.exe" : (process.env.SHELL ?? "bash");
 }
 
-export function attachMobileTerminalWs(httpServer, { validateSession }) {
+export function attachMobileTerminalWs(httpServer, { validateSession, screenStream = null }) {
   if (!_WebSocketServer) {
     console.warn("[mobile-terminal] ws package not available — interactive terminal disabled.");
     return;
   }
-  if (!_nodePty) {
-    console.warn("[mobile-terminal] node-pty not available — interactive terminal disabled.");
-    return;
+  const terminalEnabled = Boolean(_nodePty);
+  if (!terminalEnabled) {
+    console.warn("[mobile-terminal] node-pty not available — interactive terminal disabled (screen stream still available).");
   }
 
   const wss = new _WebSocketServer({ noServer: true });
+  const screenWss = new _WebSocketServer({ noServer: true });
   let activeCount = 0;
 
+  // Single upgrade router for ALL mobile WebSocket paths — avoids the
+  // multiple-listener socket.destroy() conflict.
   httpServer.on("upgrade", (request, socket, head) => {
     try {
       const url = new URL(request.url, "http://x");
-      if (url.pathname !== "/api/mobile/terminal/ws") {
-        socket.destroy();
-        return;
+      const path = url.pathname;
+      if (path !== "/api/mobile/terminal/ws" && path !== "/api/mobile/screen/ws") {
+        return; // not ours — let other listeners handle (or it times out)
       }
 
       const token = url.searchParams.get("token");
@@ -43,6 +46,17 @@ export function attachMobileTerminalWs(httpServer, { validateSession }) {
         return;
       }
 
+      if (path === "/api/mobile/screen/ws") {
+        if (!screenStream?.captureFrame) { socket.destroy(); return; }
+        screenWss.handleUpgrade(request, socket, head, (ws) => handleScreenStream(ws));
+        return;
+      }
+
+      if (!terminalEnabled) {
+        socket.write("HTTP/1.1 503 Terminal Unavailable\r\nContent-Length: 0\r\n\r\n");
+        socket.destroy();
+        return;
+      }
       if (activeCount >= MAX_ACTIVE_SHELLS) {
         socket.write("HTTP/1.1 503 Too Many Sessions\r\nContent-Length: 0\r\n\r\n");
         socket.destroy();
@@ -58,6 +72,40 @@ export function attachMobileTerminalWs(httpServer, { validateSession }) {
       try { socket.destroy(); } catch {}
     }
   });
+
+  // Screen stream: server-paced capture loop, pushing JPEG frames (binary) with
+  // a small JSON metadata frame, at the bandwidth governor's recommended cadence.
+  function handleScreenStream(ws) {
+    let stopped = false;
+    ws.on("close", () => { stopped = true; });
+    ws.on("error", () => { stopped = true; });
+    (async () => {
+      while (!stopped && ws.readyState === 1) {
+        let frame = null;
+        try {
+          frame = await screenStream.captureFrame();
+        } catch (error) {
+          try { ws.send(JSON.stringify({ type: "error", message: String(error?.message ?? error) })); } catch {}
+        }
+        if (stopped || ws.readyState !== 1) break;
+        if (frame?.buffer) {
+          try {
+            // Metadata first (JSON text), then the binary frame.
+            ws.send(JSON.stringify({
+              type: "frame_meta",
+              screenX: frame.screenX, screenY: frame.screenY,
+              screenWidth: frame.screenWidth, screenHeight: frame.screenHeight,
+              mode: frame.mode, throughputKbps: frame.throughputKbps, mime: frame.mime ?? "image/jpeg"
+            }));
+            ws.send(frame.buffer); // binary
+          } catch { break; }
+        }
+        const wait = Math.max(120, Number(frame?.intervalMs) || 800);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+      try { ws.close(); } catch {}
+    })();
+  }
 
   function handleShell(ws, { cols, rows }) {
     activeCount++;

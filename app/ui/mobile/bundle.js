@@ -21557,7 +21557,7 @@ ${h.join(`
 				}
 			}
 		}, (0, import_react.createElement)("div", { className: "remote-vp-inner" }, screenshot ? (0, import_react.createElement)("img", {
-			src: `data:${screenshotMime !== null && screenshotMime !== void 0 ? screenshotMime : "image/jpeg"};base64,${screenshot}`,
+			src: typeof screenshot === "string" && (screenshot.startsWith("blob:") || screenshot.startsWith("data:")) ? screenshot : `data:${screenshotMime !== null && screenshotMime !== void 0 ? screenshotMime : "image/jpeg"};base64,${screenshot}`,
 			className: "remote-vp-img",
 			style: {
 				transform: `translate(${tx}px,${ty}px) scale(${scale})`,
@@ -21766,7 +21766,7 @@ ${h.join(`
 		}) : null);
 	}
 	function ControlTab({ projectId, token, events, pollingInterval = 2e3 }) {
-		var _state$windows, _state$screenshotBase, _state$screenshotMime, _ref11, _activeRun$mission, _ref12, _activeRun$naturalRep, _activeRun$executionT, _activeRun$executionT2, _completedRun$mission, _ref13, _completedRun$natural, _completedRun$executi, _ref14, _completedRun$executi2, _state$screenWidth, _state$screenHeight, _state$screenX, _state$screenY, _state$screenWidth2, _state$screenHeight2, _state$screenX2, _state$screenY2;
+		var _state$windows, _ref12, _state$screenshotMime, _ref13, _streamMeta$screenWid, _ref14, _streamMeta$screenHei, _ref15, _streamMeta$screenX, _ref16, _streamMeta$screenY, _ref17, _activeRun$mission, _ref18, _activeRun$naturalRep, _activeRun$executionT, _activeRun$executionT2, _completedRun$mission, _ref19, _completedRun$natural, _completedRun$executi, _ref20, _completedRun$executi2;
 		const [state, setState] = (0, import_react.useState)(null);
 		const [busy, setBusy] = (0, import_react.useState)(null);
 		const [error, setError] = (0, import_react.useState)(null);
@@ -21783,6 +21783,10 @@ ${h.join(`
 		const [isKeyboardOpen, setIsKeyboardOpen] = (0, import_react.useState)(false);
 		const [llmResolving, setLlmResolving] = (0, import_react.useState)(false);
 		const [llmPreview, setLlmPreview] = (0, import_react.useState)(null);
+		const [planFirst, setPlanFirst] = (0, import_react.useState)(false);
+		const [planPreview, setPlanPreview] = (0, import_react.useState)(null);
+		const [streamUrl, setStreamUrl] = (0, import_react.useState)(null);
+		const [streamMeta, setStreamMeta] = (0, import_react.useState)(null);
 		const refreshFailCount = (0, import_react.useRef)(0);
 		const refreshInFlight = (0, import_react.useRef)(false);
 		const adaptiveMsRef = (0, import_react.useRef)(pollingInterval);
@@ -21842,6 +21846,44 @@ ${h.join(`
 			projectId,
 			token
 		]);
+		(0, import_react.useEffect)(() => {
+			if (!token || typeof WebSocket === "undefined") return void 0;
+			let ws = null;
+			let lastUrl = null;
+			let closedByUs = false;
+			try {
+				const scheme = location.protocol === "https:" ? "wss" : "ws";
+				ws = new WebSocket(`${scheme}://${location.host}/api/mobile/screen/ws?token=${encodeURIComponent(token)}`);
+				ws.binaryType = "blob";
+				ws.onmessage = (ev) => {
+					if (typeof ev.data === "string") {
+						try {
+							setStreamMeta(JSON.parse(ev.data));
+						} catch (_unused13) {}
+						return;
+					}
+					const url = URL.createObjectURL(ev.data);
+					setStreamUrl(url);
+					if (lastUrl) {
+						const prev = lastUrl;
+						setTimeout(() => URL.revokeObjectURL(prev), 1500);
+					}
+					lastUrl = url;
+				};
+				ws.onerror = () => {};
+				ws.onclose = () => {
+					if (!closedByUs) setStreamUrl(null);
+				};
+			} catch (_unused14) {}
+			return () => {
+				closedByUs = true;
+				try {
+					ws && ws.close();
+				} catch (_unused15) {}
+				if (lastUrl) URL.revokeObjectURL(lastUrl);
+				setStreamUrl(null);
+			};
+		}, [token]);
 		async function launchMission() {
 			const obj = mission.trim();
 			if (!obj) return;
@@ -21866,6 +21908,19 @@ ${h.join(`
 					setMissionError(err.message);
 				} finally {
 					setLlmResolving(false);
+					setMissionBusy(false);
+				}
+				return;
+			}
+			if (planFirst) {
+				setMissionBusy(true);
+				try {
+					var _ref11, _preview$preflight$un, _preview$preflight;
+					const preview = await apiPost(`/api/mobile/projects/${projectId}/missions/preflight`, { missionSpec: { objective: obj } }, token);
+					setPlanPreview((_ref11 = (_preview$preflight$un = preview === null || preview === void 0 || (_preview$preflight = preview.preflight) === null || _preview$preflight === void 0 ? void 0 : _preview$preflight.understanding) !== null && _preview$preflight$un !== void 0 ? _preview$preflight$un : preview === null || preview === void 0 ? void 0 : preview.preflight) !== null && _ref11 !== void 0 ? _ref11 : { note: "Plan indisponible" });
+				} catch (err) {
+					setMissionError(err.message);
+				} finally {
 					setMissionBusy(false);
 				}
 				return;
@@ -21919,7 +21974,7 @@ ${h.join(`
 					} }, token);
 					const b64 = (_res$result$iconBase = res === null || res === void 0 || (_res$result = res.result) === null || _res$result === void 0 ? void 0 : _res$result.iconBase64) !== null && _res$result$iconBase !== void 0 ? _res$result$iconBase : null;
 					return [w.id, b64];
-				} catch (_unused13) {
+				} catch (_unused16) {
 					return [w.id, void 0];
 				}
 			})).then((entries) => {
@@ -21991,8 +22046,12 @@ ${h.join(`
 				keys
 			}, "hotkey");
 		}
-		const screenshot = (_state$screenshotBase = state === null || state === void 0 ? void 0 : state.screenshotBase64) !== null && _state$screenshotBase !== void 0 ? _state$screenshotBase : null;
-		const screenshotMime = (_state$screenshotMime = state === null || state === void 0 ? void 0 : state.screenshotMimeType) !== null && _state$screenshotMime !== void 0 ? _state$screenshotMime : "image/jpeg";
+		const screenshot = (_ref12 = streamUrl !== null && streamUrl !== void 0 ? streamUrl : state === null || state === void 0 ? void 0 : state.screenshotBase64) !== null && _ref12 !== void 0 ? _ref12 : null;
+		const screenshotMime = streamUrl ? "image/jpeg" : (_state$screenshotMime = state === null || state === void 0 ? void 0 : state.screenshotMimeType) !== null && _state$screenshotMime !== void 0 ? _state$screenshotMime : "image/jpeg";
+		const liveScreenW = (_ref13 = (_streamMeta$screenWid = streamMeta === null || streamMeta === void 0 ? void 0 : streamMeta.screenWidth) !== null && _streamMeta$screenWid !== void 0 ? _streamMeta$screenWid : state === null || state === void 0 ? void 0 : state.screenWidth) !== null && _ref13 !== void 0 ? _ref13 : 1920;
+		const liveScreenH = (_ref14 = (_streamMeta$screenHei = streamMeta === null || streamMeta === void 0 ? void 0 : streamMeta.screenHeight) !== null && _streamMeta$screenHei !== void 0 ? _streamMeta$screenHei : state === null || state === void 0 ? void 0 : state.screenHeight) !== null && _ref14 !== void 0 ? _ref14 : 1080;
+		const liveScreenX = (_ref15 = (_streamMeta$screenX = streamMeta === null || streamMeta === void 0 ? void 0 : streamMeta.screenX) !== null && _streamMeta$screenX !== void 0 ? _streamMeta$screenX : state === null || state === void 0 ? void 0 : state.screenX) !== null && _ref15 !== void 0 ? _ref15 : 0;
+		const liveScreenY = (_ref16 = (_streamMeta$screenY = streamMeta === null || streamMeta === void 0 ? void 0 : streamMeta.screenY) !== null && _streamMeta$screenY !== void 0 ? _streamMeta$screenY : state === null || state === void 0 ? void 0 : state.screenY) !== null && _ref16 !== void 0 ? _ref16 : 0;
 		const disabled = busy !== null || (state === null || state === void 0 ? void 0 : state.enabled) === false;
 		const missionHasLlm = hasLlmDirective(mission);
 		const missionBadgeClass = activeRun ? activeRun.status === "running" ? "running" : activeRun.status === "paused" ? "paused" : "idle" : "idle";
@@ -22031,7 +22090,7 @@ ${h.join(`
 				x2: 22,
 				y2: 12
 			})
-		])), (0, import_react.createElement)("div", { className: "ctrl-card-title-group" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Mission en cours"), activeRun ? (0, import_react.createElement)("span", { className: `ctrl-mission-badge ${missionBadgeClass}` }, activeRun.status === "running" ? "Actif" : activeRun.status === "paused" ? "En pause" : activeRun.status) : (0, import_react.createElement)("span", { className: "ctrl-mission-badge idle" }, "Inactif"))), activeRun ? (0, import_react.createElement)("div", { className: "ctrl-mission-fields" }, (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Objectif"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref11 = (_activeRun$mission = activeRun.mission) !== null && _activeRun$mission !== void 0 ? _activeRun$mission : activeRun.objective) !== null && _ref11 !== void 0 ? _ref11 : "—").slice(0, 120))), activeRun.naturalReply || activeRun.summary ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Livrable attendu"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref12 = (_activeRun$naturalRep = activeRun.naturalReply) !== null && _activeRun$naturalRep !== void 0 ? _activeRun$naturalRep : activeRun.summary) !== null && _ref12 !== void 0 ? _ref12 : "—").slice(0, 100))) : null, ((_activeRun$executionT = activeRun.executionThread) === null || _activeRun$executionT === void 0 ? void 0 : _activeRun$executionT.activeStep) ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Prochaine action"), (0, import_react.createElement)("span", { className: "ctrl-field-value accent" }, String((_activeRun$executionT2 = activeRun.executionThread.activeStep.label) !== null && _activeRun$executionT2 !== void 0 ? _activeRun$executionT2 : "—").slice(0, 80))) : null) : (0, import_react.createElement)("div", { className: "ctrl-mission-empty" }, "Aucune mission active — lancez-en une ci-dessous"), (0, import_react.createElement)("div", { className: "ctrl-mission-actions" }, activeRun ? (0, import_react.createElement)("div", null, (0, import_react.createElement)("div", { className: "ctrl-mission-action-btns" }, (0, import_react.createElement)("button", {
+		])), (0, import_react.createElement)("div", { className: "ctrl-card-title-group" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Mission en cours"), activeRun ? (0, import_react.createElement)("span", { className: `ctrl-mission-badge ${missionBadgeClass}` }, activeRun.status === "running" ? "Actif" : activeRun.status === "paused" ? "En pause" : activeRun.status) : (0, import_react.createElement)("span", { className: "ctrl-mission-badge idle" }, "Inactif"))), activeRun ? (0, import_react.createElement)("div", { className: "ctrl-mission-fields" }, (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Objectif"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref17 = (_activeRun$mission = activeRun.mission) !== null && _activeRun$mission !== void 0 ? _activeRun$mission : activeRun.objective) !== null && _ref17 !== void 0 ? _ref17 : "—").slice(0, 120))), activeRun.naturalReply || activeRun.summary ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Livrable attendu"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref18 = (_activeRun$naturalRep = activeRun.naturalReply) !== null && _activeRun$naturalRep !== void 0 ? _activeRun$naturalRep : activeRun.summary) !== null && _ref18 !== void 0 ? _ref18 : "—").slice(0, 100))) : null, ((_activeRun$executionT = activeRun.executionThread) === null || _activeRun$executionT === void 0 ? void 0 : _activeRun$executionT.activeStep) ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Prochaine action"), (0, import_react.createElement)("span", { className: "ctrl-field-value accent" }, String((_activeRun$executionT2 = activeRun.executionThread.activeStep.label) !== null && _activeRun$executionT2 !== void 0 ? _activeRun$executionT2 : "—").slice(0, 80))) : null) : (0, import_react.createElement)("div", { className: "ctrl-mission-empty" }, "Aucune mission active — lancez-en une ci-dessous"), activeRun ? (0, import_react.createElement)(AgenticLog, { events }) : null, (0, import_react.createElement)("div", { className: "ctrl-mission-actions" }, activeRun ? (0, import_react.createElement)("div", null, (0, import_react.createElement)("div", { className: "ctrl-mission-action-btns" }, (0, import_react.createElement)("button", {
 			className: "mobile-btn primary",
 			disabled: true
 		}, "Reprendre"), (0, import_react.createElement)("button", {
@@ -22057,11 +22116,27 @@ ${h.join(`
 				setMission(applySlashCommand(mission, cmd));
 				setLlmPreview(null);
 			}
-		}), missionHasLlm && !missionBusy && !llmResolving ? (0, import_react.createElement)("div", { className: "llm-directive-hint active" }, "Directive /llm — la réponse sera insérée dans ce champ avant lancement") : null, llmResolving ? (0, import_react.createElement)("div", { className: "llm-thinking-banner" }, (0, import_react.createElement)("div", { className: "llm-thinking-dots" }, (0, import_react.createElement)("span"), (0, import_react.createElement)("span"), (0, import_react.createElement)("span")), "Connexion au provider LLM…") : llmPreview ? (0, import_react.createElement)("div", { className: "llm-field-status ready" }, `Réponse /llm insérée · ${llmProviderLabel(llmPreview.generation)}`) : null, (0, import_react.createElement)("button", {
+		}), missionHasLlm && !missionBusy && !llmResolving ? (0, import_react.createElement)("div", { className: "llm-directive-hint active" }, "Directive /llm — la réponse sera insérée dans ce champ avant lancement") : null, llmResolving ? (0, import_react.createElement)("div", { className: "llm-thinking-banner" }, (0, import_react.createElement)("div", { className: "llm-thinking-dots" }, (0, import_react.createElement)("span"), (0, import_react.createElement)("span"), (0, import_react.createElement)("span")), "Connexion au provider LLM…") : llmPreview ? (0, import_react.createElement)("div", { className: "llm-field-status ready" }, `Réponse /llm insérée · ${llmProviderLabel(llmPreview.generation)}`) : null, (0, import_react.createElement)("label", { className: "ctrl-plan-toggle" }, (0, import_react.createElement)("input", {
+			type: "checkbox",
+			checked: planFirst,
+			onChange: (e) => {
+				setPlanFirst(e.target.checked);
+				setPlanPreview(null);
+			}
+		}), " Proposer un plan avant exécution"), (0, import_react.createElement)("button", {
 			className: "mobile-btn primary full-width",
 			onClick: launchMission,
 			disabled: missionBusy || !mission.trim()
-		}, llmResolving ? "Génération en cours…" : missionBusy ? "Lancement…" : missionHasLlm ? "Générer /llm" : "▶ Lancer la mission"))) : null), completedRun && !activeRun ? (0, import_react.createElement)("div", { className: "ctrl-card ctrl-result-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Résultat de mission"), (0, import_react.createElement)("span", { className: `ctrl-mission-badge ${completedRun.status === "completed" || completedRun.status === "partial_success" ? "running" : "idle"}` }, completedRun.status === "completed" ? "Succès" : completedRun.status === "partial_success" ? "Partiel" : completedRun.status === "failed" ? "Échec" : "Arrêté")), (0, import_react.createElement)("div", { className: "ctrl-mission-fields" }, (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Objectif"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_completedRun$mission = completedRun.mission) !== null && _completedRun$mission !== void 0 ? _completedRun$mission : "—").slice(0, 120))), completedRun.naturalReply || completedRun.summary ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Réponse de JON"), (0, import_react.createElement)("span", { className: "ctrl-field-value ctrl-result-reply" }, String((_ref13 = (_completedRun$natural = completedRun.naturalReply) !== null && _completedRun$natural !== void 0 ? _completedRun$natural : completedRun.summary) !== null && _ref13 !== void 0 ? _ref13 : "—").slice(0, 400))) : null, ((_completedRun$executi = completedRun.executionThread) === null || _completedRun$executi === void 0 ? void 0 : _completedRun$executi.verification) ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Vérification"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref14 = (_completedRun$executi2 = completedRun.executionThread.verification.verdict) !== null && _completedRun$executi2 !== void 0 ? _completedRun$executi2 : completedRun.executionThread.verification.status) !== null && _ref14 !== void 0 ? _ref14 : "—") + (completedRun.executionThread.verification.confidence != null ? ` (${Math.round(Number(completedRun.executionThread.verification.confidence) * 100)}%)` : ""))) : null, completedRun.artifactCount > 0 || completedRun.evidenceCount > 0 ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Livrables"), (0, import_react.createElement)("span", { className: "ctrl-field-value accent" }, [completedRun.artifactCount > 0 ? `${completedRun.artifactCount} artefact(s)` : null, completedRun.evidenceCount > 0 ? `${completedRun.evidenceCount} capture(s)` : null].filter(Boolean).join(" · "))) : null)) : null, (0, import_react.createElement)("div", { className: "ctrl-card ctrl-screen-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Écran contrôlé"), (0, import_react.createElement)("div", { className: "remote-fs-mode-toggle sm" }, (0, import_react.createElement)("button", {
+		}, llmResolving ? "Génération en cours…" : missionBusy ? planFirst ? "Planification…" : "Lancement…" : missionHasLlm ? "Générer /llm" : planFirst ? "Proposer un plan" : "▶ Lancer la mission"), planPreview ? (0, import_react.createElement)("div", { className: "ctrl-plan-card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Plan proposé"), planPreview.clarifiedObjective ? (0, import_react.createElement)("p", null, planPreview.clarifiedObjective) : null, Array.isArray(planPreview.runNowPlan) ? (0, import_react.createElement)("ol", { className: "ctrl-plan-steps" }, planPreview.runNowPlan.slice(0, 8).map((s, i) => (0, import_react.createElement)("li", { key: i }, String(s).slice(0, 120)))) : planPreview.note ? (0, import_react.createElement)("p", { className: "card-sub" }, planPreview.note) : null, (0, import_react.createElement)("div", { className: "card-actions" }, (0, import_react.createElement)("button", {
+			className: "mobile-btn ghost",
+			onClick: () => setPlanPreview(null)
+		}, "Modifier"), (0, import_react.createElement)("button", {
+			className: "mobile-btn primary",
+			onClick: () => {
+				setPlanPreview(null);
+				doStartMission(mission.trim());
+			}
+		}, "Confirmer & lancer"))) : null)) : null), completedRun && !activeRun ? (0, import_react.createElement)("div", { className: "ctrl-card ctrl-result-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Résultat de mission"), (0, import_react.createElement)("span", { className: `ctrl-mission-badge ${completedRun.status === "completed" || completedRun.status === "partial_success" ? "running" : "idle"}` }, completedRun.status === "completed" ? "Succès" : completedRun.status === "partial_success" ? "Partiel" : completedRun.status === "failed" ? "Échec" : "Arrêté")), (0, import_react.createElement)("div", { className: "ctrl-mission-fields" }, (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Objectif"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_completedRun$mission = completedRun.mission) !== null && _completedRun$mission !== void 0 ? _completedRun$mission : "—").slice(0, 120))), completedRun.naturalReply || completedRun.summary ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Réponse de JON"), (0, import_react.createElement)("span", { className: "ctrl-field-value ctrl-result-reply" }, String((_ref19 = (_completedRun$natural = completedRun.naturalReply) !== null && _completedRun$natural !== void 0 ? _completedRun$natural : completedRun.summary) !== null && _ref19 !== void 0 ? _ref19 : "—").slice(0, 400))) : null, ((_completedRun$executi = completedRun.executionThread) === null || _completedRun$executi === void 0 ? void 0 : _completedRun$executi.verification) ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Vérification"), (0, import_react.createElement)("span", { className: "ctrl-field-value" }, String((_ref20 = (_completedRun$executi2 = completedRun.executionThread.verification.verdict) !== null && _completedRun$executi2 !== void 0 ? _completedRun$executi2 : completedRun.executionThread.verification.status) !== null && _ref20 !== void 0 ? _ref20 : "—") + (completedRun.executionThread.verification.confidence != null ? ` (${Math.round(Number(completedRun.executionThread.verification.confidence) * 100)}%)` : ""))) : null, completedRun.artifactCount > 0 || completedRun.evidenceCount > 0 ? (0, import_react.createElement)("div", { className: "ctrl-mission-field" }, (0, import_react.createElement)("span", { className: "ctrl-field-label" }, "Livrables"), (0, import_react.createElement)("span", { className: "ctrl-field-value accent" }, [completedRun.artifactCount > 0 ? `${completedRun.artifactCount} artefact(s)` : null, completedRun.evidenceCount > 0 ? `${completedRun.evidenceCount} capture(s)` : null].filter(Boolean).join(" · "))) : null)) : null, (0, import_react.createElement)("div", { className: "ctrl-card ctrl-screen-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Écran contrôlé"), (0, import_react.createElement)("div", { className: "remote-fs-mode-toggle sm" }, (0, import_react.createElement)("button", {
 			className: `remote-fs-mode-btn ${viewportMode === "explore" ? "active" : ""}`,
 			onClick: () => setViewportMode("explore")
 		}, "Explorer"), (0, import_react.createElement)("button", {
@@ -22083,10 +22158,10 @@ ${h.join(`
 		}))), (0, import_react.createElement)(RemoteScreenViewport, {
 			screenshot,
 			screenshotMime,
-			naturalWidth: (_state$screenWidth = state === null || state === void 0 ? void 0 : state.screenWidth) !== null && _state$screenWidth !== void 0 ? _state$screenWidth : 1920,
-			naturalHeight: (_state$screenHeight = state === null || state === void 0 ? void 0 : state.screenHeight) !== null && _state$screenHeight !== void 0 ? _state$screenHeight : 1080,
-			screenOffX: (_state$screenX = state === null || state === void 0 ? void 0 : state.screenX) !== null && _state$screenX !== void 0 ? _state$screenX : 0,
-			screenOffY: (_state$screenY = state === null || state === void 0 ? void 0 : state.screenY) !== null && _state$screenY !== void 0 ? _state$screenY : 0,
+			naturalWidth: liveScreenW,
+			naturalHeight: liveScreenH,
+			screenOffX: liveScreenX,
+			screenOffY: liveScreenY,
 			mode: viewportMode,
 			onRemoteClick: handleRemoteClick,
 			onRemoteScroll: handleRemoteScroll,
@@ -22115,10 +22190,10 @@ ${h.join(`
 		}) : null, isFullscreen ? (0, import_react.createElement)(RemoteScreenFullscreenModal, {
 			screenshot,
 			screenshotMime,
-			naturalWidth: (_state$screenWidth2 = state === null || state === void 0 ? void 0 : state.screenWidth) !== null && _state$screenWidth2 !== void 0 ? _state$screenWidth2 : 1920,
-			naturalHeight: (_state$screenHeight2 = state === null || state === void 0 ? void 0 : state.screenHeight) !== null && _state$screenHeight2 !== void 0 ? _state$screenHeight2 : 1080,
-			screenOffX: (_state$screenX2 = state === null || state === void 0 ? void 0 : state.screenX) !== null && _state$screenX2 !== void 0 ? _state$screenX2 : 0,
-			screenOffY: (_state$screenY2 = state === null || state === void 0 ? void 0 : state.screenY) !== null && _state$screenY2 !== void 0 ? _state$screenY2 : 0,
+			naturalWidth: liveScreenW,
+			naturalHeight: liveScreenH,
+			screenOffX: liveScreenX,
+			screenOffY: liveScreenY,
 			mode: viewportMode,
 			onModeChange: setViewportMode,
 			onClose: () => setIsFullscreen(false),
@@ -22130,8 +22205,8 @@ ${h.join(`
 			onHotkey: handleHotkey,
 			onResolveLlmText: resolveTypeTextLlm
 		}) : null, windows.length > 0 ? (0, import_react.createElement)("div", { className: "ctrl-card ctrl-windows-card" }, (0, import_react.createElement)("div", { className: "ctrl-card-header" }, (0, import_react.createElement)("span", { className: "ctrl-card-title" }, "Fenêtres ouvertes"), (0, import_react.createElement)("span", { className: "ctrl-windows-count" }, String(windows.length))), (0, import_react.createElement)("div", { className: "ctrl-windows-list" }, (showAllWindows ? windows : windows.slice(0, 5)).map((win) => {
-			var _ref15, _win$title, _windowIcons$win$id, _win$id, _win$id2, _win$processName, _win$processName2, _win$processName3;
-			const title = String((_ref15 = (_win$title = win.title) !== null && _win$title !== void 0 ? _win$title : win.id) !== null && _ref15 !== void 0 ? _ref15 : "Fenêtre").slice(0, 50);
+			var _ref21, _win$title, _windowIcons$win$id, _win$id, _win$id2, _win$processName, _win$processName2, _win$processName3;
+			const title = String((_ref21 = (_win$title = win.title) !== null && _win$title !== void 0 ? _win$title : win.id) !== null && _ref21 !== void 0 ? _ref21 : "Fenêtre").slice(0, 50);
 			const initial = title.replace(/\s+/g, "").slice(0, 1).toUpperCase() || "?";
 			const iconB64 = (_windowIcons$win$id = windowIcons[win.id]) !== null && _windowIcons$win$id !== void 0 ? _windowIcons$win$id : null;
 			const builtinSrc = !iconB64 ? getBuiltinIcon(win.processName, win.title) : null;
@@ -22163,14 +22238,14 @@ ${h.join(`
 	}
 	function AgenticLog({ events, limit = 8 }) {
 		const map = (ev) => {
-			var _ev$type, _ev$payload, _p$summary, _ref16, _p$summary2, _ref17, _p$summary3, _p$summary4, _ref18, _p$summary5, _p$message;
+			var _ev$type, _ev$payload, _p$summary, _ref22, _p$summary2, _ref23, _p$summary3, _p$summary4, _ref24, _p$summary5, _p$message;
 			const t = String((_ev$type = ev === null || ev === void 0 ? void 0 : ev.type) !== null && _ev$type !== void 0 ? _ev$type : "");
 			const p = (_ev$payload = ev === null || ev === void 0 ? void 0 : ev.payload) !== null && _ev$payload !== void 0 ? _ev$payload : {};
 			if (t.includes("plan_generated")) return ["PLAN", (_p$summary = p.summary) !== null && _p$summary !== void 0 ? _p$summary : "Plan généré"];
-			if (t === "tool.running") return ["ACTION", (_ref16 = (_p$summary2 = p.summary) !== null && _p$summary2 !== void 0 ? _p$summary2 : p.outputSummary) !== null && _ref16 !== void 0 ? _ref16 : "action"];
-			if (t === "tool.succeeded") return ["RESULT", (_ref17 = (_p$summary3 = p.summary) !== null && _p$summary3 !== void 0 ? _p$summary3 : p.outputSummary) !== null && _ref17 !== void 0 ? _ref17 : "ok"];
+			if (t === "tool.running") return ["ACTION", (_ref22 = (_p$summary2 = p.summary) !== null && _p$summary2 !== void 0 ? _p$summary2 : p.outputSummary) !== null && _ref22 !== void 0 ? _ref22 : "action"];
+			if (t === "tool.succeeded") return ["RESULT", (_ref23 = (_p$summary3 = p.summary) !== null && _p$summary3 !== void 0 ? _p$summary3 : p.outputSummary) !== null && _ref23 !== void 0 ? _ref23 : "ok"];
 			if (t === "tool.blocked") return ["BLOCK", (_p$summary4 = p.summary) !== null && _p$summary4 !== void 0 ? _p$summary4 : "bloqué"];
-			if (t === "tool.failed") return ["ERROR", (_ref18 = (_p$summary5 = p.summary) !== null && _p$summary5 !== void 0 ? _p$summary5 : p.error) !== null && _ref18 !== void 0 ? _ref18 : "échec"];
+			if (t === "tool.failed") return ["ERROR", (_ref24 = (_p$summary5 = p.summary) !== null && _p$summary5 !== void 0 ? _p$summary5 : p.error) !== null && _ref24 !== void 0 ? _ref24 : "échec"];
 			if (t.includes("watch_changed")) return ["OBSERVE", "changement de page détecté"];
 			if (t.includes("vision_described")) return ["OBSERVE", "frame visuel décrit"];
 			if (t === "jon.needs_user") return ["NEXT", (_p$message = p.message) !== null && _p$message !== void 0 ? _p$message : "intervention requise"];
@@ -22397,7 +22472,7 @@ ${h.join(`
 				if (disposed) return;
 				try {
 					fit.fit();
-				} catch (_unused14) {}
+				} catch (_unused17) {}
 				const { cols, rows } = term;
 				const url = `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/mobile/terminal/ws?token=${encodeURIComponent(token)}&cols=${cols}&rows=${rows}`;
 				queueMobileLog("info", "ws.connecting", "Opening mobile terminal WebSocket", {
@@ -22415,7 +22490,7 @@ ${h.join(`
 					if (disposed) return;
 					try {
 						term.write(typeof e.data === "string" ? e.data : new Uint8Array(e.data));
-					} catch (_unused15) {}
+					} catch (_unused18) {}
 				};
 				ws.onclose = (event) => {
 					queueMobileLog(event.wasClean ? "info" : "warn", "ws.close", "Mobile terminal WebSocket closed", {
@@ -22425,13 +22500,13 @@ ${h.join(`
 					});
 					if (!disposed) try {
 						term.write("\r\n\x1B[90m[Session terminée]\x1B[0m\r\n");
-					} catch (_unused16) {}
+					} catch (_unused19) {}
 				};
 				ws.onerror = () => {
 					queueMobileLog("error", "ws.error", "Mobile terminal WebSocket error");
 					if (!disposed) try {
 						term.write("\r\n\x1B[31m[Erreur de connexion WebSocket]\x1B[0m\r\n");
-					} catch (_unused17) {}
+					} catch (_unused20) {}
 				};
 				term.onData((data) => {
 					if ((ws === null || ws === void 0 ? void 0 : ws.readyState) === 1) ws.send(data);
@@ -22445,7 +22520,7 @@ ${h.join(`
 							cols: term.cols,
 							rows: term.rows
 						}));
-					} catch (_unused18) {}
+					} catch (_unused21) {}
 				});
 				ro.observe(el);
 			});
@@ -22455,10 +22530,10 @@ ${h.join(`
 				ro === null || ro === void 0 || ro.disconnect();
 				try {
 					ws === null || ws === void 0 || ws.close();
-				} catch (_unused19) {}
+				} catch (_unused22) {}
 				try {
 					term.dispose();
-				} catch (_unused20) {}
+				} catch (_unused23) {}
 			};
 		}, []);
 		return (0, import_react.createElement)("div", { className: "terminal-shell-overlay" }, (0, import_react.createElement)("div", { className: "terminal-shell-bar" }, (0, import_react.createElement)("span", { className: "terminal-shell-bar-title" }, "Shell"), (0, import_react.createElement)("button", {
@@ -22506,7 +22581,7 @@ ${h.join(`
 				const data = await apiGet(`/api/mobile/projects/${projectId}/screenshot`, token);
 				setScreenshot((_data$screenshotBase = data === null || data === void 0 ? void 0 : data.screenshotBase64) !== null && _data$screenshotBase !== void 0 ? _data$screenshotBase : null);
 				setScreenshotState((data === null || data === void 0 ? void 0 : data.screenshotBase64) ? "ok" : "empty");
-			} catch (_unused21) {
+			} catch (_unused24) {
 				setScreenshotState("error");
 				setScreenshot(null);
 			}
@@ -22556,7 +22631,7 @@ ${h.join(`
 		email: "Email"
 	};
 	function ComposedMissionBanner({ events }) {
-		var _composed$payload, _ref19, _SURFACE_LABEL_FR$p$s;
+		var _composed$payload, _ref25, _SURFACE_LABEL_FR$p$s;
 		const composed = [...events !== null && events !== void 0 ? events : []].reverse().find((e) => {
 			var _e$type;
 			return String((_e$type = e === null || e === void 0 ? void 0 : e.type) !== null && _e$type !== void 0 ? _e$type : "").startsWith("mission.composed.");
@@ -22571,7 +22646,7 @@ ${h.join(`
 				return (_SURFACE_LABEL_FR$s = SURFACE_LABEL_FR[s]) !== null && _SURFACE_LABEL_FR$s !== void 0 ? _SURFACE_LABEL_FR$s : s;
 			}).join(" → ")})`);
 		}
-		const label = (_ref19 = (_SURFACE_LABEL_FR$p$s = SURFACE_LABEL_FR[p.surface]) !== null && _SURFACE_LABEL_FR$p$s !== void 0 ? _SURFACE_LABEL_FR$p$s : p.surface) !== null && _ref19 !== void 0 ? _ref19 : "";
+		const label = (_ref25 = (_SURFACE_LABEL_FR$p$s = SURFACE_LABEL_FR[p.surface]) !== null && _SURFACE_LABEL_FR$p$s !== void 0 ? _SURFACE_LABEL_FR$p$s : p.surface) !== null && _ref25 !== void 0 ? _ref25 : "";
 		return (0, import_react.createElement)("div", { className: "composed-banner active" }, `${p.index && p.total ? `Phase ${p.index}/${p.total}` : "Phase"} · ${label} — ${composed.type === "mission.composed.phase_completed" ? "terminée" : "en cours"}`);
 	}
 	function SelfCheckCard({ token }) {
@@ -22613,7 +22688,7 @@ ${h.join(`
 		async function disconnect() {
 			try {
 				await apiPost("/api/mobile/session/revoke", {}, token);
-			} catch (_unused22) {}
+			} catch (_unused25) {}
 			clearSession();
 			onDisconnect();
 		}
@@ -22796,11 +22871,11 @@ ${h.join(`
 			}
 		}
 		return (0, import_react.createElement)("div", { className: "tab-content connectors-tab" }, (0, import_react.createElement)(McpOAuthCard, { token }), (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Connecteurs"), (0, import_react.createElement)("p", { className: "card-hint" }, "Ajoute un serveur MCP ou un connecteur externe pour que JON puisse le sélectionner comme outil agentique."), connectors.length === 0 ? (0, import_react.createElement)("div", { className: "empty-mini" }, "Aucun connecteur") : connectors.map((connector) => {
-			var _ref20, _connector$type, _connector$capabiliti;
+			var _ref26, _connector$type, _connector$capabiliti;
 			return (0, import_react.createElement)("div", {
 				key: connector.connectorId,
 				className: "connector-row"
-			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, connector.name), (0, import_react.createElement)("small", null, `${(_ref20 = (_connector$type = connector.type) !== null && _connector$type !== void 0 ? _connector$type : connector.category) !== null && _ref20 !== void 0 ? _ref20 : "builtin"} · ${((_connector$capabiliti = connector.capabilities) !== null && _connector$capabiliti !== void 0 ? _connector$capabiliti : []).slice(0, 3).join(", ") || "outil"}`)), (0, import_react.createElement)("span", { className: `status-pill status-${connector.status}` }, connector.status === "connected" ? "Connecté" : "À configurer"));
+			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, connector.name), (0, import_react.createElement)("small", null, `${(_ref26 = (_connector$type = connector.type) !== null && _connector$type !== void 0 ? _connector$type : connector.category) !== null && _ref26 !== void 0 ? _ref26 : "builtin"} · ${((_connector$capabiliti = connector.capabilities) !== null && _connector$capabiliti !== void 0 ? _connector$capabiliti : []).slice(0, 3).join(", ") || "outil"}`)), (0, import_react.createElement)("span", { className: `status-pill status-${connector.status}` }, connector.status === "connected" ? "Connecté" : "À configurer"));
 		})), (0, import_react.createElement)("div", { className: "card connector-form-card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Ajouter MCP"), (0, import_react.createElement)("input", {
 			className: "mobile-input",
 			value: name,
@@ -22871,7 +22946,7 @@ ${h.join(`
 			es.addEventListener("mobile.event", (e) => {
 				try {
 					onEventRef.current(JSON.parse(e.data));
-				} catch (_unused23) {}
+				} catch (_unused26) {}
 			});
 			return () => {
 				queueMobileLog("info", "sse.close", "Mobile event stream closed");
@@ -22960,8 +23035,8 @@ ${h.join(`
 				"approval.auto_resolved",
 				"approval.policy_blocked"
 			].includes(ev.type)) {
-				var _ref21, _ev$payload$approvalI, _ev$payload3;
-				const approvalId = (_ref21 = (_ev$payload$approvalI = (_ev$payload3 = ev.payload) === null || _ev$payload3 === void 0 ? void 0 : _ev$payload3.approvalId) !== null && _ev$payload$approvalI !== void 0 ? _ev$payload$approvalI : ev.approvalId) !== null && _ref21 !== void 0 ? _ref21 : null;
+				var _ref27, _ev$payload$approvalI, _ev$payload3;
+				const approvalId = (_ref27 = (_ev$payload$approvalI = (_ev$payload3 = ev.payload) === null || _ev$payload3 === void 0 ? void 0 : _ev$payload3.approvalId) !== null && _ev$payload$approvalI !== void 0 ? _ev$payload$approvalI : ev.approvalId) !== null && _ref27 !== void 0 ? _ref27 : null;
 				if (approvalId) setPendingApprovals((prev) => prev.filter((a) => a.id !== approvalId));
 			}
 			if (ev.severity === "high") setAlertEvent(ev);

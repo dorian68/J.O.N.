@@ -21785,14 +21785,18 @@ ${h.join(`
 		const [llmPreview, setLlmPreview] = (0, import_react.useState)(null);
 		const refreshFailCount = (0, import_react.useRef)(0);
 		const refreshInFlight = (0, import_react.useRef)(false);
+		const adaptiveMsRef = (0, import_react.useRef)(pollingInterval);
 		async function refresh() {
 			if (refreshInFlight.current) return;
 			refreshInFlight.current = true;
 			try {
+				var _next$adaptive;
 				const next = await apiGet(`/api/mobile/projects/${projectId}/desktop/state`, token);
 				refreshFailCount.current = 0;
 				setError(null);
 				setState(next);
+				const recMs = Number(next === null || next === void 0 || (_next$adaptive = next.adaptive) === null || _next$adaptive === void 0 ? void 0 : _next$adaptive.recommendedIntervalMs);
+				adaptiveMsRef.current = Number.isFinite(recMs) && recMs > 0 ? recMs : pollingInterval;
 				apiGet(`/api/mobile/projects/${projectId}/runs`, token).then((runs) => {
 					var _allRuns$find, _allRuns$find2;
 					const allRuns = Array.isArray(runs) ? runs : [];
@@ -21813,9 +21817,19 @@ ${h.join(`
 			}
 		}
 		(0, import_react.useEffect)(() => {
-			refresh();
-			const timer = setInterval(refresh, pollingInterval);
-			return () => clearInterval(timer);
+			let stopped = false;
+			let handle = null;
+			const tick = async () => {
+				if (stopped) return;
+				await refresh();
+				if (stopped) return;
+				handle = setTimeout(tick, adaptiveMsRef.current || pollingInterval);
+			};
+			tick();
+			return () => {
+				stopped = true;
+				if (handle) clearTimeout(handle);
+			};
 		}, [
 			projectId,
 			token,
@@ -22147,6 +22161,28 @@ ${h.join(`
 			onClick: () => setShowAllWindows((v) => !v)
 		}, showAllWindows ? "Réduire ▲" : `Voir tout (${windows.length}) ▼`) : null) : null);
 	}
+	function AgenticLog({ events, limit = 8 }) {
+		const map = (ev) => {
+			var _ev$type, _ev$payload, _p$summary, _ref16, _p$summary2, _ref17, _p$summary3, _p$summary4, _ref18, _p$summary5, _p$message;
+			const t = String((_ev$type = ev === null || ev === void 0 ? void 0 : ev.type) !== null && _ev$type !== void 0 ? _ev$type : "");
+			const p = (_ev$payload = ev === null || ev === void 0 ? void 0 : ev.payload) !== null && _ev$payload !== void 0 ? _ev$payload : {};
+			if (t.includes("plan_generated")) return ["PLAN", (_p$summary = p.summary) !== null && _p$summary !== void 0 ? _p$summary : "Plan généré"];
+			if (t === "tool.running") return ["ACTION", (_ref16 = (_p$summary2 = p.summary) !== null && _p$summary2 !== void 0 ? _p$summary2 : p.outputSummary) !== null && _ref16 !== void 0 ? _ref16 : "action"];
+			if (t === "tool.succeeded") return ["RESULT", (_ref17 = (_p$summary3 = p.summary) !== null && _p$summary3 !== void 0 ? _p$summary3 : p.outputSummary) !== null && _ref17 !== void 0 ? _ref17 : "ok"];
+			if (t === "tool.blocked") return ["BLOCK", (_p$summary4 = p.summary) !== null && _p$summary4 !== void 0 ? _p$summary4 : "bloqué"];
+			if (t === "tool.failed") return ["ERROR", (_ref18 = (_p$summary5 = p.summary) !== null && _p$summary5 !== void 0 ? _p$summary5 : p.error) !== null && _ref18 !== void 0 ? _ref18 : "échec"];
+			if (t.includes("watch_changed")) return ["OBSERVE", "changement de page détecté"];
+			if (t.includes("vision_described")) return ["OBSERVE", "frame visuel décrit"];
+			if (t === "jon.needs_user") return ["NEXT", (_p$message = p.message) !== null && _p$message !== void 0 ? _p$message : "intervention requise"];
+			return null;
+		};
+		const lines = (events !== null && events !== void 0 ? events : []).map(map).filter(Boolean).slice(-limit);
+		if (lines.length === 0) return null;
+		return (0, import_react.createElement)("div", { className: "agentic-log" }, lines.map((l, i) => (0, import_react.createElement)("div", {
+			key: i,
+			className: `agentic-log-line tag-${l[0].toLowerCase()}`
+		}, (0, import_react.createElement)("span", { className: "agentic-log-tag" }, l[0]), (0, import_react.createElement)("span", { className: "agentic-log-text" }, String(l[1]).slice(0, 90)))));
+	}
 	function BrowserTabsTab({ projectId, token, events }) {
 		var _tabsState$tabs, _observation$url, _observation$interact, _observation$bodyText, _observation$blocker;
 		const [tabsState, setTabsState] = (0, import_react.useState)({
@@ -22305,7 +22341,7 @@ ${h.join(`
 			onClick: () => runTabMission(tab.id),
 			disabled: busy !== null || !tabInstruction.trim(),
 			title: "Automatiser cette tâche en langage naturel (agent)"
-		}, busy === `mission-${tab.id}` ? "…" : "🤖")), tab.active && missionInfo && (0, import_react.createElement)("div", { className: "browser-tab-mission-note" }, `Agent lancé : « ${missionInfo.instruction.slice(0, 60)} »`)))), observation && (0, import_react.createElement)("div", { className: "browser-observation-card" }, (0, import_react.createElement)("div", { className: "browser-obs-header" }, (0, import_react.createElement)("span", { className: "browser-obs-title" }, "Dernière observation"), (0, import_react.createElement)("span", { className: "browser-obs-url" }, ((_observation$url = observation.url) !== null && _observation$url !== void 0 ? _observation$url : "").slice(0, 60)), (0, import_react.createElement)("button", {
+		}, busy === `mission-${tab.id}` ? "…" : "🤖")), tab.active && missionInfo && (0, import_react.createElement)("div", { className: "browser-tab-mission-note" }, `Agent lancé : « ${missionInfo.instruction.slice(0, 60)} »`), tab.active && missionInfo && (0, import_react.createElement)(AgenticLog, { events })))), observation && (0, import_react.createElement)("div", { className: "browser-observation-card" }, (0, import_react.createElement)("div", { className: "browser-obs-header" }, (0, import_react.createElement)("span", { className: "browser-obs-title" }, "Dernière observation"), (0, import_react.createElement)("span", { className: "browser-obs-url" }, ((_observation$url = observation.url) !== null && _observation$url !== void 0 ? _observation$url : "").slice(0, 60)), (0, import_react.createElement)("button", {
 			className: "mobile-btn ghost small",
 			onClick: () => setObservation(null)
 		}, "×")), observation.screenshotBase64 && (0, import_react.createElement)("img", {
@@ -22520,7 +22556,7 @@ ${h.join(`
 		email: "Email"
 	};
 	function ComposedMissionBanner({ events }) {
-		var _composed$payload, _ref16, _SURFACE_LABEL_FR$p$s;
+		var _composed$payload, _ref19, _SURFACE_LABEL_FR$p$s;
 		const composed = [...events !== null && events !== void 0 ? events : []].reverse().find((e) => {
 			var _e$type;
 			return String((_e$type = e === null || e === void 0 ? void 0 : e.type) !== null && _e$type !== void 0 ? _e$type : "").startsWith("mission.composed.");
@@ -22535,7 +22571,7 @@ ${h.join(`
 				return (_SURFACE_LABEL_FR$s = SURFACE_LABEL_FR[s]) !== null && _SURFACE_LABEL_FR$s !== void 0 ? _SURFACE_LABEL_FR$s : s;
 			}).join(" → ")})`);
 		}
-		const label = (_ref16 = (_SURFACE_LABEL_FR$p$s = SURFACE_LABEL_FR[p.surface]) !== null && _SURFACE_LABEL_FR$p$s !== void 0 ? _SURFACE_LABEL_FR$p$s : p.surface) !== null && _ref16 !== void 0 ? _ref16 : "";
+		const label = (_ref19 = (_SURFACE_LABEL_FR$p$s = SURFACE_LABEL_FR[p.surface]) !== null && _SURFACE_LABEL_FR$p$s !== void 0 ? _SURFACE_LABEL_FR$p$s : p.surface) !== null && _ref19 !== void 0 ? _ref19 : "";
 		return (0, import_react.createElement)("div", { className: "composed-banner active" }, `${p.index && p.total ? `Phase ${p.index}/${p.total}` : "Phase"} · ${label} — ${composed.type === "mission.composed.phase_completed" ? "terminée" : "en cours"}`);
 	}
 	function SelfCheckCard({ token }) {
@@ -22760,11 +22796,11 @@ ${h.join(`
 			}
 		}
 		return (0, import_react.createElement)("div", { className: "tab-content connectors-tab" }, (0, import_react.createElement)(McpOAuthCard, { token }), (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Connecteurs"), (0, import_react.createElement)("p", { className: "card-hint" }, "Ajoute un serveur MCP ou un connecteur externe pour que JON puisse le sélectionner comme outil agentique."), connectors.length === 0 ? (0, import_react.createElement)("div", { className: "empty-mini" }, "Aucun connecteur") : connectors.map((connector) => {
-			var _ref17, _connector$type, _connector$capabiliti;
+			var _ref20, _connector$type, _connector$capabiliti;
 			return (0, import_react.createElement)("div", {
 				key: connector.connectorId,
 				className: "connector-row"
-			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, connector.name), (0, import_react.createElement)("small", null, `${(_ref17 = (_connector$type = connector.type) !== null && _connector$type !== void 0 ? _connector$type : connector.category) !== null && _ref17 !== void 0 ? _ref17 : "builtin"} · ${((_connector$capabiliti = connector.capabilities) !== null && _connector$capabiliti !== void 0 ? _connector$capabiliti : []).slice(0, 3).join(", ") || "outil"}`)), (0, import_react.createElement)("span", { className: `status-pill status-${connector.status}` }, connector.status === "connected" ? "Connecté" : "À configurer"));
+			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, connector.name), (0, import_react.createElement)("small", null, `${(_ref20 = (_connector$type = connector.type) !== null && _connector$type !== void 0 ? _connector$type : connector.category) !== null && _ref20 !== void 0 ? _ref20 : "builtin"} · ${((_connector$capabiliti = connector.capabilities) !== null && _connector$capabiliti !== void 0 ? _connector$capabiliti : []).slice(0, 3).join(", ") || "outil"}`)), (0, import_react.createElement)("span", { className: `status-pill status-${connector.status}` }, connector.status === "connected" ? "Connecté" : "À configurer"));
 		})), (0, import_react.createElement)("div", { className: "card connector-form-card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Ajouter MCP"), (0, import_react.createElement)("input", {
 			className: "mobile-input",
 			value: name,
@@ -22911,9 +22947,9 @@ ${h.join(`
 			}
 		}, [projectId, sessionToken]);
 		function onEvent(ev) {
-			var _ev$payload;
+			var _ev$payload2;
 			setEvents((prev) => [...prev.slice(-99), ev]);
-			if (ev.type === "approval.required" && ((_ev$payload = ev.payload) === null || _ev$payload === void 0 ? void 0 : _ev$payload.approvalId)) setPendingApprovals((prev) => mergeApprovalLists(prev, [{
+			if (ev.type === "approval.required" && ((_ev$payload2 = ev.payload) === null || _ev$payload2 === void 0 ? void 0 : _ev$payload2.approvalId)) setPendingApprovals((prev) => mergeApprovalLists(prev, [{
 				...ev.payload,
 				id: ev.payload.approvalId,
 				createdAt: ev.timestamp
@@ -22924,8 +22960,8 @@ ${h.join(`
 				"approval.auto_resolved",
 				"approval.policy_blocked"
 			].includes(ev.type)) {
-				var _ref18, _ev$payload$approvalI, _ev$payload2;
-				const approvalId = (_ref18 = (_ev$payload$approvalI = (_ev$payload2 = ev.payload) === null || _ev$payload2 === void 0 ? void 0 : _ev$payload2.approvalId) !== null && _ev$payload$approvalI !== void 0 ? _ev$payload$approvalI : ev.approvalId) !== null && _ref18 !== void 0 ? _ref18 : null;
+				var _ref21, _ev$payload$approvalI, _ev$payload3;
+				const approvalId = (_ref21 = (_ev$payload$approvalI = (_ev$payload3 = ev.payload) === null || _ev$payload3 === void 0 ? void 0 : _ev$payload3.approvalId) !== null && _ev$payload$approvalI !== void 0 ? _ev$payload$approvalI : ev.approvalId) !== null && _ref21 !== void 0 ? _ref21 : null;
 				if (approvalId) setPendingApprovals((prev) => prev.filter((a) => a.id !== approvalId));
 			}
 			if (ev.severity === "high") setAlertEvent(ev);

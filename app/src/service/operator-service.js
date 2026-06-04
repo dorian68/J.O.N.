@@ -165,6 +165,7 @@ import { WorkspaceBrowserProvider } from "../browser/workspace-browser-provider.
 import { MobileDeviceRegistry } from "../mobile/mobile-device-registry.js";
 import { MobileGateway, MobileAuditLog } from "../mobile/mobile-gateway.js";
 import { MobileEventBuffer } from "../mobile/mobile-event-stream.js";
+import { BandwidthGovernor } from "../mobile/bandwidth-governor.js";
 import { runReflectiveRecovery, RECOVERY_ACTION } from "../recovery/reflective-recovery.js";
 import {
   resolveInlineMissionDirectives,
@@ -1664,6 +1665,7 @@ export class OperatorService extends EventEmitter {
     });
     this.connectorRegistry = new ConnectorRegistry();
     this.mcpConnectors = new McpConnectorService({ env: this.env ?? process.env });
+    this.bandwidthGovernor = new BandwidthGovernor();
     this.mobileDeviceRegistry = new MobileDeviceRegistry();
     this.mobileAuditLog = new MobileAuditLog();
     this.mobileEventBuffer = new MobileEventBuffer();
@@ -4357,8 +4359,11 @@ export class OperatorService extends EventEmitter {
     const realProvider = this.externalTerminalProvider;
     const t0 = Date.now();
     try {
+      // Capture at the width the bandwidth governor currently recommends so the
+      // server actually reduces volume on slow links.
+      const plannedWidth = this.bandwidthGovernor.snapshot().recommendedMaxWidth;
       const [capture, windows] = await Promise.all([
-        Promise.resolve().then(() => realProvider.captureScreen()),
+        Promise.resolve().then(() => realProvider.captureScreen({ maxWidth: plannedWidth })),
         Promise.resolve().then(() => realProvider.listVisibleWindows()).catch(() => [])
       ]);
       const captureMs = Date.now() - t0;
@@ -4374,17 +4379,27 @@ export class OperatorService extends EventEmitter {
       }
       const totalMs = Date.now() - t0;
       const vs = capture?.virtualScreen ?? {};
+      const rendered = capture?.rendered ?? {};
+      const payloadBytes = screenshotBase64 ? Math.round(screenshotBase64.length * 0.75) : 0;
+      // Adaptive throughput: feed each frame's size+time to the bandwidth governor.
+      const adaptive = this.bandwidthGovernor.observe({ bytes: payloadBytes, durationMs: Math.max(1, totalMs) });
       return {
         enabled,
         active: true,
         screenshotBase64,
         screenshotMimeType,
+        // Full-screen SOURCE bounds (physical) — click mapping uses these.
         screenX: vs.x ?? 0,
         screenY: vs.y ?? 0,
         screenWidth: vs.width ?? 1920,
         screenHeight: vs.height ?? 1080,
+        // Rendered (downscaled) frame — for diagnostics/observability.
+        renderedWidth: rendered.width ?? null,
+        renderedHeight: rendered.height ?? null,
+        captureScale: rendered.scale ?? 1,
         windows: Array.isArray(windows) ? windows : [],
-        perf: { captureMs, totalMs, payloadBytes: screenshotBase64 ? Math.round(screenshotBase64.length * 0.75) : 0 }
+        adaptive,
+        perf: { captureMs, totalMs, payloadBytes, throughputKbps: adaptive.throughputKbps }
       };
     } catch (err) {
       return {

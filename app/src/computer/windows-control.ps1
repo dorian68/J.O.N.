@@ -15,6 +15,7 @@ param(
   [int]$Delta = 0,
   [int]$MaxDepth = 3,
   [int]$MaxNodes = 80,
+  [int]$MaxCaptureWidth = 0,
   [switch]$PersistentMode
 )
 
@@ -25,6 +26,11 @@ using System.Runtime.InteropServices;
 
 public class User32 {
   public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+  // Simple, long-standing DPI-awareness API so full-screen capture is not
+  // cropped on scaled displays (logical vs physical pixel mismatch).
+  [DllImport("user32.dll")]
+  public static extern bool SetProcessDPIAware();
 
   [DllImport("user32.dll")]
   public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
@@ -72,6 +78,9 @@ try {
   # OCR remains optional. The ocrImage action reports this explicitly when unavailable.
 }
 
+# DPI-aware so full-screen capture is not cropped on scaled displays.
+try { [void][User32]::SetProcessDPIAware() } catch { }
+
 $MOUSEEVENTF_LEFTDOWN = 0x0002
 $MOUSEEVENTF_LEFTUP = 0x0004
 $MOUSEEVENTF_RIGHTDOWN = 0x0008
@@ -81,7 +90,7 @@ $MOUSEEVENTF_WHEEL = 0x0800
 # Capture quality/size tuning (env-overridable). JPEG + downscale keep the
 # mobile projection light enough for polling over LAN. Implemented with plain
 # GDI+ ImageFormat to stay friendly with endpoint AV heuristics.
-$CaptureMaxWidth = if ($env:COWORK_CAPTURE_MAX_WIDTH) { [int]$env:COWORK_CAPTURE_MAX_WIDTH } else { 1366 }
+$CaptureMaxWidth = if ($MaxCaptureWidth -gt 0) { $MaxCaptureWidth } elseif ($env:COWORK_CAPTURE_MAX_WIDTH) { [int]$env:COWORK_CAPTURE_MAX_WIDTH } else { 1920 }
 
 function Save-BitmapSmart([System.Drawing.Bitmap]$Bitmap, [string]$Path) {
   if ($Path.ToLowerInvariant().EndsWith(".png")) {
@@ -677,6 +686,7 @@ if ($PersistentMode) {
           $result = @{ scrolledAt = [DateTime]::UtcNow.ToString("o"); delta = [int]$cmd.delta; targetHandle = $h }
         }
         "captureScreen" {
+          if ($cmd.maxWidth -and [int]$cmd.maxWidth -gt 0) { $script:CaptureMaxWidth = [int]$cmd.maxWidth }
           $result = Save-ScreenCapture -Path ([string]$cmd.outputPath)
         }
         default {

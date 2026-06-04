@@ -67,6 +67,10 @@ const suites = [
     modulePath: "../../tests/conversation-mcp-tool.test.js"
   },
   {
+    name: "bandwidth-governor",
+    modulePath: "../../tests/bandwidth-governor.test.js"
+  },
+  {
     name: "computer-control-service",
     modulePath: "../../tests/computer-control-service.test.js"
   },

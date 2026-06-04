@@ -1561,6 +1561,7 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
   const [llmPreview, setLlmPreview] = useState(null); // { resolvedText, generatedText }
   const refreshFailCount = useRef(0);
   const refreshInFlight = useRef(false);
+  const adaptiveMsRef = useRef(pollingInterval);
 
   async function refresh() {
     if (refreshInFlight.current) return;
@@ -1570,6 +1571,9 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
       refreshFailCount.current = 0;
       setError(null);
       setState(next);
+      // Adaptive cadence: follow the server bandwidth governor's recommendation.
+      const recMs = Number(next?.adaptive?.recommendedIntervalMs);
+      adaptiveMsRef.current = Number.isFinite(recMs) && recMs > 0 ? recMs : pollingInterval;
       apiGet(`/api/mobile/projects/${projectId}/runs`, token)
         .then((runs) => {
           const allRuns = Array.isArray(runs) ? runs : [];
@@ -1592,9 +1596,16 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
   }
 
   useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, pollingInterval);
-    return () => clearInterval(timer);
+    let stopped = false;
+    let handle = null;
+    const tick = async () => {
+      if (stopped) return;
+      await refresh();
+      if (stopped) return;
+      handle = setTimeout(tick, adaptiveMsRef.current || pollingInterval);
+    };
+    tick();
+    return () => { stopped = true; if (handle) clearTimeout(handle); };
   }, [projectId, token, pollingInterval]);
 
   useEffect(() => {
@@ -2042,6 +2053,32 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
 
 // ─── Tab: Browser Tabs ───────────────────────────────────────────────────────
 
+// Live agentic log derived from the SSE event stream: surfaces the
+// OBSERVE / PLAN / ACTION / RESULT / NEXT trace of the running agent.
+function AgenticLog({ events, limit = 8 }) {
+  const map = (ev) => {
+    const t = String(ev?.type ?? "");
+    const p = ev?.payload ?? {};
+    if (t.includes("plan_generated")) return ["PLAN", p.summary ?? "Plan généré"];
+    if (t === "tool.running") return ["ACTION", p.summary ?? p.outputSummary ?? "action"];
+    if (t === "tool.succeeded") return ["RESULT", p.summary ?? p.outputSummary ?? "ok"];
+    if (t === "tool.blocked") return ["BLOCK", p.summary ?? "bloqué"];
+    if (t === "tool.failed") return ["ERROR", p.summary ?? p.error ?? "échec"];
+    if (t.includes("watch_changed")) return ["OBSERVE", "changement de page détecté"];
+    if (t.includes("vision_described")) return ["OBSERVE", "frame visuel décrit"];
+    if (t === "jon.needs_user") return ["NEXT", p.message ?? "intervention requise"];
+    return null;
+  };
+  const lines = (events ?? []).map(map).filter(Boolean).slice(-limit);
+  if (lines.length === 0) return null;
+  return h("div", { className: "agentic-log" },
+    lines.map((l, i) => h("div", { key: i, className: `agentic-log-line tag-${l[0].toLowerCase()}` },
+      h("span", { className: "agentic-log-tag" }, l[0]),
+      h("span", { className: "agentic-log-text" }, String(l[1]).slice(0, 90))
+    ))
+  );
+}
+
 function BrowserTabsTab({ projectId, token, events }) {
   const [tabsState, setTabsState] = useState({ active: false, tabs: [] });
   const [newUrl, setNewUrl] = useState("");
@@ -2217,7 +2254,8 @@ function BrowserTabsTab({ projectId, token, events }) {
               ),
               tab.active && missionInfo && h("div", { className: "browser-tab-mission-note" },
                 `Agent lancé : « ${missionInfo.instruction.slice(0, 60)} »`
-              )
+              ),
+              tab.active && missionInfo && h(AgenticLog, { events })
             )
           )
     ),

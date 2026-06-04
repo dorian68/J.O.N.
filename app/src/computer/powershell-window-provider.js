@@ -266,7 +266,10 @@ function singleShotHotAction(command) {
     case "scroll":
       return runPowerShell(["-Action", "scroll", "-Delta", String(command.delta), ...handle]);
     case "captureScreen":
-      return runPowerShell(["-Action", "captureScreen", "-OutputPath", String(command.outputPath)]);
+      return runPowerShell([
+        "-Action", "captureScreen", "-OutputPath", String(command.outputPath),
+        ...(command.maxWidth ? ["-MaxCaptureWidth", String(command.maxWidth)] : [])
+      ]);
     default:
       throw new Error(`No single-shot fallback for action: ${command.action}`);
   }
@@ -435,9 +438,13 @@ export class PowerShellWindowProvider {
     };
   }
 
-  async captureScreen() {
+  async captureScreen({ maxWidth = null } = {}) {
     const outputPath = await tempCapturePath("screen");
-    const result = await sendHotAction({ action: "captureScreen", outputPath });
+    const command = { action: "captureScreen", outputPath };
+    if (Number.isFinite(Number(maxWidth)) && Number(maxWidth) > 0) {
+      command.maxWidth = Math.round(Number(maxWidth));
+    }
+    const result = await sendHotAction(command);
     return {
       ...result,
       outputPath

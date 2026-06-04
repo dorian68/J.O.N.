@@ -21401,7 +21401,8 @@ ${h.join(`
 						startPy: p.py,
 						startTx: cTx,
 						startTy: cTy,
-						moved: false
+						moved: false,
+						startTime: Date.now()
 					};
 				} else if (e.touches.length >= 2) {
 					if (doubleTapTimerRef.current) {
@@ -21466,6 +21467,7 @@ ${h.join(`
 					const now = Date.now();
 					const { mode: m, nw: nwP, nh: nhP, screenOffX: sox, screenOffY: soy, onRemoteClick: orc, onOpenFullscreen: oof } = propsRef.current;
 					if (m === "control" && orc) {
+						var _g$startTime;
 						if (doubleTapTimerRef.current) {
 							clearTimeout(doubleTapTimerRef.current);
 							doubleTapTimerRef.current = null;
@@ -21482,13 +21484,15 @@ ${h.join(`
 							translateX: tx2,
 							translateY: ty2
 						});
+						const kind = now - ((_g$startTime = g.startTime) !== null && _g$startTime !== void 0 ? _g$startTime : now) > 500 ? "right" : "left";
 						setTapFeedback({
 							x: px,
 							y: py,
-							id: Date.now()
+							id: Date.now(),
+							kind
 						});
 						setTimeout(() => setTapFeedback(null), 500);
-						orc((sox || 0) + remote.x, (soy || 0) + remote.y);
+						orc((sox || 0) + remote.x, (soy || 0) + remote.y, kind);
 					} else {
 						const last = lastTapRef.current;
 						if (now - last.time < 350 && Math.hypot(px - last.px, py - last.py) < 50) {
@@ -21930,9 +21934,10 @@ ${h.join(`
 				setBusy(null);
 			}
 		}
-		function handleRemoteClick(x, y) {
+		function handleRemoteClick(x, y, kind = "left") {
+			const type = kind === "right" ? "rightClickAt" : kind === "double" ? "doubleClickAt" : "clickAt";
 			apiPost(`/api/mobile/projects/${projectId}/desktop/action`, { action: {
-				type: "clickAt",
+				type,
 				x,
 				y
 			} }, token).catch(() => {});
@@ -22153,7 +22158,26 @@ ${h.join(`
 		const [busy, setBusy] = (0, import_react.useState)(null);
 		const [error, setError] = (0, import_react.useState)(null);
 		const [observation, setObservation] = (0, import_react.useState)(null);
+		const [tabInstruction, setTabInstruction] = (0, import_react.useState)("");
+		const [missionInfo, setMissionInfo] = (0, import_react.useState)(null);
 		const refreshInFlight = (0, import_react.useRef)(false);
+		async function runTabMission(tabId) {
+			const instruction = tabInstruction.trim();
+			if (!instruction) return;
+			setBusy(`mission-${tabId}`);
+			setError(null);
+			try {
+				setMissionInfo({
+					runId: (await apiPost(`/api/mobile/projects/${projectId}/browser/tabs/${encodeURIComponent(tabId)}/mission`, { instruction }, token)).runId,
+					instruction
+				});
+				setTabInstruction("");
+			} catch (err) {
+				setError(err.message);
+			} finally {
+				setBusy(null);
+			}
+		}
 		async function refresh() {
 			if (refreshInFlight.current) return;
 			refreshInFlight.current = true;
@@ -22270,7 +22294,18 @@ ${h.join(`
 			className: "mobile-btn primary small",
 			onClick: () => navigateActiveTab(tab.id),
 			disabled: busy !== null || !navigateUrl.trim()
-		}, busy === `navigate-${tab.id}` ? "…" : "→"))))), observation && (0, import_react.createElement)("div", { className: "browser-observation-card" }, (0, import_react.createElement)("div", { className: "browser-obs-header" }, (0, import_react.createElement)("span", { className: "browser-obs-title" }, "Dernière observation"), (0, import_react.createElement)("span", { className: "browser-obs-url" }, ((_observation$url = observation.url) !== null && _observation$url !== void 0 ? _observation$url : "").slice(0, 60)), (0, import_react.createElement)("button", {
+		}, busy === `navigate-${tab.id}` ? "…" : "→")), tab.active && (0, import_react.createElement)("div", { className: "browser-tab-agent-row" }, (0, import_react.createElement)("input", {
+			className: "mobile-input small",
+			placeholder: "Demande à JON sur cet onglet…",
+			value: tabInstruction,
+			onChange: (e) => setTabInstruction(e.target.value),
+			onKeyDown: (e) => e.key === "Enter" && runTabMission(tab.id)
+		}), (0, import_react.createElement)("button", {
+			className: "mobile-btn accent small",
+			onClick: () => runTabMission(tab.id),
+			disabled: busy !== null || !tabInstruction.trim(),
+			title: "Automatiser cette tâche en langage naturel (agent)"
+		}, busy === `mission-${tab.id}` ? "…" : "🤖")), tab.active && missionInfo && (0, import_react.createElement)("div", { className: "browser-tab-mission-note" }, `Agent lancé : « ${missionInfo.instruction.slice(0, 60)} »`)))), observation && (0, import_react.createElement)("div", { className: "browser-observation-card" }, (0, import_react.createElement)("div", { className: "browser-obs-header" }, (0, import_react.createElement)("span", { className: "browser-obs-title" }, "Dernière observation"), (0, import_react.createElement)("span", { className: "browser-obs-url" }, ((_observation$url = observation.url) !== null && _observation$url !== void 0 ? _observation$url : "").slice(0, 60)), (0, import_react.createElement)("button", {
 			className: "mobile-btn ghost small",
 			onClick: () => setObservation(null)
 		}, "×")), observation.screenshotBase64 && (0, import_react.createElement)("img", {
@@ -22478,6 +22513,58 @@ ${h.join(`
 			height: 40
 		})), (0, import_react.createElement)("p", { className: "empty-title" }, "Aucun terminal actif")) : null);
 	}
+	var SURFACE_LABEL_FR = {
+		browser: "Web",
+		desktop: "Bureau",
+		terminal: "Terminal",
+		email: "Email"
+	};
+	function ComposedMissionBanner({ events }) {
+		var _composed$payload, _ref16, _SURFACE_LABEL_FR$p$s;
+		const composed = [...events !== null && events !== void 0 ? events : []].reverse().find((e) => {
+			var _e$type;
+			return String((_e$type = e === null || e === void 0 ? void 0 : e.type) !== null && _e$type !== void 0 ? _e$type : "").startsWith("mission.composed.");
+		});
+		if (!composed) return null;
+		const p = (_composed$payload = composed.payload) !== null && _composed$payload !== void 0 ? _composed$payload : {};
+		if (composed.type === "mission.composed.completed") return (0, import_react.createElement)("div", { className: `composed-banner ${p.ok ? "ok" : "fail"}` }, p.ok ? "✓ Mission multi-étapes terminée" : "✗ Mission multi-étapes interrompue");
+		if (composed.type === "mission.composed.started") {
+			var _p$phaseCount, _p$surfaces;
+			return (0, import_react.createElement)("div", { className: "composed-banner active" }, `Mission multi-étapes — ${(_p$phaseCount = p.phaseCount) !== null && _p$phaseCount !== void 0 ? _p$phaseCount : "?"} phases (${((_p$surfaces = p.surfaces) !== null && _p$surfaces !== void 0 ? _p$surfaces : []).map((s) => {
+				var _SURFACE_LABEL_FR$s;
+				return (_SURFACE_LABEL_FR$s = SURFACE_LABEL_FR[s]) !== null && _SURFACE_LABEL_FR$s !== void 0 ? _SURFACE_LABEL_FR$s : s;
+			}).join(" → ")})`);
+		}
+		const label = (_ref16 = (_SURFACE_LABEL_FR$p$s = SURFACE_LABEL_FR[p.surface]) !== null && _SURFACE_LABEL_FR$p$s !== void 0 ? _SURFACE_LABEL_FR$p$s : p.surface) !== null && _ref16 !== void 0 ? _ref16 : "";
+		return (0, import_react.createElement)("div", { className: "composed-banner active" }, `${p.index && p.total ? `Phase ${p.index}/${p.total}` : "Phase"} · ${label} — ${composed.type === "mission.composed.phase_completed" ? "terminée" : "en cours"}`);
+	}
+	function SelfCheckCard({ token }) {
+		var _report$checks;
+		const [report, setReport] = (0, import_react.useState)(null);
+		const [loading, setLoading] = (0, import_react.useState)(false);
+		const runCheck = (0, import_react.useCallback)(() => {
+			setLoading(true);
+			apiGet("/api/mobile/system/self-check", token).then(setReport).catch(() => setReport({
+				ok: false,
+				summary: "Self-check indisponible.",
+				checks: []
+			})).finally(() => setLoading(false));
+		}, [token]);
+		(0, import_react.useEffect)(() => {
+			runCheck();
+		}, [runCheck]);
+		return (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "État du système (auto-test)"), (0, import_react.createElement)("button", {
+			className: "mobile-btn ghost small",
+			onClick: runCheck,
+			disabled: loading
+		}, loading ? "…" : "Relancer")), report ? (0, import_react.createElement)("div", null, (0, import_react.createElement)("div", { className: `selfcheck-verdict ${report.ok ? "ok" : "attention"}` }, report.ok ? "✓ Tous les sous-systèmes opérationnels" : `⚠ ${report.summary}`), ((_report$checks = report.checks) !== null && _report$checks !== void 0 ? _report$checks : []).map((c) => {
+			var _c$detail;
+			return (0, import_react.createElement)("div", {
+				key: c.id,
+				className: "card-row"
+			}, (0, import_react.createElement)("span", { className: "card-label" }, c.id), (0, import_react.createElement)("span", { className: `status-pill status-${c.ok ? "ok" : "error"}` }, c.id === "desktop_provider" && ((_c$detail = c.detail) === null || _c$detail === void 0 ? void 0 : _c$detail.actuationMode) ? c.detail.actuationMode : c.ok ? "ok" : "à vérifier"));
+		})) : (0, import_react.createElement)("p", { className: "card-sub" }, "Vérification en cours…"));
+	}
 	function AdminTab({ token, session, onDisconnect }) {
 		var _session$deviceName, _session$expiresAt$sl, _session$expiresAt, _status$devices2;
 		const [status, setStatus] = (0, import_react.useState)(null);
@@ -22494,7 +22581,7 @@ ${h.join(`
 			clearSession();
 			onDisconnect();
 		}
-		return (0, import_react.createElement)("div", { className: "admin-tab" }, (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Session"), (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("span", { className: "card-label" }, "Appareil"), (0, import_react.createElement)("span", { className: "card-value" }, (_session$deviceName = session === null || session === void 0 ? void 0 : session.deviceName) !== null && _session$deviceName !== void 0 ? _session$deviceName : "—")), (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("span", { className: "card-label" }, "Expire le"), (0, import_react.createElement)("span", { className: "card-value" }, (_session$expiresAt$sl = session === null || session === void 0 || (_session$expiresAt = session.expiresAt) === null || _session$expiresAt === void 0 ? void 0 : _session$expiresAt.slice(0, 16).replace("T", " ")) !== null && _session$expiresAt$sl !== void 0 ? _session$expiresAt$sl : "—"))), confirmDisconnect ? (0, import_react.createElement)("div", { className: "confirm-card" }, (0, import_react.createElement)("p", { className: "confirm-title" }, "Déconnecter cet appareil ?"), (0, import_react.createElement)("p", { className: "confirm-sub" }, "Il faudra rescanner le QR ou entrer un nouveau code."), (0, import_react.createElement)("div", { className: "card-actions" }, (0, import_react.createElement)("button", {
+		return (0, import_react.createElement)("div", { className: "admin-tab" }, (0, import_react.createElement)(SelfCheckCard, { token }), (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Session"), (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("span", { className: "card-label" }, "Appareil"), (0, import_react.createElement)("span", { className: "card-value" }, (_session$deviceName = session === null || session === void 0 ? void 0 : session.deviceName) !== null && _session$deviceName !== void 0 ? _session$deviceName : "—")), (0, import_react.createElement)("div", { className: "card-row" }, (0, import_react.createElement)("span", { className: "card-label" }, "Expire le"), (0, import_react.createElement)("span", { className: "card-value" }, (_session$expiresAt$sl = session === null || session === void 0 || (_session$expiresAt = session.expiresAt) === null || _session$expiresAt === void 0 ? void 0 : _session$expiresAt.slice(0, 16).replace("T", " ")) !== null && _session$expiresAt$sl !== void 0 ? _session$expiresAt$sl : "—"))), confirmDisconnect ? (0, import_react.createElement)("div", { className: "confirm-card" }, (0, import_react.createElement)("p", { className: "confirm-title" }, "Déconnecter cet appareil ?"), (0, import_react.createElement)("p", { className: "confirm-sub" }, "Il faudra rescanner le QR ou entrer un nouveau code."), (0, import_react.createElement)("div", { className: "card-actions" }, (0, import_react.createElement)("button", {
 			className: "mobile-btn ghost",
 			onClick: () => setConfirmDisconnect(false)
 		}, "Annuler"), (0, import_react.createElement)("button", {
@@ -22523,6 +22610,104 @@ ${h.join(`
 			className: `polling-option-btn ${pollingInterval === opt.value ? "active" : ""}`,
 			onClick: () => onPollingIntervalChange(opt.value)
 		}, opt.label)))));
+	}
+	function McpOAuthCard({ token }) {
+		const [catalog, setCatalog] = (0, import_react.useState)([]);
+		const [managed, setManaged] = (0, import_react.useState)([]);
+		const [statuses, setStatuses] = (0, import_react.useState)({});
+		const [busyId, setBusyId] = (0, import_react.useState)(null);
+		const [error, setError] = (0, import_react.useState)(null);
+		const [search, setSearch] = (0, import_react.useState)("");
+		async function refreshManaged() {
+			const d = await apiGet("/api/mobile/mcp/connectors", token).catch(() => null);
+			if (d) setManaged(Array.isArray(d.connectors) ? d.connectors : []);
+		}
+		(0, import_react.useEffect)(() => {
+			apiGet("/api/mobile/mcp/catalog", token).then((d) => setCatalog(Array.isArray(d === null || d === void 0 ? void 0 : d.catalog) ? d.catalog : [])).catch(() => {});
+			refreshManaged();
+		}, [token]);
+		async function connectServer(server) {
+			setBusyId(server.id);
+			setError(null);
+			try {
+				const res = await apiPost("/api/mobile/mcp/remote/connect", {
+					connectorId: server.id,
+					server: server.id
+				}, token);
+				if (res.connected) {
+					await refreshManaged();
+					return;
+				}
+				if (res.authorizeUrl) window.open(res.authorizeUrl, "_blank", "noopener");
+				for (let i = 0; i < 90; i += 1) {
+					await new Promise((r) => setTimeout(r, 2e3));
+					const st = await apiGet(`/api/mobile/mcp/${server.id}/status`, token).catch(() => null);
+					if (st) {
+						setStatuses((p) => ({
+							...p,
+							[server.id]: st
+						}));
+						if (st.connected || st.phase === "error") break;
+					}
+				}
+				await refreshManaged();
+			} catch (e) {
+				setError(e.message);
+			} finally {
+				setBusyId(null);
+			}
+		}
+		async function disconnect(id) {
+			setBusyId(id);
+			try {
+				await fetch(`${BASE}/api/mobile/mcp/${encodeURIComponent(id)}`, {
+					method: "DELETE",
+					headers: apiHeaders(token)
+				});
+				await refreshManaged();
+				setStatuses((prev) => {
+					const n = { ...prev };
+					delete n[id];
+					return n;
+				});
+			} catch (e) {
+				setError(e.message);
+			} finally {
+				setBusyId(null);
+			}
+		}
+		const managedIds = new Set(managed.filter((c) => c.connected).map((c) => c.id));
+		const filtered = catalog.filter((s) => !search || (s.label + s.category).toLowerCase().includes(search.toLowerCase()));
+		return (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Ajouter un tool (MCP via OAuth)"), (0, import_react.createElement)("p", { className: "card-hint" }, "Choisis un service et autorise-le — JON découvre ses tools et peut les utiliser. Tokens chiffrés localement."), (0, import_react.createElement)("input", {
+			className: "mobile-input small",
+			placeholder: "Rechercher un service…",
+			value: search,
+			onChange: (e) => setSearch(e.target.value)
+		}), filtered.length === 0 ? (0, import_react.createElement)("div", { className: "empty-mini" }, "Aucun service") : filtered.slice(0, 60).map((s) => {
+			const st = statuses[s.id];
+			const connected = managedIds.has(s.id) || (st === null || st === void 0 ? void 0 : st.connected);
+			return (0, import_react.createElement)("div", {
+				key: s.id,
+				className: "connector-row"
+			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, s.label), (0, import_react.createElement)("small", null, connected ? `Connecté${(st === null || st === void 0 ? void 0 : st.toolCount) != null ? ` · ${st.toolCount} tool(s)` : ""}` : (st === null || st === void 0 ? void 0 : st.authPending) ? `Autorisation… (${st.phase})` : `${s.category}${s.connectable ? "" : " · endpoint à configurer"}`)), connected ? (0, import_react.createElement)("span", { className: "status-pill status-ok" }, "Connecté") : (0, import_react.createElement)("button", {
+				className: "mobile-btn primary small",
+				disabled: !s.connectable || busyId === s.id,
+				onClick: () => connectServer(s)
+			}, busyId === s.id ? "…" : "Connecter"));
+		}), managed.length > 0 ? (0, import_react.createElement)("div", { className: "mcp-managed-list" }, (0, import_react.createElement)("p", {
+			className: "card-hint",
+			style: { marginTop: "10px" }
+		}, "Connecteurs gérés"), managed.map((c) => {
+			var _c$label, _c$kind;
+			return (0, import_react.createElement)("div", {
+				key: c.id,
+				className: "connector-row"
+			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, (_c$label = c.label) !== null && _c$label !== void 0 ? _c$label : c.id), (0, import_react.createElement)("small", null, `${(_c$kind = c.kind) !== null && _c$kind !== void 0 ? _c$kind : "mcp"}${c.connected ? ` · ${c.toolCount} tool(s)` : c.authPending ? " · autorisation…" : " · inactif"}`)), (0, import_react.createElement)("button", {
+				className: "mobile-btn outline-danger small",
+				disabled: busyId === c.id,
+				onClick: () => disconnect(c.id)
+			}, busyId === c.id ? "…" : "Retirer"));
+		})) : null, error ? (0, import_react.createElement)("div", { className: "inline-error" }, error) : null);
 	}
 	function ConnecteursTab({ token }) {
 		const [connectors, setConnectors] = (0, import_react.useState)([]);
@@ -22574,12 +22759,12 @@ ${h.join(`
 				setBusy(false);
 			}
 		}
-		return (0, import_react.createElement)("div", { className: "tab-content connectors-tab" }, (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Connecteurs"), (0, import_react.createElement)("p", { className: "card-hint" }, "Ajoute un serveur MCP ou un connecteur externe pour que JON puisse le sélectionner comme outil agentique."), connectors.length === 0 ? (0, import_react.createElement)("div", { className: "empty-mini" }, "Aucun connecteur") : connectors.map((connector) => {
-			var _ref16, _connector$type, _connector$capabiliti;
+		return (0, import_react.createElement)("div", { className: "tab-content connectors-tab" }, (0, import_react.createElement)(McpOAuthCard, { token }), (0, import_react.createElement)("div", { className: "card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Connecteurs"), (0, import_react.createElement)("p", { className: "card-hint" }, "Ajoute un serveur MCP ou un connecteur externe pour que JON puisse le sélectionner comme outil agentique."), connectors.length === 0 ? (0, import_react.createElement)("div", { className: "empty-mini" }, "Aucun connecteur") : connectors.map((connector) => {
+			var _ref17, _connector$type, _connector$capabiliti;
 			return (0, import_react.createElement)("div", {
 				key: connector.connectorId,
 				className: "connector-row"
-			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, connector.name), (0, import_react.createElement)("small", null, `${(_ref16 = (_connector$type = connector.type) !== null && _connector$type !== void 0 ? _connector$type : connector.category) !== null && _ref16 !== void 0 ? _ref16 : "builtin"} · ${((_connector$capabiliti = connector.capabilities) !== null && _connector$capabiliti !== void 0 ? _connector$capabiliti : []).slice(0, 3).join(", ") || "outil"}`)), (0, import_react.createElement)("span", { className: `status-pill status-${connector.status}` }, connector.status === "connected" ? "Connecté" : "À configurer"));
+			}, (0, import_react.createElement)("div", null, (0, import_react.createElement)("strong", null, connector.name), (0, import_react.createElement)("small", null, `${(_ref17 = (_connector$type = connector.type) !== null && _connector$type !== void 0 ? _connector$type : connector.category) !== null && _ref17 !== void 0 ? _ref17 : "builtin"} · ${((_connector$capabiliti = connector.capabilities) !== null && _connector$capabiliti !== void 0 ? _connector$capabiliti : []).slice(0, 3).join(", ") || "outil"}`)), (0, import_react.createElement)("span", { className: `status-pill status-${connector.status}` }, connector.status === "connected" ? "Connecté" : "À configurer"));
 		})), (0, import_react.createElement)("div", { className: "card connector-form-card" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Ajouter MCP"), (0, import_react.createElement)("input", {
 			className: "mobile-input",
 			value: name,
@@ -22739,8 +22924,8 @@ ${h.join(`
 				"approval.auto_resolved",
 				"approval.policy_blocked"
 			].includes(ev.type)) {
-				var _ref17, _ev$payload$approvalI, _ev$payload2;
-				const approvalId = (_ref17 = (_ev$payload$approvalI = (_ev$payload2 = ev.payload) === null || _ev$payload2 === void 0 ? void 0 : _ev$payload2.approvalId) !== null && _ev$payload$approvalI !== void 0 ? _ev$payload$approvalI : ev.approvalId) !== null && _ref17 !== void 0 ? _ref17 : null;
+				var _ref18, _ev$payload$approvalI, _ev$payload2;
+				const approvalId = (_ref18 = (_ev$payload$approvalI = (_ev$payload2 = ev.payload) === null || _ev$payload2 === void 0 ? void 0 : _ev$payload2.approvalId) !== null && _ev$payload$approvalI !== void 0 ? _ev$payload$approvalI : ev.approvalId) !== null && _ref18 !== void 0 ? _ref18 : null;
 				if (approvalId) setPendingApprovals((prev) => prev.filter((a) => a.id !== approvalId));
 			}
 			if (ev.severity === "high") setAlertEvent(ev);
@@ -22842,7 +23027,7 @@ ${h.join(`
 		return (0, import_react.createElement)("div", { className: "mobile-app" }, (0, import_react.createElement)(AppHeader, { connStatus }), (0, import_react.createElement)(AlertBanner, {
 			event: alertEvent,
 			onDismiss: () => setAlertEvent(null)
-		}), (0, import_react.createElement)("div", { className: "mobile-content" }, activeTab === "dashboard" && (0, import_react.createElement)(DashboardTab, {
+		}), (0, import_react.createElement)(ComposedMissionBanner, { events }), (0, import_react.createElement)("div", { className: "mobile-content" }, activeTab === "dashboard" && (0, import_react.createElement)(DashboardTab, {
 			projectId,
 			token: sessionToken,
 			events,

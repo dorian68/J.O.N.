@@ -1,4 +1,5 @@
 import { inferMissionMode } from "../mission/mission-understanding.js";
+import { hasTemporalReference, buildTemporalContextLines } from "../mission/temporal-context.js";
 
 const DEFAULT_FORM_VALUES = Object.freeze({
   name: "Jordan Labry",
@@ -739,6 +740,13 @@ export function normalizeMissionSpec(input, missionEntryContract = buildMissionE
 
 export function buildMissionStatement(spec, modeDescriptor = null, { includeExecutionFrame = false } = {}) {
   const lines = [`Objective: ${spec.objective}`];
+
+  // Ground relative dates ("demain", "tomorrow", "ce week-end", …) so the
+  // planner can filter/compute against concrete dates. Only added when the
+  // objective actually references time — non-temporal missions are unchanged.
+  if (hasTemporalReference(spec.objective)) {
+    lines.push(...buildTemporalContextLines());
+  }
 
   if (spec.deliverable) {
     lines.push(`Expected deliverable: ${spec.deliverable}`);

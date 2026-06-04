@@ -367,6 +367,22 @@ async function apiGet(path, token) {
   }
 }
 
+// Download a binary deliverable with the mobile auth header, then trigger a
+// browser save via a temporary blob URL.
+async function downloadDeliverable(path, fileName, token) {
+  const res = await fetch(`${BASE}${path}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw makeApiError("Téléchargement impossible", { status: res.status, code: "DOWNLOAD_ERROR" });
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName || "deliverable";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
 function validateMobileSession(token) {
   return apiGet("/api/mobile/session/status", token);
 }
@@ -1255,7 +1271,7 @@ function RemoteScreenViewport({ screenshot, screenshotMime, naturalWidth, natura
       const { scale: s, tx: cTx, ty: cTy } = liveRef.current;
       if (e.touches.length === 1) {
         const p = gPos(e.touches[0]);
-        gestureRef.current = { type: "potential", startPx: p.px, startPy: p.py, startTx: cTx, startTy: cTy, moved: false };
+        gestureRef.current = { type: "potential", startPx: p.px, startPy: p.py, startTx: cTx, startTy: cTy, moved: false, startTime: Date.now() };
       } else if (e.touches.length >= 2) {
         if (doubleTapTimerRef.current) { clearTimeout(doubleTapTimerRef.current); doubleTapTimerRef.current = null; }
         const d = gDist(e.touches[0], e.touches[1]);
@@ -1304,13 +1320,16 @@ function RemoteScreenViewport({ screenshot, screenshotMime, naturalWidth, natura
 
         if (m === "control" && orc) {
           // Control mode: fire click IMMEDIATELY — no double-tap ambiguity timer.
-          // Zooming in control mode is pinch-only.
+          // Zooming in control mode is pinch-only. A long press (>500ms, no move)
+          // maps to a right-click (context menu).
           if (doubleTapTimerRef.current) { clearTimeout(doubleTapTimerRef.current); doubleTapTimerRef.current = null; }
           const { scale: s2, tx: tx2, ty: ty2 } = liveRef.current;
           const remote = mapClientPointToRemotePoint({ px, py, containerWidth: cRect.width, containerHeight: cRect.height, naturalWidth: nwP, naturalHeight: nhP, scale: s2, translateX: tx2, translateY: ty2 });
-          setTapFeedback({ x: px, y: py, id: Date.now() });
+          const pressMs = now - (g.startTime ?? now);
+          const kind = pressMs > 500 ? "right" : "left";
+          setTapFeedback({ x: px, y: py, id: Date.now(), kind });
           setTimeout(() => setTapFeedback(null), 500);
-          orc((sox || 0) + remote.x, (soy || 0) + remote.y);
+          orc((sox || 0) + remote.x, (soy || 0) + remote.y, kind);
         } else {
           // Explore mode: double-tap → zoom, single-tap → open fullscreen.
           const last = lastTapRef.current;
@@ -1691,8 +1710,9 @@ function ControlTab({ projectId, token, events, pollingInterval = 2000 }) {
     }
   }
 
-  function handleRemoteClick(x, y) {
-    apiPost(`/api/mobile/projects/${projectId}/desktop/action`, { action: { type: "clickAt", x, y } }, token)
+  function handleRemoteClick(x, y, kind = "left") {
+    const type = kind === "right" ? "rightClickAt" : kind === "double" ? "doubleClickAt" : "clickAt";
+    apiPost(`/api/mobile/projects/${projectId}/desktop/action`, { action: { type, x, y } }, token)
       .catch(() => { /* fire-and-forget: ignore transient errors */ });
   }
   async function handleRemoteScroll(delta) {
@@ -2029,7 +2049,25 @@ function BrowserTabsTab({ projectId, token, events }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const [observation, setObservation] = useState(null); // last observeTab result
+  const [tabInstruction, setTabInstruction] = useState("");
+  const [missionInfo, setMissionInfo] = useState(null);
   const refreshInFlight = useRef(false);
+
+  async function runTabMission(tabId) {
+    const instruction = tabInstruction.trim();
+    if (!instruction) return;
+    setBusy(`mission-${tabId}`);
+    setError(null);
+    try {
+      const res = await apiPost(`/api/mobile/projects/${projectId}/browser/tabs/${encodeURIComponent(tabId)}/mission`, { instruction }, token);
+      setMissionInfo({ runId: res.runId, instruction });
+      setTabInstruction("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function refresh() {
     if (refreshInFlight.current) return;
@@ -2160,6 +2198,25 @@ function BrowserTabsTab({ projectId, token, events }) {
                   onClick: () => navigateActiveTab(tab.id),
                   disabled: busy !== null || !navigateUrl.trim()
                 }, busy === `navigate-${tab.id}` ? "…" : "→")
+              ),
+              // Agentic natural-language instruction for this tab
+              tab.active && h("div", { className: "browser-tab-agent-row" },
+                h("input", {
+                  className: "mobile-input small",
+                  placeholder: "Demande à JON sur cet onglet…",
+                  value: tabInstruction,
+                  onChange: (e) => setTabInstruction(e.target.value),
+                  onKeyDown: (e) => e.key === "Enter" && runTabMission(tab.id)
+                }),
+                h("button", {
+                  className: "mobile-btn accent small",
+                  onClick: () => runTabMission(tab.id),
+                  disabled: busy !== null || !tabInstruction.trim(),
+                  title: "Automatiser cette tâche en langage naturel (agent)"
+                }, busy === `mission-${tab.id}` ? "…" : "🤖")
+              ),
+              tab.active && missionInfo && h("div", { className: "browser-tab-mission-note" },
+                `Agent lancé : « ${missionInfo.instruction.slice(0, 60)} »`
               )
             )
           )
@@ -2389,6 +2446,81 @@ function TerminalsTab({ projectId, token, events }) {
 
 // ─── Tab: Résultats ───────────────────────────────────────────────────────────
 
+const DELIVERABLE_LABELS = { pdf: "PDF", docx: "Word", xlsx: "Excel" };
+
+function DeliverableDownloads({ projectId, runId, token }) {
+  const [artifacts, setArtifacts] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiGet(`/api/mobile/projects/${projectId}/runs/${runId}/artifacts`, token)
+      .then((list) => { if (!cancelled) setArtifacts(Array.isArray(list) ? list : []); })
+      .catch(() => { if (!cancelled) setArtifacts([]); });
+    return () => { cancelled = true; };
+  }, [projectId, runId, token]);
+
+  if (!artifacts || artifacts.length === 0) return null;
+  const withDeliverables = artifacts.filter((a) => a.deliverables && a.deliverables.length > 0);
+  if (withDeliverables.length === 0) return null;
+
+  async function download(artifactId, format, title, ext) {
+    try {
+      setError(null);
+      await downloadDeliverable(
+        `/api/mobile/runs/${runId}/artifacts/${artifactId}/deliverable/${format}`,
+        `${title}.${ext}`,
+        token
+      );
+    } catch (e) {
+      setError(e?.message ?? "Téléchargement impossible");
+    }
+  }
+
+  return h("div", { className: "deliverables-block" },
+    h("p", { className: "card-section-title" }, "Livrables"),
+    withDeliverables.map((artifact) =>
+      h("div", { key: artifact.id, className: "deliverable-row" },
+        h("span", { className: "deliverable-title" }, artifact.title),
+        h("div", { className: "deliverable-actions" },
+          artifact.deliverables.map((d) =>
+            h("button", {
+              key: d.format,
+              className: "mobile-btn ghost small",
+              onClick: () => download(artifact.id, d.format, artifact.title, d.ext)
+            }, `↓ ${DELIVERABLE_LABELS[d.format] ?? d.format.toUpperCase()}`)
+          )
+        )
+      )
+    ),
+    error ? h("p", { className: "deliverable-error" }, error) : null
+  );
+}
+
+const SURFACE_LABEL_FR = { browser: "Web", desktop: "Bureau", terminal: "Terminal", email: "Email" };
+
+// Shows the live progress of a cross-surface ("agent OS") composed mission:
+// Phase 1/2 Web → Phase 2/2 Bureau, with a final ✓/✗.
+function ComposedMissionBanner({ events }) {
+  const composed = [...(events ?? [])].reverse().find((e) => String(e?.type ?? "").startsWith("mission.composed."));
+  if (!composed) return null;
+  const p = composed.payload ?? {};
+  if (composed.type === "mission.composed.completed") {
+    return h("div", { className: `composed-banner ${p.ok ? "ok" : "fail"}` },
+      p.ok ? "✓ Mission multi-étapes terminée" : "✗ Mission multi-étapes interrompue"
+    );
+  }
+  if (composed.type === "mission.composed.started") {
+    return h("div", { className: "composed-banner active" },
+      `Mission multi-étapes — ${p.phaseCount ?? "?"} phases (${(p.surfaces ?? []).map((s) => SURFACE_LABEL_FR[s] ?? s).join(" → ")})`
+    );
+  }
+  const label = SURFACE_LABEL_FR[p.surface] ?? p.surface ?? "";
+  const phase = p.index && p.total ? `Phase ${p.index}/${p.total}` : "Phase";
+  const verb = composed.type === "mission.composed.phase_completed" ? "terminée" : "en cours";
+  return h("div", { className: "composed-banner active" }, `${phase} · ${label} — ${verb}`);
+}
+
 function ResultatsTab({ projectId, token, events }) {
   const [runs, setRuns] = useState([]);
 
@@ -2413,13 +2545,53 @@ function ResultatsTab({ projectId, token, events }) {
               h("span", { className: "run-ts" }, run.updatedAt ? formatTime(run.updatedAt) : "")
             ),
             h("p", { className: "run-mission" }, run.mission),
-            run.summary ? h("p", { className: "run-summary" }, run.summary) : null
+            run.summary ? h("p", { className: "run-summary" }, run.summary) : null,
+            run.status === "completed" ? h(DeliverableDownloads, { projectId, runId: run.id, token }) : null
           )
         )
   );
 }
 
 // ─── Tab: Admin ───────────────────────────────────────────────────────────────
+
+function SelfCheckCard({ token }) {
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const runCheck = useCallback(() => {
+    setLoading(true);
+    apiGet("/api/mobile/system/self-check", token)
+      .then(setReport)
+      .catch(() => setReport({ ok: false, summary: "Self-check indisponible.", checks: [] }))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  useEffect(() => { runCheck(); }, [runCheck]);
+
+  return h("div", { className: "card" },
+    h("div", { className: "card-row" },
+      h("p", { className: "card-section-title" }, "État du système (auto-test)"),
+      h("button", { className: "mobile-btn ghost small", onClick: runCheck, disabled: loading }, loading ? "…" : "Relancer")
+    ),
+    report
+      ? h("div", null,
+          h("div", { className: `selfcheck-verdict ${report.ok ? "ok" : "attention"}` },
+            report.ok ? "✓ Tous les sous-systèmes opérationnels" : `⚠ ${report.summary}`
+          ),
+          (report.checks ?? []).map((c) =>
+            h("div", { key: c.id, className: "card-row" },
+              h("span", { className: "card-label" }, c.id),
+              h("span", { className: `status-pill status-${c.ok ? "ok" : "error"}` },
+                c.id === "desktop_provider" && c.detail?.actuationMode
+                  ? c.detail.actuationMode
+                  : (c.ok ? "ok" : "à vérifier")
+              )
+            )
+          )
+        )
+      : h("p", { className: "card-sub" }, "Vérification en cours…")
+  );
+}
 
 function AdminTab({ token, session, onDisconnect }) {
   const [status, setStatus] = useState(null);
@@ -2440,6 +2612,8 @@ function AdminTab({ token, session, onDisconnect }) {
   }
 
   return h("div", { className: "admin-tab" },
+
+    h(SelfCheckCard, { token }),
 
     h("div", { className: "card" },
       h("p", { className: "card-section-title" }, "Session"),
@@ -2513,6 +2687,93 @@ function ParametresTab({ pollingInterval, onPollingIntervalChange }) {
   );
 }
 
+function McpOAuthCard({ token }) {
+  const [catalog, setCatalog] = useState([]);
+  const [managed, setManaged] = useState([]);
+  const [statuses, setStatuses] = useState({});
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+
+  async function refreshManaged() {
+    const d = await apiGet("/api/mobile/mcp/connectors", token).catch(() => null);
+    if (d) setManaged(Array.isArray(d.connectors) ? d.connectors : []);
+  }
+
+  useEffect(() => {
+    apiGet("/api/mobile/mcp/catalog", token)
+      .then((d) => setCatalog(Array.isArray(d?.catalog) ? d.catalog : []))
+      .catch(() => {});
+    refreshManaged();
+  }, [token]);
+
+  async function connectServer(server) {
+    setBusyId(server.id); setError(null);
+    try {
+      const res = await apiPost("/api/mobile/mcp/remote/connect", { connectorId: server.id, server: server.id }, token);
+      if (res.connected) { await refreshManaged(); return; }
+      if (res.authorizeUrl) window.open(res.authorizeUrl, "_blank", "noopener");
+      for (let i = 0; i < 90; i += 1) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const st = await apiGet(`/api/mobile/mcp/${server.id}/status`, token).catch(() => null);
+        if (st) { setStatuses((p) => ({ ...p, [server.id]: st })); if (st.connected || st.phase === "error") break; }
+      }
+      await refreshManaged();
+    } catch (e) { setError(e.message); } finally { setBusyId(null); }
+  }
+
+  async function disconnect(id) {
+    setBusyId(id);
+    try {
+      await fetch(`${BASE}/api/mobile/mcp/${encodeURIComponent(id)}`, { method: "DELETE", headers: apiHeaders(token) });
+      await refreshManaged();
+      setStatuses((prev) => { const n = { ...prev }; delete n[id]; return n; });
+    } catch (e) { setError(e.message); } finally { setBusyId(null); }
+  }
+
+  const managedIds = new Set(managed.filter((c) => c.connected).map((c) => c.id));
+  const filtered = catalog.filter((s) => !search || (s.label + s.category).toLowerCase().includes(search.toLowerCase()));
+
+  return h("div", { className: "card" },
+    h("p", { className: "card-section-title" }, "Ajouter un tool (MCP via OAuth)"),
+    h("p", { className: "card-hint" }, "Choisis un service et autorise-le — JON découvre ses tools et peut les utiliser. Tokens chiffrés localement."),
+    h("input", { className: "mobile-input small", placeholder: "Rechercher un service…", value: search, onChange: (e) => setSearch(e.target.value) }),
+    filtered.length === 0
+      ? h("div", { className: "empty-mini" }, "Aucun service")
+      : filtered.slice(0, 60).map((s) => {
+          const st = statuses[s.id];
+          const connected = managedIds.has(s.id) || st?.connected;
+          return h("div", { key: s.id, className: "connector-row" },
+            h("div", null,
+              h("strong", null, s.label),
+              h("small", null, connected
+                ? `Connecté${st?.toolCount != null ? ` · ${st.toolCount} tool(s)` : ""}`
+                : st?.authPending ? `Autorisation… (${st.phase})`
+                : `${s.category}${s.connectable ? "" : " · endpoint à configurer"}`)
+            ),
+            connected
+              ? h("span", { className: "status-pill status-ok" }, "Connecté")
+              : h("button", {
+                  className: "mobile-btn primary small",
+                  disabled: !s.connectable || busyId === s.id,
+                  onClick: () => connectServer(s)
+                }, busyId === s.id ? "…" : "Connecter")
+          );
+        }),
+    managed.length > 0 ? h("div", { className: "mcp-managed-list" },
+      h("p", { className: "card-hint", style: { marginTop: "10px" } }, "Connecteurs gérés"),
+      managed.map((c) => h("div", { key: c.id, className: "connector-row" },
+        h("div", null,
+          h("strong", null, c.label ?? c.id),
+          h("small", null, `${c.kind ?? "mcp"}${c.connected ? ` · ${c.toolCount} tool(s)` : c.authPending ? " · autorisation…" : " · inactif"}`)
+        ),
+        h("button", { className: "mobile-btn outline-danger small", disabled: busyId === c.id, onClick: () => disconnect(c.id) }, busyId === c.id ? "…" : "Retirer")
+      ))
+    ) : null,
+    error ? h("div", { className: "inline-error" }, error) : null
+  );
+}
+
 function ConnecteursTab({ token }) {
   const [connectors, setConnectors] = useState([]);
   const [name, setName] = useState("");
@@ -2568,6 +2829,7 @@ function ConnecteursTab({ token }) {
   }
 
   return h("div", { className: "tab-content connectors-tab" },
+    h(McpOAuthCard, { token }),
     h("div", { className: "card" },
       h("p", { className: "card-section-title" }, "Connecteurs"),
       h("p", { className: "card-hint" }, "Ajoute un serveur MCP ou un connecteur externe pour que JON puisse le sélectionner comme outil agentique."),
@@ -2860,6 +3122,7 @@ function App() {
   return h("div", { className: "mobile-app" },
     h(AppHeader, { connStatus }),
     h(AlertBanner, { event: alertEvent, onDismiss: () => setAlertEvent(null) }),
+    h(ComposedMissionBanner, { events }),
     h("div", { className: "mobile-content" },
       activeTab === "dashboard" && h(DashboardTab, {
         projectId,

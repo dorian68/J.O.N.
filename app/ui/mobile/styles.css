@@ -2898,3 +2898,28 @@ html, body {
 .llm-preview-actions .mobile-btn {
   flex: 1;
 }
+
+/* --- Deliverable downloads (Résultats) --- */
+.deliverables-block { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); }
+.deliverable-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; flex-wrap: wrap; }
+.deliverable-title { font-size: 13px; opacity: 0.9; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deliverable-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.deliverable-error { color: #ff6b6b; font-size: 12px; margin-top: 6px; }
+
+/* --- Self-check card (Admin) --- */
+.selfcheck-verdict { font-size: 13px; font-weight: 600; padding: 8px 10px; border-radius: 8px; margin: 6px 0 10px; }
+.selfcheck-verdict.ok { background: rgba(46, 160, 67, 0.15); color: #3fb950; }
+.selfcheck-verdict.attention { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+.status-pill.status-ok { background: rgba(46,160,67,0.18); color: #3fb950; }
+
+/* --- Composed (cross-surface "agent OS") mission banner --- */
+.composed-banner { padding: 8px 14px; font-size: 13px; font-weight: 600; text-align: center; border-bottom: 1px solid var(--border, rgba(255,255,255,0.08)); }
+.composed-banner.active { background: rgba(88,166,255,0.14); color: #58a6ff; }
+.composed-banner.ok { background: rgba(46,160,67,0.15); color: #3fb950; }
+.composed-banner.fail { background: rgba(210,153,34,0.15); color: #d29922; }
+
+/* --- Per-tab agentic instruction + MCP --- */
+.browser-tab-agent-row { display: flex; gap: 6px; margin-top: 6px; }
+.browser-tab-agent-row .mobile-input { flex: 1; }
+.mobile-btn.accent { background: rgba(168,85,247,0.18); color: #c084fc; border: 1px solid rgba(168,85,247,0.35); }
+.browser-tab-mission-note { font-size: 12px; color: #c084fc; margin-top: 4px; }

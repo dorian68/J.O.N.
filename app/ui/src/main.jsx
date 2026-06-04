@@ -788,6 +788,84 @@ function PairDeviceModal({ t, onClose }) {
 
 // ─── SettingsModal ────────────────────────────────────────────────────────────
 
+// Shared connector & MCP-tool management (settings). Same backend service as
+// JON mobile, so connectors added here appear on both surfaces.
+function McpManagerSection() {
+  const [catalog, setCatalog] = useState([]);
+  const [connectors, setConnectors] = useState([]);
+  const [tools, setTools] = useState([]);
+  const [busy, setBusy] = useState(null);
+  const [search, setSearch] = useState("");
+  const [err, setErr] = useState(null);
+
+  async function refresh() {
+    try {
+      const [cat, c] = await Promise.all([
+        api("/api/mcp/catalog").catch(() => ({ catalog: [] })),
+        api("/api/mcp/connectors").catch(() => ({ connectors: [], tools: [] }))
+      ]);
+      setCatalog(cat.catalog ?? []);
+      setConnectors(c.connectors ?? []);
+      setTools(c.tools ?? []);
+    } catch (e) { setErr(e.message); }
+  }
+  useEffect(() => { refresh(); }, []);
+
+  async function connect(server) {
+    setBusy(server.id); setErr(null);
+    try {
+      const res = await api("/api/mcp/remote/connect", { method: "POST", body: JSON.stringify({ connectorId: server.id, server: server.id }) });
+      if (!res.connected && res.authorizeUrl) window.open(res.authorizeUrl, "_blank", "noopener");
+      for (let i = 0; i < 90 && !res.connected; i += 1) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const st = await api(`/api/mcp/${server.id}/status`).catch(() => null);
+        if (st && (st.connected || st.phase === "error")) break;
+      }
+      await refresh();
+    } catch (e) { setErr(e.message); } finally { setBusy(null); }
+  }
+  async function disconnect(id) {
+    setBusy(id);
+    try { await api(`/api/mcp/${encodeURIComponent(id)}`, { method: "DELETE" }); await refresh(); }
+    catch (e) { setErr(e.message); } finally { setBusy(null); }
+  }
+
+  const connectedIds = new Set(connectors.filter((c) => c.connected).map((c) => c.id));
+  const filtered = catalog.filter((s) => !search || (s.label + s.category).toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <section style={{ marginBottom: "20px" }}>
+      <h3 style={{ fontSize: "13px", marginBottom: "6px" }}>Connecteurs &amp; Tools (MCP)</h3>
+      <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "8px" }}>
+        Choisis un service, autorise-le — JON découvre ses tools (OAuth + sauvegarde locale chiffrée). Partagé avec JON mobile.
+      </p>
+      <input className="settings-domains-textarea" style={{ minHeight: 0, height: "30px", marginBottom: "8px" }}
+        placeholder="Rechercher un service…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="settings-toggle-list" style={{ maxHeight: "240px", overflowY: "auto" }}>
+        {filtered.slice(0, 80).map((s) => {
+          const connected = connectedIds.has(s.id);
+          return (
+            <div key={s.id} className="settings-toggle-row" style={{ alignItems: "center" }}>
+              <span className="settings-toggle-label">
+                {s.label} <span style={{ color: "var(--muted)", fontSize: "11px" }}>{connected ? "· connecté" : `· ${s.category}${s.connectable ? "" : " · endpoint à configurer"}`}</span>
+              </span>
+              {connected
+                ? <button type="button" className="ghost small" disabled={busy === s.id} onClick={() => disconnect(s.id)}>Déconnecter</button>
+                : <button type="button" className="secondary small" disabled={!s.connectable || busy === s.id} onClick={() => connect(s)}>{busy === s.id ? "…" : "Connecter"}</button>}
+            </div>
+          );
+        })}
+      </div>
+      {tools.length > 0 ? (
+        <p style={{ fontSize: "11px", color: "var(--muted)", marginTop: "8px" }}>
+          Tools disponibles pour JON : {tools.map((t) => t.name).slice(0, 12).join(", ")}{tools.length > 12 ? "…" : ""}
+        </p>
+      ) : null}
+      {err ? <p style={{ fontSize: "12px", color: "var(--danger, #d9534f)" }}>{err}</p> : null}
+    </section>
+  );
+}
+
 function SettingsModal({ t, projectId, agentConfiguration, availableApplications, availableBrowsers, project, llmGatewayStatus, onClose }) {
   const existing = agentConfiguration?.guardrails ?? {};
   const [trustedApps, setTrustedApps] = useState(() => new Set(existing.trustedApplications ?? []));
@@ -907,6 +985,8 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
           <h2>{t.settingsTitle}</h2>
           <button type="button" className="ghost icon-only" onClick={onClose}>✕</button>
         </div>
+
+        <McpManagerSection />
 
         {availableApplications.length > 0 ? (
           <section style={{ marginBottom: "20px" }}>
@@ -1049,6 +1129,7 @@ function App() {
   const [jonUnread, setJonUnread] = useState(0);
   const [pairModalOpen, setPairModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [composedPhase, setComposedPhase] = useState(null);
 
   const selectedProjectIdRef = useRef(null);
   const selectedRunIdRef = useRef(null);
@@ -1342,6 +1423,9 @@ function App() {
         event = JSON.parse(message.data);
       } catch {
         event = { type: "stream.message", createdAt: new Date().toISOString(), payload: {} };
+      }
+      if (event.type && event.type.startsWith("mission.composed.")) {
+        setComposedPhase({ type: event.type, payload: event.payload ?? {} });
       }
       if (event.type && event.type !== "stream.connected" && !event.type.startsWith("conversation.")) {
         const runId = event.payload?.runId ?? event.payload?.nextRunId ?? null;
@@ -1854,6 +1938,8 @@ function App() {
       ) : null}
 
       {feedback ? <div className={`react-feedback ${feedback.tone ?? ""}`}>{feedback.text}</div> : null}
+
+      <ComposedMissionBanner composed={composedPhase} />
 
       <main className={`react-cowork-main ${historyOpen ? "history-open" : "history-collapsed"} ${workspacePanel ? "workspace-open" : "workspace-collapsed"} ${workspacePanel === "terminals" && terminalViewMode === "surface" ? "terminal-surface-open" : ""}`}>
         <ConversationSidebar
@@ -3987,16 +4073,19 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 
       case "artifacts":
         return (
-          <section key={widgetId} className="activity-section">
-            <h3>{t.artifacts}</h3>
-            {artifacts.length === 0 ? <p className="muted">{t.noArtifacts}</p> : null}
-            {artifacts.slice(0, 8).map((artifact, index) => (
-              <a className="activity-link" key={artifact.id ?? artifact.path ?? index} href={artifact.href ?? artifact.url ?? "#"} target="_blank" rel="noreferrer">
-                <strong>{artifact.title ?? artifact.name ?? artifact.path ?? `Artifact ${index + 1}`}</strong>
-                {artifact.description ? <span>{artifact.description}</span> : null}
-              </a>
-            ))}
-          </section>
+          <React.Fragment key={widgetId}>
+            <section className="activity-section">
+              <h3>{t.artifacts}</h3>
+              {artifacts.length === 0 ? <p className="muted">{t.noArtifacts}</p> : null}
+              {artifacts.slice(0, 8).map((artifact, index) => (
+                <a className="activity-link" key={artifact.id ?? artifact.path ?? index} href={artifact.href ?? artifact.url ?? "#"} target="_blank" rel="noreferrer">
+                  <strong>{artifact.title ?? artifact.name ?? artifact.path ?? `Artifact ${index + 1}`}</strong>
+                  {artifact.description ? <span>{artifact.description}</span> : null}
+                </a>
+              ))}
+            </section>
+            {selectedRunId ? <RunDeliverables runId={selectedRunId} /> : null}
+          </React.Fragment>
         );
 
       case "terminal_alerts":
@@ -5292,6 +5381,68 @@ function ReportPreviewBlock({ block }) {
   );
 }
 
+const SURFACE_LABEL = { browser: "Web", desktop: "Bureau", terminal: "Terminal", email: "Email" };
+
+// Cross-surface ("agent OS") composed-mission progress banner.
+function ComposedMissionBanner({ composed }) {
+  if (!composed) return null;
+  const p = composed.payload ?? {};
+  if (composed.type === "mission.composed.completed") {
+    return <div className={`composed-banner ${p.ok ? "ok" : "fail"}`}>{p.ok ? "✓ Mission multi-étapes terminée" : "✗ Mission multi-étapes interrompue"}</div>;
+  }
+  if (composed.type === "mission.composed.started") {
+    return <div className="composed-banner active">Mission multi-étapes — {p.phaseCount ?? "?"} phases ({(p.surfaces ?? []).map((s) => SURFACE_LABEL[s] ?? s).join(" → ")})</div>;
+  }
+  const label = SURFACE_LABEL[p.surface] ?? p.surface ?? "";
+  const phase = p.index && p.total ? `Phase ${p.index}/${p.total}` : "Phase";
+  const verb = composed.type === "mission.composed.phase_completed" ? "terminée" : "en cours";
+  return <div className="composed-banner active">{phase} · {label} — {verb}</div>;
+}
+
+const DELIVERABLE_LABELS = { pdf: "PDF", docx: "Word", xlsx: "Excel" };
+
+// Loads a run's artifacts and renders download links for their real binary
+// deliverables (PDF / DOCX / XLSX). Desktop runs on loopback, so plain anchors
+// work without auth headers.
+function RunDeliverables({ runId }) {
+  const [artifacts, setArtifacts] = useState(null);
+
+  useEffect(() => {
+    if (!runId) return undefined;
+    let cancelled = false;
+    api(`/api/runs/${runId}/artifacts`)
+      .then((list) => { if (!cancelled) setArtifacts(Array.isArray(list) ? list : []); })
+      .catch(() => { if (!cancelled) setArtifacts([]); });
+    return () => { cancelled = true; };
+  }, [runId]);
+
+  const withDeliverables = (artifacts ?? []).filter((a) => a.deliverables && a.deliverables.length > 0);
+  if (withDeliverables.length === 0) return null;
+
+  return (
+    <section className="activity-section deliverables-section">
+      <h3>Livrables</h3>
+      {withDeliverables.map((artifact) => (
+        <div className="deliverable-row" key={artifact.id}>
+          <span className="deliverable-title">{artifact.title}</span>
+          <span className="deliverable-actions">
+            {artifact.deliverables.map((d) => (
+              <a
+                key={d.format}
+                className="deliverable-dl"
+                href={`/api/runs/${runId}/artifacts/${artifact.id}/deliverable/${d.format}`}
+                download
+              >
+                ↓ {DELIVERABLE_LABELS[d.format] ?? d.format.toUpperCase()}
+              </a>
+            ))}
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function ArtifactCardBlock({ block }) {
   return (
     <div className="ui-block artifact-block">
@@ -5553,6 +5704,21 @@ function RunProgressMessage({ run, runDetail, liveStatus, pendingApprovals, even
           <JonPulse state={jonPulseState(run.status, { pendingApprovals, busy: true })} small />
           <span>{workingStatus}</span>
         </div>
+        {(run.status === "running" || run.status === "paused") ? (
+          <div className="emergency-stop-row">
+            <button
+              type="button"
+              className="danger ghost-danger emergency-stop-btn"
+              onClick={() => {
+                if (window.confirm(t.emergencyStopConfirm ?? "Arrêter immédiatement cette mission ?")) {
+                  api(`/api/runs/${run.id}/stop`, { method: "POST", body: JSON.stringify({}) }).catch(() => {});
+                }
+              }}
+            >
+              ⛔ {t.emergencyStop ?? "Arrêt d’urgence"}
+            </button>
+          </div>
+        ) : null}
         <MissionProgressGraph steps={steps} run={run} verification={response?.executionThread?.verification} t={t} />
         <UiBlocks blocks={visibleBlocks} t={t} onTerminalInput={onTerminalInput} projectId={run.projectId} />
       </div>

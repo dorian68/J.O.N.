@@ -413,6 +413,59 @@ export async function createOperatorServer({
         });
         return;
       }
+
+      // ── MCP connectors (desktop surface — shares the same service/store as mobile) ──
+      if (pathname === "/api/mcp/providers" && request.method === "GET") {
+        sendJson(response, 200, { providers: operatorService.listMcpProviders() });
+        return;
+      }
+      if (pathname === "/api/mcp/connectors" && request.method === "GET") {
+        sendJson(response, 200, { connectors: operatorService.listMcpConnectors(), tools: operatorService.listConnectedMcpTools() });
+        return;
+      }
+      if (pathname === "/api/mcp/catalog" && request.method === "GET") {
+        sendJson(response, 200, { catalog: operatorService.listMcpCatalog() });
+        return;
+      }
+      if (pathname === "/api/mcp/remote/connect" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.connectRemoteMcpServer(body.connectorId ?? body.server, body.server ?? body, { scopes: body.scopes ?? null }));
+        } catch (err) { sendError(response, 400, err.message, { code: err.code }); }
+        return;
+      }
+      if (pathname === "/api/mcp/oauth/start" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.startMcpOAuthConnect(body.connectorId ?? body.provider, body.providerConfig ?? body.provider, { scopes: body.scopes ?? null }));
+        } catch (err) { sendError(response, 400, err.message, { code: err.code }); }
+        return;
+      }
+      if (pathname === "/api/mcp/stdio/connect" && request.method === "POST") {
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.connectMcpStdio(body.connectorId, body.connection ?? body));
+        } catch (err) { sendError(response, 400, err.message, { code: err.code }); }
+        return;
+      }
+      const desktopMcpStatusRoute = matchRoute(pathname, /^\/api\/mcp\/(?<connectorId>[^/]+)\/status$/);
+      if (desktopMcpStatusRoute && request.method === "GET") {
+        sendJson(response, 200, operatorService.getMcpConnectorStatus(desktopMcpStatusRoute.connectorId));
+        return;
+      }
+      const desktopMcpCallRoute = matchRoute(pathname, /^\/api\/mcp\/(?<connectorId>[^/]+)\/call$/);
+      if (desktopMcpCallRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.callMcpTool(desktopMcpCallRoute.connectorId, body.tool, body.args ?? {}));
+        } catch (err) { sendError(response, 400, err.message, { code: err.code }); }
+        return;
+      }
+      const desktopMcpDisconnectRoute = matchRoute(pathname, /^\/api\/mcp\/(?<connectorId>[^/]+)$/);
+      if (desktopMcpDisconnectRoute && request.method === "DELETE") {
+        sendJson(response, 200, await operatorService.disconnectMcpConnector(desktopMcpDisconnectRoute.connectorId));
+        return;
+      }
       if (pathname === "/api/connectors" && request.method === "POST") {
         const body = await readJsonBody(request);
         try {
@@ -1182,6 +1235,34 @@ export async function createOperatorServer({
         return;
       }
 
+      // Mobile: list a run's artifacts with their downloadable deliverables.
+      const mobileRunArtifactsRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/runs\/(?<runId>[^/]+)\/artifacts$/);
+      if (mobileRunArtifactsRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, operatorService.listRunArtifactsWithDeliverables(mobileRunArtifactsRoute.runId));
+        return;
+      }
+
+      // Mobile: download a binary deliverable (auth-checked, then streamed).
+      const mobileDeliverableRoute = matchRoute(pathname, /^\/api\/mobile\/runs\/(?<runId>[^/]+)\/artifacts\/(?<artifactId>[^/]+)\/deliverable\/(?<format>[a-z0-9]+)$/);
+      if (mobileDeliverableRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const deliverable = await operatorService.readArtifactDeliverable(
+          mobileDeliverableRoute.runId,
+          mobileDeliverableRoute.artifactId,
+          mobileDeliverableRoute.format
+        );
+        if (!deliverable) { sendError(response, 404, "Deliverable not found"); return; }
+        const content = await fs.readFile(deliverable.filePath);
+        response.writeHead(200, {
+          "content-type": deliverable.mime,
+          "content-disposition": `attachment; filename="${deliverable.downloadName}"`,
+          "cache-control": "no-store"
+        });
+        response.end(content);
+        return;
+      }
+
       const mobileTerminalsRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/terminals$/);
       if (mobileTerminalsRoute && request.method === "GET") {
         if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
@@ -1269,10 +1350,109 @@ export async function createOperatorServer({
         return;
       }
 
+      // Agentic natural-language mission scoped to one browser tab.
+      const mobileTabMissionRoute = matchRoute(pathname, /^\/api\/mobile\/projects\/(?<projectId>[^/]+)\/browser\/tabs\/(?<targetId>[^/]+)\/mission$/);
+      if (mobileTabMissionRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.dispatchMobileTabMission(
+            mobileTabMissionRoute.projectId,
+            decodeURIComponent(mobileTabMissionRoute.targetId),
+            body.instruction ?? body.objective ?? ""
+          ));
+        } catch (err) {
+          sendError(response, err.code === "MOBILE_CONTROL_DISABLED" ? 403 : 400, err.message, { code: err.code });
+        }
+        return;
+      }
+
       // ── Connectors ───────────────────────────────────────────────────────────
       if (pathname === "/api/mobile/connectors" && request.method === "GET") {
         if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
         sendJson(response, 200, { connectors: operatorService.listConnectors() });
+        return;
+      }
+
+      // ── MCP connectors (OAuth-fluent tool integrations) ──
+      if (pathname === "/api/mobile/mcp/providers" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, { providers: operatorService.listMcpProviders() });
+        return;
+      }
+      if (pathname === "/api/mobile/mcp/connectors" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, { connectors: operatorService.listMcpConnectors(), tools: operatorService.listConnectedMcpTools() });
+        return;
+      }
+      if (pathname === "/api/mobile/mcp/catalog" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, { catalog: operatorService.listMcpCatalog() });
+        return;
+      }
+      if (pathname === "/api/mobile/mcp/remote/connect" && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.connectRemoteMcpServer(body.connectorId ?? body.server, body.server ?? body, { scopes: body.scopes ?? null }));
+        } catch (err) { sendError(response, 400, err.message, { code: err.code }); }
+        return;
+      }
+      if (pathname === "/api/mobile/mcp/oauth/start" && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.startMcpOAuthConnect(
+            body.connectorId ?? body.provider,
+            body.providerConfig ?? body.provider,
+            { scopes: body.scopes ?? null }
+          ));
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+      if (pathname === "/api/mobile/mcp/stdio/connect" && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.connectMcpStdio(body.connectorId, body.connection ?? body));
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+      const mcpStatusRoute = matchRoute(pathname, /^\/api\/mobile\/mcp\/(?<connectorId>[^/]+)\/status$/);
+      if (mcpStatusRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, operatorService.getMcpConnectorStatus(mcpStatusRoute.connectorId));
+        return;
+      }
+      const mcpToolsRoute = matchRoute(pathname, /^\/api\/mobile\/mcp\/(?<connectorId>[^/]+)\/tools$/);
+      if (mcpToolsRoute && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        try {
+          sendJson(response, 200, { tools: await operatorService.listMcpTools(mcpToolsRoute.connectorId) });
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+      const mcpCallRoute = matchRoute(pathname, /^\/api\/mobile\/mcp\/(?<connectorId>[^/]+)\/call$/);
+      if (mcpCallRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.callMcpTool(mcpCallRoute.connectorId, body.tool, body.args ?? {}));
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+      const mcpDisconnectRoute = matchRoute(pathname, /^\/api\/mobile\/mcp\/(?<connectorId>[^/]+)$/);
+      if (mcpDisconnectRoute && request.method === "DELETE") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
+        sendJson(response, 200, await operatorService.disconnectMcpConnector(mcpDisconnectRoute.connectorId));
         return;
       }
       if (pathname === "/api/mobile/connectors" && request.method === "POST") {
@@ -1439,6 +1619,27 @@ export async function createOperatorServer({
         return;
       }
 
+      const artifactDeliverableRoute = matchRoute(pathname, /^\/api\/runs\/(?<runId>[^/]+)\/artifacts\/(?<artifactId>[^/]+)\/deliverable\/(?<format>[a-z0-9]+)$/);
+      if (artifactDeliverableRoute && request.method === "GET") {
+        const deliverable = await operatorService.readArtifactDeliverable(
+          artifactDeliverableRoute.runId,
+          artifactDeliverableRoute.artifactId,
+          artifactDeliverableRoute.format
+        );
+        if (!deliverable) {
+          sendError(response, 404, "Deliverable not found");
+          return;
+        }
+        const content = await fs.readFile(deliverable.filePath);
+        response.writeHead(200, {
+          "content-type": deliverable.mime,
+          "content-disposition": `attachment; filename="${deliverable.downloadName}"`,
+          "cache-control": "no-store"
+        });
+        response.end(content);
+        return;
+      }
+
       const conversationArtifactRoute = matchRoute(pathname, /^\/api\/conversation\/artifacts\/(?<artifactId>[^/]+)\/content$/);
       if (conversationArtifactRoute && request.method === "GET") {
         const artifactContent = await operatorService.readConversationArtifact(conversationArtifactRoute.artifactId);
@@ -1501,6 +1702,24 @@ export async function createOperatorServer({
           body.decision,
           body.rationale ?? null
         ));
+        return;
+      }
+
+      // Global emergency stop — works for desktop and mobile, mid-step or paused.
+      const emergencyStopRoute = matchRoute(pathname, /^\/api\/runs\/(?<runId>[^/]+)\/stop$/);
+      if (emergencyStopRoute && request.method === "POST") {
+        sendJson(response, 200, await operatorService.requestEmergencyStop(emergencyStopRoute.runId));
+        return;
+      }
+
+      const mobileEmergencyStopRoute = matchRoute(pathname, /^\/api\/mobile\/runs\/(?<runId>[^/]+)\/stop$/);
+      if (mobileEmergencyStopRoute && request.method === "POST") {
+        sendJson(response, 200, await operatorService.requestEmergencyStop(mobileEmergencyStopRoute.runId));
+        return;
+      }
+
+      if ((pathname === "/api/system/self-check" || pathname === "/api/mobile/system/self-check") && request.method === "GET") {
+        sendJson(response, 200, await operatorService.getSelfCheck());
         return;
       }
 
@@ -1584,6 +1803,15 @@ export async function createOperatorServer({
   if (bindHost === "0.0.0.0") {
     console.log(`[LAN] Mobile: ${scheme}://${serverInfo.lanIp}:${actualPort}/mobile/`);
   }
+
+  // Startup self-test: surface broken subsystems immediately instead of failing
+  // mid-mission. Non-blocking — never prevents the server from serving.
+  operatorService.getSelfCheck()
+    .then((report) => {
+      const tag = report.ok ? "[SELF-CHECK ok]" : "[SELF-CHECK ATTENTION]";
+      console.log(`${tag} ${report.summary}`);
+    })
+    .catch(() => { /* self-check must never crash startup */ });
 
   return {
     port: actualPort,

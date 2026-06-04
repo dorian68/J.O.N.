@@ -436,10 +436,10 @@ export class WorkspaceBrowserProvider {
         targetId: tid,
         url: snapshot.url,
         title: snapshot.title,
-        bodyText: (snapshot.bodyText ?? "").slice(0, 8000),
+        bodyText: (snapshot.bodyText ?? "").slice(0, 12000),
         bodyTextLength: snapshot.bodyText?.length ?? 0,
         interactiveElementCount: snapshot.interactiveElements?.length ?? 0,
-        interactiveElements: (snapshot.interactiveElements ?? []).slice(0, 30),
+        interactiveElements: (snapshot.interactiveElements ?? []).slice(0, 60),
         blocker: blockers,
         screenshotBase64,
         observedAt: nowIso()

@@ -19,6 +19,54 @@ const suites = [
     modulePath: "../../tests/artifact-builders.test.js"
   },
   {
+    name: "document-renderer",
+    modulePath: "../../tests/document-renderer.test.js"
+  },
+  {
+    name: "self-check",
+    modulePath: "../../tests/self-check.test.js"
+  },
+  {
+    name: "emergency-stop",
+    modulePath: "../../tests/emergency-stop.test.js"
+  },
+  {
+    name: "mission-translator",
+    modulePath: "../../tests/mission-translator.test.js"
+  },
+  {
+    name: "mission-decomposition",
+    modulePath: "../../tests/mission-decomposition.test.js"
+  },
+  {
+    name: "composed-mission",
+    modulePath: "../../tests/composed-mission.test.js"
+  },
+  {
+    name: "temporal-context",
+    modulePath: "../../tests/temporal-context.test.js"
+  },
+  {
+    name: "mcp-client",
+    modulePath: "../../tests/mcp-client.test.js"
+  },
+  {
+    name: "oauth-flow",
+    modulePath: "../../tests/oauth-flow.test.js"
+  },
+  {
+    name: "mcp-connector-service",
+    modulePath: "../../tests/mcp-connector-service.test.js"
+  },
+  {
+    name: "mcp-catalog",
+    modulePath: "../../tests/mcp-catalog.test.js"
+  },
+  {
+    name: "conversation-mcp-tool",
+    modulePath: "../../tests/conversation-mcp-tool.test.js"
+  },
+  {
     name: "computer-control-service",
     modulePath: "../../tests/computer-control-service.test.js"
   },

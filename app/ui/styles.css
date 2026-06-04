@@ -6603,3 +6603,20 @@ button.tiny.danger:hover {
     border-color: var(--accent);
   }
 }
+
+/* --- Deliverable downloads (run inspector) --- */
+.deliverables-section .deliverable-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; flex-wrap: wrap; }
+.deliverables-section .deliverable-title { font-size: 13px; opacity: 0.9; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deliverables-section .deliverable-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.deliverable-dl { display: inline-block; padding: 3px 9px; border-radius: 6px; font-size: 12px; text-decoration: none; background: rgba(88,166,255,0.14); color: #58a6ff; border: 1px solid rgba(88,166,255,0.3); }
+.deliverable-dl:hover { background: rgba(88,166,255,0.24); }
+
+/* --- Emergency stop --- */
+.emergency-stop-row { margin: 8px 0; }
+.emergency-stop-btn { font-size: 13px; padding: 6px 14px; }
+
+/* --- Composed (cross-surface) mission banner --- */
+.composed-banner { padding: 7px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; margin: 6px 12px; }
+.composed-banner.active { background: rgba(88,166,255,0.14); color: #58a6ff; }
+.composed-banner.ok { background: rgba(46,160,67,0.15); color: #3fb950; }
+.composed-banner.fail { background: rgba(210,153,34,0.15); color: #d29922; }

@@ -1,5 +1,4 @@
 param(
-  [Parameter(Mandatory = $true)]
   [string]$Action,
   [string]$Handle,
   [string]$OutputPath,
@@ -15,7 +14,8 @@ param(
   [int]$Height = 0,
   [int]$Delta = 0,
   [int]$MaxDepth = 3,
-  [int]$MaxNodes = 80
+  [int]$MaxNodes = 80,
+  [switch]$PersistentMode
 )
 
 Add-Type @"
@@ -74,7 +74,37 @@ try {
 
 $MOUSEEVENTF_LEFTDOWN = 0x0002
 $MOUSEEVENTF_LEFTUP = 0x0004
+$MOUSEEVENTF_RIGHTDOWN = 0x0008
+$MOUSEEVENTF_RIGHTUP = 0x0010
 $MOUSEEVENTF_WHEEL = 0x0800
+
+# Capture quality/size tuning (env-overridable). JPEG + downscale keep the
+# mobile projection light enough for polling over LAN. Implemented with plain
+# GDI+ ImageFormat to stay friendly with endpoint AV heuristics.
+$CaptureMaxWidth = if ($env:COWORK_CAPTURE_MAX_WIDTH) { [int]$env:COWORK_CAPTURE_MAX_WIDTH } else { 1366 }
+
+function Save-BitmapSmart([System.Drawing.Bitmap]$Bitmap, [string]$Path) {
+  if ($Path.ToLowerInvariant().EndsWith(".png")) {
+    $Bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    return @{ format = "png"; width = $Bitmap.Width; height = $Bitmap.Height }
+  }
+  $scale = 1.0
+  if ($Bitmap.Width -gt $CaptureMaxWidth) { $scale = $CaptureMaxWidth / $Bitmap.Width }
+  if ($scale -lt 1.0) {
+    $outW = [int]([Math]::Round($Bitmap.Width * $scale))
+    $outH = [int]([Math]::Round($Bitmap.Height * $scale))
+    $target = New-Object System.Drawing.Bitmap $outW, $outH
+    $g = [System.Drawing.Graphics]::FromImage($target)
+    $g.DrawImage($Bitmap, 0, 0, $outW, $outH)
+    $g.Dispose()
+    $target.Save($Path, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+    $result = @{ format = "jpeg"; width = $outW; height = $outH; scale = $scale }
+    $target.Dispose()
+    return $result
+  }
+  $Bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Jpeg)
+  return @{ format = "jpeg"; width = $Bitmap.Width; height = $Bitmap.Height; scale = 1.0 }
+}
 
 function ConvertTo-SafeId([string]$Value) {
   return (($Value.ToLowerInvariant() -replace '[^a-z0-9]+', '_').Trim('_'))
@@ -325,14 +355,18 @@ function Save-Capture([int]$Left, [int]$Top, [int]$CaptureWidth, [int]$CaptureHe
   $bitmap = New-Object System.Drawing.Bitmap $CaptureWidth, $CaptureHeight
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
   $graphics.CopyFromScreen($Left, $Top, 0, 0, $bitmap.Size)
-  $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+  # JPEG + downscale for the file, but callers still report the FULL-RES source
+  # bounds so client coordinate mapping stays exact.
+  $rendered = Save-BitmapSmart -Bitmap $bitmap -Path $Path
   $graphics.Dispose()
   $bitmap.Dispose()
+  return $rendered
 }
 
 function Save-ScreenCapture([string]$Path) {
-  $bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
-  Save-Capture -Left $bounds.Left -Top $bounds.Top -CaptureWidth $bounds.Width -CaptureHeight $bounds.Height -Path $Path
+  # Capture the PRIMARY screen (single coordinate origin) — robust on multi-monitor.
+  $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+  $rendered = Save-Capture -Left $bounds.Left -Top $bounds.Top -CaptureWidth $bounds.Width -CaptureHeight $bounds.Height -Path $Path
   return @{
     virtualScreen = @{
       x = $bounds.Left
@@ -340,6 +374,7 @@ function Save-ScreenCapture([string]$Path) {
       width = $bounds.Width
       height = $bounds.Height
     }
+    rendered = $rendered
     outputPath = $Path
   }
 }
@@ -580,7 +615,90 @@ function Get-AccessibilityTree([string]$WindowHandle, [int]$Depth, [int]$NodeLim
   }
 }
 
+if ($PersistentMode) {
+  # Long-lived daemon: read newline-delimited JSON commands on stdin, emit one
+  # compact JSON response per line on stdout. Eliminates ~800 ms per-action
+  # PowerShell startup cost for the hot-path interactive actions. The single-shot
+  # switch below remains the proven fallback path used by the Node provider when
+  # the daemon is unavailable.
+  $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+  while ($true) {
+    $line = [Console]::In.ReadLine()
+    if ($null -eq $line) { break }   # stdin closed by parent -> exit cleanly
+    $line = $line.Trim()
+    if (-not $line) { continue }
+    $reqId = $null
+    try {
+      $cmd = $line | ConvertFrom-Json
+      $reqId = $cmd.id
+      $h = if ($cmd.handle) { [string]$cmd.handle } else { "" }
+      $result = $null
+      switch ($cmd.action) {
+        "ping" {
+          $result = @{ ok = $true; pong = [DateTime]::UtcNow.ToString("o"); persistent = $true }
+        }
+        "typeText" {
+          Focus-IfHandle $h
+          [System.Windows.Forms.SendKeys]::SendWait((Escape-SendKeysText ([string]$cmd.text)))
+          $result = @{ typedAt = [DateTime]::UtcNow.ToString("o"); textLength = ([string]$cmd.text).Length; targetHandle = $h }
+        }
+        "sendHotkey" {
+          Focus-IfHandle $h
+          [System.Windows.Forms.SendKeys]::SendWait((Convert-Hotkey ([string]$cmd.keys)))
+          $result = @{ sentAt = [DateTime]::UtcNow.ToString("o"); keys = [string]$cmd.keys; targetHandle = $h }
+        }
+        "clickPoint" {
+          Focus-IfHandle $h
+          [void][User32]::SetCursorPos([int]$cmd.x, [int]$cmd.y)
+          [User32]::mouse_event($MOUSEEVENTF_LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+          [User32]::mouse_event($MOUSEEVENTF_LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
+          $result = @{ clickedAt = [DateTime]::UtcNow.ToString("o"); x = [int]$cmd.x; y = [int]$cmd.y; targetHandle = $h }
+        }
+        "rightClick" {
+          Focus-IfHandle $h
+          [void][User32]::SetCursorPos([int]$cmd.x, [int]$cmd.y)
+          [User32]::mouse_event($MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+          [User32]::mouse_event($MOUSEEVENTF_RIGHTUP, 0, 0, 0, [UIntPtr]::Zero)
+          $result = @{ rightClickedAt = [DateTime]::UtcNow.ToString("o"); x = [int]$cmd.x; y = [int]$cmd.y; targetHandle = $h }
+        }
+        "doubleClick" {
+          Focus-IfHandle $h
+          [void][User32]::SetCursorPos([int]$cmd.x, [int]$cmd.y)
+          [User32]::mouse_event($MOUSEEVENTF_LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+          [User32]::mouse_event($MOUSEEVENTF_LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
+          Start-Sleep -Milliseconds 60
+          [User32]::mouse_event($MOUSEEVENTF_LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+          [User32]::mouse_event($MOUSEEVENTF_LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
+          $result = @{ doubleClickedAt = [DateTime]::UtcNow.ToString("o"); x = [int]$cmd.x; y = [int]$cmd.y; targetHandle = $h }
+        }
+        "scroll" {
+          Focus-IfHandle $h
+          [User32]::mouse_event($MOUSEEVENTF_WHEEL, 0, 0, [uint32][int]$cmd.delta, [UIntPtr]::Zero)
+          $result = @{ scrolledAt = [DateTime]::UtcNow.ToString("o"); delta = [int]$cmd.delta; targetHandle = $h }
+        }
+        "captureScreen" {
+          $result = Save-ScreenCapture -Path ([string]$cmd.outputPath)
+        }
+        default {
+          throw "Unsupported persistent action: $($cmd.action)"
+        }
+      }
+      $response = @{ id = $reqId; result = $result } | ConvertTo-Json -Depth 8 -Compress
+      [Console]::Out.WriteLine($response)
+      [Console]::Out.Flush()
+    } catch {
+      $errResponse = @{ id = $reqId; error = $_.Exception.Message } | ConvertTo-Json -Depth 5 -Compress
+      [Console]::Out.WriteLine($errResponse)
+      [Console]::Out.Flush()
+    }
+  }
+  return
+}
+
 switch ($Action) {
+  "ping" {
+    @{ ok = $true; pong = [DateTime]::UtcNow.ToString("o"); persistent = $false } | ConvertTo-Json -Depth 3
+  }
   "listBrowsers" {
     Get-KnownBrowsers | ConvertTo-Json -Depth 5
   }
@@ -624,6 +742,23 @@ switch ($Action) {
     [User32]::mouse_event($MOUSEEVENTF_LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
     [User32]::mouse_event($MOUSEEVENTF_LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
     @{ clickedAt = [DateTime]::UtcNow.ToString("o"); x = $X; y = $Y; targetHandle = $Handle } | ConvertTo-Json -Depth 5
+  }
+  "rightClick" {
+    Focus-IfHandle $Handle
+    [void][User32]::SetCursorPos($X, $Y)
+    [User32]::mouse_event($MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+    [User32]::mouse_event($MOUSEEVENTF_RIGHTUP, 0, 0, 0, [UIntPtr]::Zero)
+    @{ rightClickedAt = [DateTime]::UtcNow.ToString("o"); x = $X; y = $Y; targetHandle = $Handle } | ConvertTo-Json -Depth 5
+  }
+  "doubleClick" {
+    Focus-IfHandle $Handle
+    [void][User32]::SetCursorPos($X, $Y)
+    [User32]::mouse_event($MOUSEEVENTF_LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+    [User32]::mouse_event($MOUSEEVENTF_LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 60
+    [User32]::mouse_event($MOUSEEVENTF_LEFTDOWN, 0, 0, 0, [UIntPtr]::Zero)
+    [User32]::mouse_event($MOUSEEVENTF_LEFTUP, 0, 0, 0, [UIntPtr]::Zero)
+    @{ doubleClickedAt = [DateTime]::UtcNow.ToString("o"); x = $X; y = $Y; targetHandle = $Handle } | ConvertTo-Json -Depth 5
   }
   "scroll" {
     Focus-IfHandle $Handle

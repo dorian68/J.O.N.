@@ -11599,6 +11599,157 @@ function PairDeviceModal({ t, onClose }) {
 		})
 	});
 }
+function McpManagerSection() {
+	const [catalog, setCatalog] = (0, import_react.useState)([]);
+	const [connectors, setConnectors] = (0, import_react.useState)([]);
+	const [tools, setTools] = (0, import_react.useState)([]);
+	const [busy, setBusy] = (0, import_react.useState)(null);
+	const [search, setSearch] = (0, import_react.useState)("");
+	const [err, setErr] = (0, import_react.useState)(null);
+	async function refresh() {
+		try {
+			const [cat, c] = await Promise.all([api("/api/mcp/catalog").catch(() => ({ catalog: [] })), api("/api/mcp/connectors").catch(() => ({
+				connectors: [],
+				tools: []
+			}))]);
+			setCatalog(cat.catalog ?? []);
+			setConnectors(c.connectors ?? []);
+			setTools(c.tools ?? []);
+		} catch (e) {
+			setErr(e.message);
+		}
+	}
+	(0, import_react.useEffect)(() => {
+		refresh();
+	}, []);
+	async function connect(server) {
+		setBusy(server.id);
+		setErr(null);
+		try {
+			const res = await api("/api/mcp/remote/connect", {
+				method: "POST",
+				body: JSON.stringify({
+					connectorId: server.id,
+					server: server.id
+				})
+			});
+			if (!res.connected && res.authorizeUrl) window.open(res.authorizeUrl, "_blank", "noopener");
+			for (let i = 0; i < 90 && !res.connected; i += 1) {
+				await new Promise((r) => setTimeout(r, 2e3));
+				const st = await api(`/api/mcp/${server.id}/status`).catch(() => null);
+				if (st && (st.connected || st.phase === "error")) break;
+			}
+			await refresh();
+		} catch (e) {
+			setErr(e.message);
+		} finally {
+			setBusy(null);
+		}
+	}
+	async function disconnect(id) {
+		setBusy(id);
+		try {
+			await api(`/api/mcp/${encodeURIComponent(id)}`, { method: "DELETE" });
+			await refresh();
+		} catch (e) {
+			setErr(e.message);
+		} finally {
+			setBusy(null);
+		}
+	}
+	const connectedIds = new Set(connectors.filter((c) => c.connected).map((c) => c.id));
+	const filtered = catalog.filter((s) => !search || (s.label + s.category).toLowerCase().includes(search.toLowerCase()));
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		style: { marginBottom: "20px" },
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+				style: {
+					fontSize: "13px",
+					marginBottom: "6px"
+				},
+				children: "Connecteurs & Tools (MCP)"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				style: {
+					fontSize: "12px",
+					color: "var(--muted)",
+					marginBottom: "8px"
+				},
+				children: "Choisis un service, autorise-le — JON découvre ses tools (OAuth + sauvegarde locale chiffrée). Partagé avec JON mobile."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				className: "settings-domains-textarea",
+				style: {
+					minHeight: 0,
+					height: "30px",
+					marginBottom: "8px"
+				},
+				placeholder: "Rechercher un service…",
+				value: search,
+				onChange: (e) => setSearch(e.target.value)
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "settings-toggle-list",
+				style: {
+					maxHeight: "240px",
+					overflowY: "auto"
+				},
+				children: filtered.slice(0, 80).map((s) => {
+					const connected = connectedIds.has(s.id);
+					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "settings-toggle-row",
+						style: { alignItems: "center" },
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "settings-toggle-label",
+							children: [
+								s.label,
+								" ",
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									style: {
+										color: "var(--muted)",
+										fontSize: "11px"
+									},
+									children: connected ? "· connecté" : `· ${s.category}${s.connectable ? "" : " · endpoint à configurer"}`
+								})
+							]
+						}), connected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ghost small",
+							disabled: busy === s.id,
+							onClick: () => disconnect(s.id),
+							children: "Déconnecter"
+						}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "secondary small",
+							disabled: !s.connectable || busy === s.id,
+							onClick: () => connect(s),
+							children: busy === s.id ? "…" : "Connecter"
+						})]
+					}, s.id);
+				})
+			}),
+			tools.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				style: {
+					fontSize: "11px",
+					color: "var(--muted)",
+					marginTop: "8px"
+				},
+				children: [
+					"Tools disponibles pour JON : ",
+					tools.map((t) => t.name).slice(0, 12).join(", "),
+					tools.length > 12 ? "…" : ""
+				]
+			}) : null,
+			err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				style: {
+					fontSize: "12px",
+					color: "var(--danger, #d9534f)"
+				},
+				children: err
+			}) : null
+		]
+	});
+}
 function SettingsModal({ t, projectId, agentConfiguration, availableApplications, availableBrowsers, project, llmGatewayStatus, onClose }) {
 	const existing = agentConfiguration?.guardrails ?? {};
 	const [trustedApps, setTrustedApps] = (0, import_react.useState)(() => new Set(existing.trustedApplications ?? []));
@@ -11723,6 +11874,7 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
 						children: "✕"
 					})]
 				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(McpManagerSection, {}),
 				availableApplications.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 					style: { marginBottom: "20px" },
 					children: [
@@ -12027,6 +12179,7 @@ function App() {
 	const [jonUnread, setJonUnread] = (0, import_react.useState)(0);
 	const [pairModalOpen, setPairModalOpen] = (0, import_react.useState)(false);
 	const [settingsOpen, setSettingsOpen] = (0, import_react.useState)(false);
+	const [composedPhase, setComposedPhase] = (0, import_react.useState)(null);
 	const selectedProjectIdRef = (0, import_react.useRef)(null);
 	const selectedRunIdRef = (0, import_react.useRef)(null);
 	const activeConversationIdRef = (0, import_react.useRef)(null);
@@ -12283,6 +12436,10 @@ function App() {
 					payload: {}
 				};
 			}
+			if (event.type && event.type.startsWith("mission.composed.")) setComposedPhase({
+				type: event.type,
+				payload: event.payload ?? {}
+			});
 			if (event.type && event.type !== "stream.connected" && !event.type.startsWith("conversation.")) {
 				const runId = event.payload?.runId ?? event.payload?.nextRunId ?? null;
 				if (runId && !selectedRunIdRef.current) {
@@ -12843,6 +13000,7 @@ function App() {
 				className: `react-feedback ${feedback.tone ?? ""}`,
 				children: feedback.text
 			}) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ComposedMissionBanner, { composed: composedPhase }),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
 				className: `react-cowork-main ${historyOpen ? "history-open" : "history-collapsed"} ${workspacePanel ? "workspace-open" : "workspace-collapsed"} ${workspacePanel === "terminals" && terminalViewMode === "surface" ? "terminal-surface-open" : ""}`,
 				children: [
@@ -15228,7 +15386,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 					}, item.id))
 				]
 			}, widgetId);
-			case "artifacts": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+			case "artifacts": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_react.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 				className: "activity-section",
 				children: [
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: t.artifacts }),
@@ -15244,7 +15402,7 @@ function ActivityPanel({ run, runDetail, events, runs, workspace, selectedRunId,
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: artifact.title ?? artifact.name ?? artifact.path ?? `Artifact ${index + 1}` }), artifact.description ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: artifact.description }) : null]
 					}, artifact.id ?? artifact.path ?? index))
 				]
-			}, widgetId);
+			}), selectedRunId ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RunDeliverables, { runId: selectedRunId }) : null] }, widgetId);
 			case "terminal_alerts": return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 				className: "activity-section",
 				children: [
@@ -18247,6 +18405,81 @@ function ReportPreviewBlock({ block }) {
 		]
 	});
 }
+var SURFACE_LABEL = {
+	browser: "Web",
+	desktop: "Bureau",
+	terminal: "Terminal",
+	email: "Email"
+};
+function ComposedMissionBanner({ composed }) {
+	if (!composed) return null;
+	const p = composed.payload ?? {};
+	if (composed.type === "mission.composed.completed") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: `composed-banner ${p.ok ? "ok" : "fail"}`,
+		children: p.ok ? "✓ Mission multi-étapes terminée" : "✗ Mission multi-étapes interrompue"
+	});
+	if (composed.type === "mission.composed.started") return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "composed-banner active",
+		children: [
+			"Mission multi-étapes — ",
+			p.phaseCount ?? "?",
+			" phases (",
+			(p.surfaces ?? []).map((s) => SURFACE_LABEL[s] ?? s).join(" → "),
+			")"
+		]
+	});
+	const label = SURFACE_LABEL[p.surface] ?? p.surface ?? "";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "composed-banner active",
+		children: [
+			p.index && p.total ? `Phase ${p.index}/${p.total}` : "Phase",
+			" · ",
+			label,
+			" — ",
+			composed.type === "mission.composed.phase_completed" ? "terminée" : "en cours"
+		]
+	});
+}
+var DELIVERABLE_LABELS = {
+	pdf: "PDF",
+	docx: "Word",
+	xlsx: "Excel"
+};
+function RunDeliverables({ runId }) {
+	const [artifacts, setArtifacts] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		if (!runId) return void 0;
+		let cancelled = false;
+		api(`/api/runs/${runId}/artifacts`).then((list) => {
+			if (!cancelled) setArtifacts(Array.isArray(list) ? list : []);
+		}).catch(() => {
+			if (!cancelled) setArtifacts([]);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [runId]);
+	const withDeliverables = (artifacts ?? []).filter((a) => a.deliverables && a.deliverables.length > 0);
+	if (withDeliverables.length === 0) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "activity-section deliverables-section",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Livrables" }), withDeliverables.map((artifact) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "deliverable-row",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "deliverable-title",
+				children: artifact.title
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "deliverable-actions",
+				children: artifact.deliverables.map((d) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+					className: "deliverable-dl",
+					href: `/api/runs/${runId}/artifacts/${artifact.id}/deliverable/${d.format}`,
+					download: true,
+					children: ["↓ ", DELIVERABLE_LABELS[d.format] ?? d.format.toUpperCase()]
+				}, d.format))
+			})]
+		}, artifact.id))]
+	});
+}
 function ArtifactCardBlock({ block }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "ui-block artifact-block",
@@ -18553,6 +18786,20 @@ function RunProgressMessage({ run, runDetail, liveStatus, pendingApprovals, even
 						small: true
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: workingStatus })]
 				}),
+				run.status === "running" || run.status === "paused" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "emergency-stop-row",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						type: "button",
+						className: "danger ghost-danger emergency-stop-btn",
+						onClick: () => {
+							if (window.confirm(t.emergencyStopConfirm ?? "Arrêter immédiatement cette mission ?")) api(`/api/runs/${run.id}/stop`, {
+								method: "POST",
+								body: JSON.stringify({})
+							}).catch(() => {});
+						},
+						children: ["⛔ ", t.emergencyStop ?? "Arrêt d’urgence"]
+					})
+				}) : null,
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MissionProgressGraph, {
 					steps,
 					run,

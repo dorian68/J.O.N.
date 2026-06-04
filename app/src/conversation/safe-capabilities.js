@@ -236,10 +236,31 @@ async function generateReportPreview(request = {}) {
   };
 }
 
+async function runMcpToolCapability(request, callMcpTool) {
+  const p = request.parameters ?? {};
+  const connectorId = p.connectorId ?? p.connector ?? null;
+  const tool = p.tool ?? p.toolName ?? null;
+  if (!connectorId || !tool) {
+    return { text: "Outil MCP non spécifié.", uiBlocks: [], capabilityResult: { id: request.id, status: "error", error: "missing connectorId/tool" } };
+  }
+  try {
+    const res = await callMcpTool(connectorId, tool, p.args ?? p.arguments ?? {});
+    const text = res?.text ? String(res.text).slice(0, 2000) : "(résultat sans texte)";
+    return {
+      text: `Tool ${tool} → ${text}`,
+      uiBlocks: [],
+      capabilityResult: { id: request.id, status: res?.isError ? "error" : "ok", connectorId, tool, output: text }
+    };
+  } catch (error) {
+    return { text: `Échec du tool ${tool}: ${error.message}`, uiBlocks: [], capabilityResult: { id: request.id, status: "error", connectorId, tool, error: error.message } };
+  }
+}
+
 export async function executeSafeConversationCapabilities({
   requests = [],
   listInstalledApplications = async () => [],
-  listInstalledBrowsers = async () => []
+  listInstalledBrowsers = async () => [],
+  callMcpTool = null
 } = {}) {
   const uiBlocks = [];
   const resultTexts = [];
@@ -254,6 +275,8 @@ export async function executeSafeConversationCapabilities({
       result = await runListInstalledBrowsersCapability({ listInstalledBrowsers });
     } else if (request.id === "generate_report_preview") {
       result = await generateReportPreview(request);
+    } else if ((request.id === "call_mcp_tool" || request.id === "use_tool") && callMcpTool) {
+      result = await runMcpToolCapability(request, callMcpTool);
     }
     if (!result) {
       continue;

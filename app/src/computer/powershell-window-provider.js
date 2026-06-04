@@ -109,20 +109,43 @@ function runPowerShell(args) {
 // Persistent PowerShell process — eliminates ~800 ms per-action startup cost.
 // One process is shared for all hot-path actions: clickPoint, scroll, typeText,
 // sendHotkey, captureScreen.
+//
+// Self-correction: the daemon self-tests on first use (ping) and, if it ever
+// fails to spawn or exits unexpectedly, it disables itself so callers fall back
+// to the proven single-shot path. This guarantees desktop actuation keeps
+// working even when the persistent mode is unavailable on a given machine.
 class PersistentPsProcess {
   constructor() {
     this._proc = null;
     this._pending = new Map();
     this._idCtr = 0;
     this._buf = "";
+    this._disabled = false;        // set true after an unrecoverable daemon failure
+    this._disposing = false;       // distinguishes intentional shutdown from a crash
+    this._disabledReason = null;
+  }
+
+  isDisabled() {
+    return this._disabled;
+  }
+
+  disable(reason) {
+    this._disabled = true;
+    this._disabledReason = reason ?? "unknown";
   }
 
   _spawn() {
-    const child = spawn("powershell", [
-      "-NoProfile", "-ExecutionPolicy", "Bypass",
-      "-File", SCRIPT_PATH,
-      "-PersistentMode"
-    ], { stdio: ["pipe", "pipe", "pipe"] });
+    let child;
+    try {
+      child = spawn("powershell", [
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", SCRIPT_PATH,
+        "-PersistentMode"
+      ], { stdio: ["pipe", "pipe", "pipe"] });
+    } catch (error) {
+      this.disable(`spawn_failed: ${error?.message ?? error}`);
+      throw error;
+    }
 
     this._buf = "";
 
@@ -148,9 +171,17 @@ class PersistentPsProcess {
     child.stderr.on("data", () => { /* suppress stderr noise */ });
 
     const onExit = () => {
+      const hadInflight = this._pending.size > 0;
       this._proc = null;
       for (const [, p] of this._pending) p.reject(new Error("PS daemon exited unexpectedly"));
       this._pending.clear();
+      // An exit while requests were in flight (and not during dispose) means the
+      // persistent mode is broken on this host. Disable it permanently so all
+      // subsequent calls take the single-shot fallback instead of repeatedly
+      // paying spawn+timeout on a daemon that will never answer.
+      if (!this._disposing && hadInflight) {
+        this.disable("daemon_exited_with_inflight_requests");
+      }
     };
     child.on("error", onExit);
     child.on("close", onExit);
@@ -159,7 +190,16 @@ class PersistentPsProcess {
   }
 
   send(command) {
-    if (!this._proc || this._proc.killed) this._spawn();
+    if (this._disabled) {
+      return Promise.reject(new Error(`PS daemon disabled (${this._disabledReason})`));
+    }
+    if (!this._proc || this._proc.killed) {
+      try {
+        this._spawn();
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    }
     return new Promise((resolve, reject) => {
       const id = String(++this._idCtr);
       const timer = setTimeout(() => {
@@ -172,11 +212,30 @@ class PersistentPsProcess {
         resolve: (v) => { clearTimeout(timer); resolve(v); },
         reject: (e) => { clearTimeout(timer); reject(e); }
       });
-      this._proc.stdin.write(JSON.stringify({ ...command, id }) + "\n");
+      try {
+        this._proc.stdin.write(JSON.stringify({ ...command, id }) + "\n");
+      } catch (error) {
+        this._pending.delete(id);
+        clearTimeout(timer);
+        reject(error);
+      }
     });
   }
 
+  // Verify the daemon actually answers. Resolves true if persistent mode works,
+  // false otherwise (caller should rely on single-shot).
+  async selfTest() {
+    if (this._disabled) return false;
+    try {
+      const res = await this.send({ action: "ping" });
+      return Boolean(res && res.ok);
+    } catch {
+      return false;
+    }
+  }
+
   dispose() {
+    this._disposing = true;
     if (this._proc) {
       try { this._proc.stdin.end(); } catch { /* ignore */ }
     }
@@ -185,6 +244,51 @@ class PersistentPsProcess {
 
 // Module-level singleton — shared across all provider instances in this process.
 const _daemon = new PersistentPsProcess();
+
+// Maps a daemon command to the equivalent single-shot PowerShell invocation.
+// This is the self-correcting fallback path: it uses the proven `switch ($Action)`
+// branches that have always worked, at the cost of per-action process startup.
+function singleShotHotAction(command) {
+  const handle = command.handle ? ["-Handle", String(command.handle)] : [];
+  switch (command.action) {
+    case "ping":
+      return runPowerShell(["-Action", "ping"]);
+    case "typeText":
+      return runPowerShell(["-Action", "typeText", "-Text", String(command.text ?? ""), ...handle]);
+    case "sendHotkey":
+      return runPowerShell(["-Action", "sendHotkey", "-Keys", String(command.keys ?? ""), ...handle]);
+    case "clickPoint":
+      return runPowerShell(["-Action", "clickPoint", "-X", String(command.x), "-Y", String(command.y), ...handle]);
+    case "rightClick":
+      return runPowerShell(["-Action", "rightClick", "-X", String(command.x), "-Y", String(command.y), ...handle]);
+    case "doubleClick":
+      return runPowerShell(["-Action", "doubleClick", "-X", String(command.x), "-Y", String(command.y), ...handle]);
+    case "scroll":
+      return runPowerShell(["-Action", "scroll", "-Delta", String(command.delta), ...handle]);
+    case "captureScreen":
+      return runPowerShell(["-Action", "captureScreen", "-OutputPath", String(command.outputPath)]);
+    default:
+      throw new Error(`No single-shot fallback for action: ${command.action}`);
+  }
+}
+
+// Send a hot-path action through the fast daemon, automatically falling back to
+// the single-shot path if the daemon is unavailable or fails. Once the daemon
+// proves broken it disables itself, so steady-state cost is one path only.
+async function sendHotAction(command) {
+  if (_daemon.isDisabled()) {
+    return singleShotHotAction(command);
+  }
+  try {
+    return await _daemon.send(command);
+  } catch (daemonError) {
+    // Self-correction: daemon failed -> mark it broken and use the proven path.
+    if (!_daemon.isDisabled()) {
+      _daemon.disable(`send_failed: ${daemonError?.message ?? daemonError}`);
+    }
+    return singleShotHotAction(command);
+  }
+}
 
 async function tempCapturePath(prefix) {
   await fs.mkdir(TEMP_RUNTIME_ROOT, { recursive: true });
@@ -253,13 +357,13 @@ export class PowerShellWindowProvider {
   async typeText(windowId, text) {
     const textStr = String(text ?? "").slice(0, 4000);
     const handle = validateWindowHandle(windowId);
-    return _daemon.send({ action: "typeText", text: textStr, handle: handle ?? null });
+    return sendHotAction({ action: "typeText", text: textStr, handle: handle ?? null });
   }
 
   async sendHotkey(windowId, keys) {
     const validatedKeys = validateHotkey(keys);
     const handle = validateWindowHandle(windowId);
-    return _daemon.send({ action: "sendHotkey", keys: validatedKeys, handle: handle ?? null });
+    return sendHotAction({ action: "sendHotkey", keys: validatedKeys, handle: handle ?? null });
   }
 
   async clickPoint(windowId, point) {
@@ -269,7 +373,7 @@ export class PowerShellWindowProvider {
       throw new Error("clickPoint coordinates must be finite numbers.");
     }
     const handle = validateWindowHandle(windowId);
-    return _daemon.send({ action: "clickPoint", x, y, handle: handle ?? null });
+    return sendHotAction({ action: "clickPoint", x, y, handle: handle ?? null });
   }
 
   async scrollWindow(windowId, delta) {
@@ -278,7 +382,23 @@ export class PowerShellWindowProvider {
       throw new Error("scroll delta must be a finite number.");
     }
     const handle = validateWindowHandle(windowId);
-    return _daemon.send({ action: "scroll", delta: deltaInt, handle: handle ?? null });
+    return sendHotAction({ action: "scroll", delta: deltaInt, handle: handle ?? null });
+  }
+
+  async rightClickPoint(windowId, point) {
+    const x = Math.round(Number(point.x));
+    const y = Math.round(Number(point.y));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("rightClick coordinates must be finite numbers.");
+    const handle = validateWindowHandle(windowId);
+    return sendHotAction({ action: "rightClick", x, y, handle: handle ?? null });
+  }
+
+  async doubleClickPoint(windowId, point) {
+    const x = Math.round(Number(point.x));
+    const y = Math.round(Number(point.y));
+    if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("doubleClick coordinates must be finite numbers.");
+    const handle = validateWindowHandle(windowId);
+    return sendHotAction({ action: "doubleClick", x, y, handle: handle ?? null });
   }
 
   async captureWindow(windowId) {
@@ -317,10 +437,53 @@ export class PowerShellWindowProvider {
 
   async captureScreen() {
     const outputPath = await tempCapturePath("screen");
-    const result = await _daemon.send({ action: "captureScreen", outputPath });
+    const result = await sendHotAction({ action: "captureScreen", outputPath });
     return {
       ...result,
       outputPath
+    };
+  }
+
+  // Health probe for the self-test layer. Reports whether the real provider can
+  // actuate (fast daemon or single-shot) so the runtime can surface a clear
+  // diagnostic instead of failing mid-mission.
+  async selfTest() {
+    const checks = {};
+    let ok = true;
+
+    // 1. Window enumeration (single-shot path, always required).
+    try {
+      const windows = await this.listVisibleWindows();
+      checks.listWindows = { ok: true, windowCount: Array.isArray(windows) ? windows.length : 0 };
+    } catch (error) {
+      ok = false;
+      checks.listWindows = { ok: false, error: String(error?.message ?? error) };
+    }
+
+    // 2. Persistent daemon (fast path). Non-fatal: single-shot covers it.
+    const daemonHealthy = await _daemon.selfTest();
+    checks.persistentDaemon = {
+      ok: daemonHealthy,
+      mode: daemonHealthy ? "persistent" : "single_shot_fallback",
+      disabled: _daemon.isDisabled()
+    };
+
+    // 3. Single-shot actuation path (ping via the proven switch). This is the
+    //    floor: if it fails, interactive actions cannot work at all.
+    try {
+      const pong = await runPowerShell(["-Action", "ping"]);
+      checks.singleShotActuation = { ok: Boolean(pong && pong.ok) };
+      if (!pong || !pong.ok) ok = false;
+    } catch (error) {
+      ok = false;
+      checks.singleShotActuation = { ok: false, error: String(error?.message ?? error) };
+    }
+
+    return {
+      ok,
+      provider: "powershell_window_provider",
+      actuationMode: checks.persistentDaemon.ok ? "persistent" : "single_shot",
+      checks
     };
   }
 

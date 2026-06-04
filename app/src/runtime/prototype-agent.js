@@ -43,7 +43,8 @@ import {
   TOOL_CALL_STATUS
 } from "./tool-call-lifecycle.js";
 import { createId, nowIso } from "../utils/ids.js";
-import { sanitizeFilename, writeText } from "../utils/files.js";
+import { sanitizeFilename, writeText, writeBinary } from "../utils/files.js";
+import { renderArtifactDeliverables } from "../artifacts/document-renderer.js";
 import { buildDeterministicAmbiguityOutput, buildDeterministicEvaluationOutput } from "../reasoning/evaluator.js";
 import { createDefaultContextualReasoningEngine } from "../reasoning/contextual-reasoning-engine.js";
 import { buildRunReviewModel } from "../service/run-review-model.js";
@@ -422,6 +423,36 @@ export class PrototypeAgent {
     this.workspaceLauncher = workspaceLauncher;
     this.browserLauncher = browserLauncher;
     this.surfaceLocks = new Map();
+    // Cooperative emergency-stop registry. Operators can abort a run at any time
+    // (not only at an approval gate); the execution loops consult this between
+    // steps and bail out cleanly into a STOPPED state.
+    this.abortedRuns = new Set();
+  }
+
+  // Public: request a cooperative abort of a running mission. Returns true if the
+  // run was active and is now flagged for abort.
+  requestAbort(runId) {
+    if (!runId) return false;
+    this.abortedRuns.add(runId);
+    return true;
+  }
+
+  isRunAborted(runId) {
+    return this.abortedRuns.has(runId);
+  }
+
+  #clearAbort(runId) {
+    this.abortedRuns.delete(runId);
+  }
+
+  // Throws a tagged AbortError if the operator requested an emergency stop.
+  // Called at step boundaries inside the long-running execution loops.
+  #throwIfAborted(runId) {
+    if (this.abortedRuns.has(runId)) {
+      const error = new Error("Run aborted by operator (emergency stop).");
+      error.code = "RUN_ABORTED";
+      throw error;
+    }
   }
 
   #surfaceLockLabel(lockName) {
@@ -2554,6 +2585,19 @@ export class PrototypeAgent {
       missionTracker.setActiveSurface("desktop", { app: desktopPlan.output.selectedApplication?.id ?? null });
       for (let stepIndex = 0; stepIndex < executableSteps.length; stepIndex++) {
         const step = executableSteps[stepIndex];
+        // Emergency-stop checkpoint: bail out cleanly between steps.
+        if (this.isRunAborted(run.id)) {
+          this.#clearAbort(run.id);
+          this.#recordEvent(run.id, createEvent("run.stopped", EVENT_ACTOR.OPERATOR, "Run stopped by operator (emergency stop).", {
+            stoppedAtStep: stepIndex
+          }));
+          await this.#stageRun(run.id, {
+            status: RUN_STATUS.STOPPED,
+            lifecycleStage: "stopped",
+            summary: "Run stopped by operator (emergency stop)."
+          }, "run.stopped", "Run stopped by operator (emergency stop).");
+          return this.database.getRun(run.id);
+        }
         let toolCall = createToolCall({
           runId: run.id,
           stepId: step.id,
@@ -5605,16 +5649,64 @@ export class PrototypeAgent {
 
   async #persistArtifact(runId, runDir, artifactDefinition, metadata) {
     const artifactId = createId("art");
-    const fileName = `${sanitizeFilename(artifactDefinition.title)}-${artifactId}.md`;
-    const storagePath = path.join(runDir, "artifacts", fileName);
+    const baseName = `${sanitizeFilename(artifactDefinition.title)}-${artifactId}`;
+    const artifactsDir = path.join(runDir, "artifacts");
+
+    // Markdown remains the editable source / preview text.
+    const storagePath = path.join(artifactsDir, `${baseName}.md`);
     await writeText(storagePath, artifactDefinition.content);
+
+    // Render real, ready-to-use deliverables (PDF / DOCX / XLSX). A renderer
+    // failure must never sink the run — the .md is always available, and each
+    // failure is captured in metadata for the self-test/diagnostics layer.
+    const deliverables = [];
+    try {
+      const rendered = await renderArtifactDeliverables({
+        artifactType: artifactDefinition.artifactType,
+        title: artifactDefinition.title,
+        content: artifactDefinition.content
+      });
+      for (const item of rendered) {
+        if (item.errored || !item.buffer) {
+          deliverables.push({ format: item.format, ok: false, error: item.error ?? "render_failed" });
+          this.#recordEvent(runId, createEvent("artifact.deliverable_failed", EVENT_ACTOR.SYSTEM, `${artifactDefinition.title}: ${item.format} render failed.`, {
+            artifactId,
+            format: item.format,
+            error: item.error ?? "render_failed"
+          }));
+          continue;
+        }
+        const filePath = path.join(artifactsDir, `${baseName}.${item.ext}`);
+        await writeBinary(filePath, item.buffer);
+        deliverables.push({
+          format: item.format,
+          ext: item.ext,
+          mime: item.mime,
+          path: filePath,
+          bytes: item.buffer.length,
+          ok: true
+        });
+      }
+    } catch (error) {
+      this.#recordEvent(runId, createEvent("artifact.deliverable_failed", EVENT_ACTOR.SYSTEM, `${artifactDefinition.title}: deliverable rendering errored.`, {
+        artifactId,
+        error: String(error?.message ?? error)
+      }));
+    }
+
+    const enrichedMetadata = {
+      ...metadata,
+      sourceFormat: "markdown",
+      deliverables
+    };
+
     const artifact = {
       id: artifactId,
       artifactType: artifactDefinition.artifactType,
       status: "draft",
       title: artifactDefinition.title,
       storagePath,
-      metadata,
+      metadata: enrichedMetadata,
       createdAt: nowIso()
     };
     this.database.insertArtifact(runId, artifact);
@@ -5622,7 +5714,8 @@ export class PrototypeAgent {
       artifactId,
       artifactType: artifact.artifactType,
       sourceIds: artifact.metadata?.sourceIds ?? [],
-      evidenceIds: artifact.metadata?.evidenceIds ?? []
+      evidenceIds: artifact.metadata?.evidenceIds ?? [],
+      deliverables: deliverables.filter((d) => d.ok).map((d) => d.format)
     }));
     return artifact;
   }

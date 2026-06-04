@@ -32,7 +32,7 @@ export async function captureDomSnapshot(page) {
       "[role='link']"
     ].join(", ");
 
-    const interactiveElements = Array.from(document.querySelectorAll(interactiveSelector)).slice(0, 50).map((element) => ({
+    const interactiveElements = Array.from(document.querySelectorAll(interactiveSelector)).slice(0, 100).map((element) => ({
       tagName: element.tagName.toLowerCase(),
       text: (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim(),
       role: inferRole(element),
@@ -46,7 +46,7 @@ export async function captureDomSnapshot(page) {
     return {
       title: document.title,
       url: window.location.href,
-      bodyText: (main?.innerText || document.body.innerText || "").replace(/\s+/g, " ").trim().slice(0, 5000),
+      bodyText: (main?.innerText || document.body.innerText || "").replace(/\s+/g, " ").trim().slice(0, 12000),
       interactiveElements
     };
   });

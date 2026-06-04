@@ -26,6 +26,11 @@ export async function writeText(filePath, value) {
   await fs.writeFile(filePath, value, "utf8");
 }
 
+export async function writeBinary(filePath, buffer) {
+  await ensureDir(path.dirname(filePath));
+  await fs.writeFile(filePath, buffer);
+}
+
 export function resolvePath(filePath) {
   return path.resolve(filePath);
 }

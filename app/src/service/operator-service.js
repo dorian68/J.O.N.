@@ -12,6 +12,8 @@ import { createPrototypeRuntime } from "../runtime/create-prototype-runtime.js";
 import { ApprovalBroker } from "../runtime/approval-broker.js";
 import { applySurfaceRouteToMission, routeMissionToSurface } from "../runtime/surface-router.js";
 import { resolveApprovalByPolicy, shouldUseInteractiveApproval } from "../policy/approval-resolution-policy.js";
+import { runSelfCheck } from "../release/self-check.js";
+import { decomposeMissionSurfaces } from "../mission/mission-decomposition.js";
 import { BenchmarkService } from "./benchmark-service.js";
 import { summarizeLlmCalls } from "./llm-analytics.js";
 import { FakeWindowProvider } from "../computer/fake-window-provider.js";
@@ -34,7 +36,7 @@ import { createId, nowIso } from "../utils/ids.js";
 import { buildRunReviewModel } from "./run-review-model.js";
 import { buildConversationResponsePlan } from "../conversation/conversation-response-planner.js";
 import { buildOperationalDeepReadinessReport } from "../release/operational-deep-readiness.js";
-import { ensureDir, isPathInside, removePathIfExists } from "../utils/files.js";
+import { ensureDir, isPathInside, removePathIfExists, sanitizeFilename } from "../utils/files.js";
 import {
   buildComputerObservationScenarioDefinition,
   buildProjectAllowlistedDomains,
@@ -119,6 +121,9 @@ import {
 } from "../capabilities/capability-candidate-workspace.js";
 import { buildDeterministicCapabilityDescriptionOutput } from "../llm/deterministic-fallbacks.js";
 import { ConnectorRegistry } from "../connectors/connector-registry.js";
+import { McpConnectorService } from "../connectors/mcp-connector-service.js";
+import { listOAuthProviders } from "../connectors/oauth-provider-catalog.js";
+import { listMcpServerCatalog } from "../connectors/mcp-server-catalog.js";
 import {
   BUILTIN_SKILL_MANIFESTS,
   USER_SKILL_MANIFESTS_SETTING_KEY,
@@ -169,6 +174,8 @@ import {
 const DESKTOP_CONTROL_ACTIONS = new Set([
   "captureScreen",
   "clickAt",
+  "rightClickAt",
+  "doubleClickAt",
   "typeText",
   "pressKey",
   "hotkey",
@@ -335,7 +342,10 @@ function evidenceFilePaths(evidence) {
 }
 
 function artifactFilePaths(artifact) {
-  return safeDeletionPaths([artifact.storagePath]);
+  const deliverablePaths = Array.isArray(artifact.metadata?.deliverables)
+    ? artifact.metadata.deliverables.filter((d) => d?.ok && d?.path).map((d) => d.path)
+    : [];
+  return safeDeletionPaths([artifact.storagePath, ...deliverablePaths]);
 }
 
 function findScenarioDescriptor(scenarios, scenarioId) {
@@ -1653,6 +1663,7 @@ export class OperatorService extends EventEmitter {
       onEvent: (event) => this.#handleBrowserEvent(event)
     });
     this.connectorRegistry = new ConnectorRegistry();
+    this.mcpConnectors = new McpConnectorService({ env: this.env ?? process.env });
     this.mobileDeviceRegistry = new MobileDeviceRegistry();
     this.mobileAuditLog = new MobileAuditLog();
     this.mobileEventBuffer = new MobileEventBuffer();
@@ -2696,9 +2707,25 @@ export class OperatorService extends EventEmitter {
       this.listCapabilityCandidates({ status: CAPABILITY_CANDIDATE_STATUS.ENABLED })
     );
     const connectorProviders = this.connectorRegistry.listExternalToolProviders();
+    // Live MCP tools (connected via OAuth/stdio) become first-class capabilities
+    // the planner can select, each tagged with its connectorId for invocation.
+    const liveMcpTools = this.listConnectedMcpTools();
+    const mcpProvider = liveMcpTools.length > 0 ? {
+      id: "mcp_live",
+      label: "Connected MCP tools",
+      category: "mcp",
+      tools: liveMcpTools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        riskLevel: "medium",
+        requiresApproval: true,
+        payload: { providerType: "mcp_live", connectorId: t.connectorId, tool: t.name }
+      }))
+    } : null;
     const externalToolProviders = [
       ...(generatedProvider.tools.length > 0 ? [generatedProvider] : []),
-      ...connectorProviders
+      ...connectorProviders,
+      ...(mcpProvider ? [mcpProvider] : [])
     ];
     const graph = refreshCapabilityGraph(this.runtimeHandle.database, {
       applications: availableApplications,
@@ -4401,6 +4428,24 @@ export class OperatorService extends EventEmitter {
       actionResult = await realProvider.clickPoint(null, { x, y });
       break;
     }
+    case "rightClickAt": {
+      const x = Math.round(Number(rawAction.x));
+      const y = Math.round(Number(rawAction.y));
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw Object.assign(new Error("rightClickAt requires finite x, y pixel coordinates."), { code: "INVALID_PARAMS" });
+      }
+      actionResult = await realProvider.rightClickPoint(null, { x, y });
+      break;
+    }
+    case "doubleClickAt": {
+      const x = Math.round(Number(rawAction.x));
+      const y = Math.round(Number(rawAction.y));
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw Object.assign(new Error("doubleClickAt requires finite x, y pixel coordinates."), { code: "INVALID_PARAMS" });
+      }
+      actionResult = await realProvider.doubleClickPoint(null, { x, y });
+      break;
+    }
     case "typeText": {
       const text = String(rawAction.text ?? "").slice(0, 2000);
       actionResult = await realProvider.typeText(null, text);
@@ -4497,6 +4542,41 @@ export class OperatorService extends EventEmitter {
         createdAt: nowIso()
       });
     }
+  }
+
+  // Agentic automation in natural language, scoped to a specific browser tab.
+  // Reuses the proven browser-autonomy loop (plan → act → verify), started on the
+  // tab's current URL. This is what turns the "Onglets" tab from a manual remote
+  // into a per-tab agent.
+  async dispatchMobileTabMission(projectId, targetId, instruction) {
+    const resolvedId = this.#resolveMobileProjectId(projectId);
+    if (!resolvedId) throw Object.assign(new Error("No active project."), { code: "NO_PROJECT" });
+    const text = String(instruction ?? "").trim();
+    if (!text) throw Object.assign(new Error("Instruction is required."), { code: "EMPTY_INSTRUCTION" });
+
+    // Resolve the tab's current URL so the agent starts where the user is looking.
+    let startUrl = null;
+    let tabTitle = null;
+    try {
+      const state = await this.browserProvider.getTabsState(resolvedId);
+      const tab = (state?.tabs ?? []).find((t) => t.id === targetId || t.targetId === targetId);
+      startUrl = tab?.url ?? null;
+      tabTitle = tab?.title ?? null;
+    } catch { /* tab state optional */ }
+
+    const launch = await this.startMission(resolvedId, {
+      missionSpec: {
+        objective: text.slice(0, 300),
+        constraints: [`Work within the current browser tab${tabTitle ? ` ("${tabTitle.slice(0, 80)}")` : ""}.`, "Stay on this site unless the task clearly requires navigation."],
+        mode: "computer",
+        parameters: {
+          computerAction: { type: "browser_autonomy" },
+          browserAutonomy: startUrl ? { startUrl } : {}
+        }
+      }
+    });
+    this.emitStateChanged("browser.tab_mission_started", { projectId: resolvedId, targetId, runId: launch.runId, startUrl });
+    return { runId: launch.runId, targetId, startUrl };
   }
 
   async dispatchMobileCommand(commandType, params, sessionContext) {
@@ -4627,6 +4707,64 @@ export class OperatorService extends EventEmitter {
 
   getConnectorActionLog({ limit = 50, connectorId = null } = {}) {
     return this.connectorRegistry.getActionLog({ limit, connectorId });
+  }
+
+  // ── MCP connectors (OAuth-fluent tool integrations, Composio-style) ────────
+  listMcpProviders() {
+    return listOAuthProviders({ env: this.env ?? process.env });
+  }
+
+  // Catalog of remote MCP servers (Composio-style directory).
+  listMcpCatalog() {
+    return listMcpServerCatalog({ env: this.env ?? process.env });
+  }
+
+  // Connect a remote MCP server via the MCP OAuth spec (discovery + DCR).
+  async connectRemoteMcpServer(connectorId, serverConfigOrId, { scopes = null } = {}) {
+    const result = await this.mcpConnectors.connectRemoteMcp(connectorId, serverConfigOrId, { scopes });
+    this.emitStateChanged("mcp.connector.remote_started", { connectorId, connected: Boolean(result.connected) });
+    return result;
+  }
+
+  // Persisted connectors the user added (shared by JON desktop + mobile).
+  listMcpConnectors() {
+    return this.mcpConnectors.listConnectors();
+  }
+
+  listConnectedMcpTools() {
+    return this.mcpConnectors.listAllConnectedTools();
+  }
+
+  getMcpConnectorStatus(connectorId) {
+    return this.mcpConnectors.status(connectorId);
+  }
+
+  // Begin an OAuth connection — returns an authorize URL to open in the browser.
+  async startMcpOAuthConnect(connectorId, providerConfigOrId, { scopes = null } = {}) {
+    const result = await this.mcpConnectors.startOAuthConnect(connectorId, providerConfigOrId, { scopes });
+    this.emitStateChanged("mcp.connector.oauth_started", { connectorId, provider: result.provider });
+    return result;
+  }
+
+  // Connect a local stdio MCP server (no OAuth).
+  async connectMcpStdio(connectorId, connection) {
+    const result = await this.mcpConnectors.connectStdio(connectorId, connection);
+    this.emitStateChanged("mcp.connector.connected", { connectorId, toolCount: result.tools?.length ?? 0 });
+    return result;
+  }
+
+  async listMcpTools(connectorId, opts = {}) {
+    return this.mcpConnectors.listTools(connectorId, opts);
+  }
+
+  async callMcpTool(connectorId, toolName, args = {}, opts = {}) {
+    return this.mcpConnectors.callTool(connectorId, toolName, args, opts);
+  }
+
+  async disconnectMcpConnector(connectorId) {
+    const result = await this.mcpConnectors.disconnect(connectorId);
+    this.emitStateChanged("mcp.connector.disconnected", { connectorId });
+    return result;
   }
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -4935,7 +5073,133 @@ export class OperatorService extends EventEmitter {
     };
   }
 
+  // Reads a finished run's deliverable text (the gathered data) so it can be
+  // handed to the next phase of a composed cross-surface mission.
+  async extractRunDeliverableText(runId) {
+    const artifacts = this.runtimeHandle.database.listArtifacts(runId);
+    const parts = [];
+    for (const artifact of artifacts) {
+      try {
+        parts.push(await fs.readFile(artifact.storagePath, "utf8"));
+      } catch { /* artifact file may be missing; skip */ }
+    }
+    return parts.join("\n\n---\n\n").slice(0, 8000);
+  }
+
+  // Cross-surface "agent OS" orchestration. A mission like "open the cinestar
+  // site AND write tomorrow's showtimes to Notepad" spans two surfaces. Instead
+  // of silently dropping half of it (single-surface routing), JON decomposes it
+  // into ordered phases, runs each on its own surface, and hands the data
+  // gathered on the web to the desktop phase that writes it.
+  async runComposedMission(projectId, { objective, conversationId = null, decomposition = null } = {}) {
+    const plan = decomposition ?? decomposeMissionSurfaces(objective);
+    if (!plan.multiSurface) {
+      return this.startMission(projectId, { missionSpec: { objective }, conversationId, _composedPhase: true });
+    }
+
+    this.emitStateChanged("mission.composed.started", {
+      projectId,
+      objective,
+      phaseCount: plan.phases.length,
+      surfaces: plan.detectedSurfaces ?? []
+    });
+
+    const phaseResults = [];
+    let carried = "";
+    for (let i = 0; i < plan.phases.length; i += 1) {
+      const phase = plan.phases[i];
+
+      // The objective stays short. Detailed guidance rides in constraints; the
+      // data gathered upstream is handed over as inline content (typed/inserted
+      // as-is by the planner) — never crammed into the length-capped objective.
+      //
+      // The orchestrator COMMANDS the surface for each phase (the translator
+      // already resolved the action type) instead of letting keyword routing
+      // re-guess it.
+      const actionType = phase.actionType
+        ?? (phase.surface === "browser" ? "browser_autonomy"
+          : phase.surface === "desktop" ? "desktop_autonomy"
+          : null);
+      const missionSpec = {
+        objective: phase.objective,
+        constraints: Array.isArray(phase.constraints) ? phase.constraints : [],
+        mode: "computer",
+        parameters: actionType ? { computerAction: { type: actionType } } : {}
+      };
+      if (phase.consumesPrevious && carried) {
+        missionSpec.parameters.inlineGeneratedContent = [{
+          id: "phase1_data",
+          content: carried.slice(0, 4000),
+          source: "previous_phase"
+        }];
+      }
+
+      this.emitStateChanged("mission.composed.phase_started", {
+        projectId, phaseId: phase.id, surface: phase.surface, index: i + 1, total: plan.phases.length
+      });
+
+      let launch;
+      try {
+        launch = await this.startMission(projectId, {
+          missionSpec,
+          conversationId,
+          _composedPhase: true
+        });
+      } catch (error) {
+        phaseResults.push({ phaseId: phase.id, surface: phase.surface, runId: null, status: "failed", error: error.message });
+        this.emitStateChanged("mission.composed.phase_failed", { projectId, phaseId: phase.id, error: error.message });
+        break;
+      }
+
+      // Wait for this phase's run to settle before starting the next one.
+      const completion = this.activeRuns.get(launch.runId);
+      if (completion) {
+        try { await completion; } catch { /* run errors are recorded on the run row */ }
+      }
+
+      const run = this.runtimeHandle.database.getRun(launch.runId);
+      phaseResults.push({ phaseId: phase.id, surface: phase.surface, runId: launch.runId, status: run?.status ?? null });
+      this.emitStateChanged("mission.composed.phase_completed", {
+        projectId, phaseId: phase.id, runId: launch.runId, status: run?.status ?? null
+      });
+
+      if (phase.producesData) {
+        carried = await this.extractRunDeliverableText(launch.runId);
+      }
+      // Stop the chain if a phase did not complete cleanly.
+      if (run && run.status !== "completed") break;
+    }
+
+    const allCompleted = phaseResults.length === plan.phases.length && phaseResults.every((p) => p.status === "completed");
+    this.emitStateChanged("mission.composed.completed", { projectId, ok: allCompleted, phases: phaseResults });
+
+    return {
+      runId: phaseResults[0]?.runId ?? null,
+      composed: true,
+      ok: allCompleted,
+      objective,
+      phases: phaseResults,
+      conversation: conversationId ? this.runtimeHandle.database.getConversation(conversationId) : null
+    };
+  }
+
   async startMission(projectId, missionRequest) {
+    // Cross-surface "agent OS" path: if the mission spans web + desktop, run it
+    // as an ordered, data-passing composed mission instead of collapsing it to a
+    // single surface. Single-surface missions (the default) fall straight
+    // through. `_composedPhase` prevents re-entrancy for the per-phase runs.
+    if (!missionRequest?._composedPhase) {
+      const composedObjective = String((missionRequest?.missionSpec ?? missionRequest)?.objective ?? "");
+      const decomposition = decomposeMissionSurfaces(composedObjective);
+      if (decomposition.multiSurface) {
+        return this.runComposedMission(projectId, {
+          objective: composedObjective,
+          conversationId: missionRequest?.conversationId ?? null,
+          decomposition
+        });
+      }
+    }
+
     const missionEntry = this.getMissionEntryContract();
     const rawMissionInitial = missionRequest?.missionSpec ?? missionRequest;
 
@@ -5454,7 +5718,19 @@ export class OperatorService extends EventEmitter {
         persistedTurns: compactConversationHistory(persistedHistory),
         pendingClarification: compactPendingClarificationForPrompt(pendingClarification)
       },
-      safeCapabilities: safeCapabilitiesDescriptor(),
+      safeCapabilities: [
+        ...safeCapabilitiesDescriptor(),
+        ...(() => {
+          const tools = this.listConnectedMcpTools();
+          if (tools.length === 0) return [];
+          return [{
+            id: "call_mcp_tool",
+            boundary: "external_action",
+            description: "Invoke a connected MCP tool. parameters: { connectorId, tool, args }. Available tools: " +
+              tools.slice(0, 40).map((t) => `${t.connectorId}/${t.name}`).join(", ")
+          }];
+        })()
+      ],
       availableBrowsers: promptBrowsers,
       availableApplications: promptApplications,
       availableCliAgents,
@@ -5523,7 +5799,8 @@ export class OperatorService extends EventEmitter {
     const capabilityExecution = await executeSafeConversationCapabilities({
       requests: plannerResult.output.capabilityRequests,
       listInstalledApplications: () => this.listInstalledApplications(),
-      listInstalledBrowsers: () => this.listInstalledBrowsers()
+      listInstalledBrowsers: () => this.listInstalledBrowsers(),
+      callMcpTool: (connectorId, tool, args) => this.callMcpTool(connectorId, tool, args)
     }).catch((error) => ({
       text: `Je n’ai pas pu terminer l’inspection : ${error.message}`,
       uiBlocks: [{
@@ -6184,14 +6461,115 @@ export class OperatorService extends EventEmitter {
     };
   }
 
+  // Self-test the whole system (deliverable renderer, desktop actuation, LLM
+  // gateway). Used by startup, the /api/system/self-check endpoint, and the UI
+  // health panel. Never throws.
+  async getSelfCheck() {
+    return runSelfCheck({ runtime: this.runtimeHandle.runtime });
+  }
+
+  // Back-compat alias used by the mobile command gateway ("stopRun"). Routes to
+  // the global emergency stop so a mobile Stop button halts a run mid-step, not
+  // only when it is paused at an approval gate.
+  async stopRun(runId) {
+    return this.requestEmergencyStop(runId);
+  }
+
+  // Global emergency stop — reachable at any time, not only at an approval gate.
+  // Combines a cooperative abort (consumed by the execution loops between steps)
+  // with resolving any pending approval as STOP_RUN, so the run halts whether it
+  // is mid-step or paused waiting for the operator.
+  async requestEmergencyStop(runId) {
+    if (!runId) {
+      throw new Error("runId is required for emergency stop.");
+    }
+    const run = this.runtimeHandle.database.getRun(runId);
+    if (!run) {
+      throw new Error("Run not found.");
+    }
+
+    let cooperativeAbort = false;
+    if (typeof this.runtimeHandle.runtime.requestAbort === "function") {
+      cooperativeAbort = this.runtimeHandle.runtime.requestAbort(runId);
+    }
+
+    // Resolve any pending approval for this run with STOP_RUN (covers a run that
+    // is paused at an approval gate, including browser missions).
+    const pending = this.listPendingApprovals(runId);
+    for (const approval of pending) {
+      try {
+        this.approvalBroker.stopRun(approval.id, "Operator emergency stop.");
+      } catch {
+        /* approval may have just resolved; ignore */
+      }
+    }
+
+    this.emitStateChanged("run.emergency_stop_requested", {
+      runId,
+      projectId: run.projectId ?? null,
+      cooperativeAbort,
+      resolvedPendingApprovals: pending.length
+    });
+
+    return {
+      runId,
+      requested: true,
+      cooperativeAbort,
+      resolvedPendingApprovals: pending.length,
+      wasActive: this.activeRuns.has(runId)
+    };
+  }
+
   async readArtifactContent(runId, artifactId) {
     const artifact = this.runtimeHandle.database.listArtifacts(runId).find((item) => item.id === artifactId);
     if (!artifact) {
       return null;
     }
+    const deliverables = Array.isArray(artifact.metadata?.deliverables)
+      ? artifact.metadata.deliverables.filter((d) => d?.ok).map((d) => ({ format: d.format, ext: d.ext, mime: d.mime, bytes: d.bytes }))
+      : [];
     return {
       artifact,
-      content: await fs.readFile(artifact.storagePath, "utf8")
+      content: await fs.readFile(artifact.storagePath, "utf8"),
+      deliverables
+    };
+  }
+
+  // Lists a run's artifacts with their available downloadable deliverables.
+  // Used by both surfaces to render download buttons.
+  listRunArtifactsWithDeliverables(runId) {
+    const artifacts = this.runtimeHandle.database.listArtifacts(runId);
+    return artifacts.map((artifact) => ({
+      id: artifact.id,
+      title: artifact.title,
+      artifactType: artifact.artifactType,
+      status: artifact.status,
+      createdAt: artifact.createdAt,
+      deliverables: Array.isArray(artifact.metadata?.deliverables)
+        ? artifact.metadata.deliverables
+            .filter((d) => d?.ok)
+            .map((d) => ({ format: d.format, ext: d.ext, bytes: d.bytes ?? null }))
+        : []
+    }));
+  }
+
+  // Returns the binary deliverable (pdf/docx/xlsx) for download, or null.
+  async readArtifactDeliverable(runId, artifactId, format) {
+    const artifact = this.runtimeHandle.database.listArtifacts(runId).find((item) => item.id === artifactId);
+    if (!artifact) {
+      return null;
+    }
+    const deliverables = Array.isArray(artifact.metadata?.deliverables) ? artifact.metadata.deliverables : [];
+    const match = deliverables.find((d) => d?.ok && d?.path && d.format === format);
+    if (!match) {
+      return null;
+    }
+    const sanitizedTitle = sanitizeFilename(artifact.title || "artifact");
+    return {
+      artifact,
+      filePath: match.path,
+      mime: match.mime ?? "application/octet-stream",
+      downloadName: `${sanitizedTitle}.${match.ext}`
     };
   }
 

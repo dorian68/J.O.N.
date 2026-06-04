@@ -21,13 +21,39 @@ const STEALTH_ARGS = [
   "--disable-dev-shm-usage",
 ];
 
-// Injected before any page script — masks the CDP automation fingerprint
+// Playwright adds these by default and they leak automation; strip them so
+// passive bot checks (e.g. Cloudflare "Just a moment…") clear without a loop.
+const STEALTH_IGNORE_DEFAULT_ARGS = ["--enable-automation"];
+
+// Injected before any page script — masks the common automation fingerprints
+// that bot-detection (Cloudflare/Turnstile) keys on. Real Chrome (channel) plus
+// these usually lets managed challenges auto-resolve with no user action.
 const STEALTH_INIT_SCRIPT = `
   Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
   if (!window.chrome) { window.chrome = { runtime: {} }; }
   const _plugins = [1, 2, 3]; _plugins.item = i => _plugins[i];
   Object.defineProperty(navigator, 'plugins', { get: () => _plugins });
   Object.defineProperty(navigator, 'languages', { get: () => ['fr-FR', 'fr', 'en-US', 'en'] });
+  Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
+  Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+  try {
+    const _q = window.navigator.permissions && window.navigator.permissions.query;
+    if (_q) {
+      window.navigator.permissions.query = (p) => (
+        p && p.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission })
+          : _q(p)
+      );
+    }
+  } catch (e) {}
+  try {
+    const _gp = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function (p) {
+      if (p === 37445) return 'Intel Inc.';            // UNMASKED_VENDOR_WEBGL
+      if (p === 37446) return 'Intel Iris OpenGL Engine'; // UNMASKED_RENDERER_WEBGL
+      return _gp.call(this, p);
+    };
+  } catch (e) {}
 `;
 
 const STEALTH_USER_AGENT =
@@ -800,9 +826,9 @@ export class BrowserController {
     }
   }
 
-  async detectBlockers(targetId) {
+  async #readBlockerSignal(targetId) {
     const page = this.#getPage(targetId);
-    const result = await page.evaluate(() => {
+    return page.evaluate(() => {
       const candidates = Array.from(document.querySelectorAll("[data-blocking='true'], dialog[open], [role='dialog']"));
       const dialog = candidates.find((element) => {
         const style = window.getComputedStyle(element);
@@ -818,7 +844,33 @@ export class BrowserController {
           : ""
       };
     });
-    const classified = classifyBrowserBlockerSignal(result);
+  }
+
+  async detectBlockers(targetId) {
+    let classified = classifyBrowserBlockerSignal(await this.#readBlockerSignal(targetId));
+
+    // Passive anti-bot interstitials (e.g. Cloudflare "Just a moment…") clear by
+    // themselves in a few seconds with a real, non-automated-looking browser.
+    // Wait and re-check before escalating to a manual handoff, so JON doesn't
+    // pause on a challenge that would have resolved on its own.
+    if (classified.blocked && classified.type === "captcha_or_automation_block") {
+      const deadline = Date.now() + 12000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1500));
+        let next;
+        try {
+          next = classifyBrowserBlockerSignal(await this.#readBlockerSignal(targetId));
+        } catch {
+          break; // navigation in progress (challenge likely clearing)
+        }
+        if (!next.blocked || next.type !== "captcha_or_automation_block") {
+          classified = next;
+          break;
+        }
+        classified = next;
+      }
+    }
+
     await this.#refreshTargetMeta(targetId, {
       blocker: classified,
       lastResult: classified,
@@ -1058,14 +1110,22 @@ export class BrowserController {
     };
   }
 
+  #stealthLaunchExtras() {
+    return this.stealth ? { args: ["--no-sandbox", ...STEALTH_ARGS], ignoreDefaultArgs: STEALTH_IGNORE_DEFAULT_ARGS } : { args: ["--no-sandbox"] };
+  }
+
+  // Real installed Chrome (channel: "chrome") is far harder for bot-detection to
+  // fingerprint than bundled Chromium, so we prefer it and fall back to bundled.
   async #launchBrowser(headless) {
-    const executablePath = chromium.executablePath();
-    const args = ["--no-sandbox", ...(this.stealth ? STEALTH_ARGS : [])];
+    const extras = this.#stealthLaunchExtras();
     try {
-      return await chromium.launch({ headless, executablePath, args });
-    } catch (error) {
-      const message = error?.message ?? "Unknown launch error";
-      throw new Error(`Failed to launch bundled Chromium: ${message}`);
+      return await chromium.launch({ headless, channel: "chrome", ...extras });
+    } catch {
+      try {
+        return await chromium.launch({ headless, executablePath: chromium.executablePath(), ...extras });
+      } catch (error) {
+        throw new Error(`Failed to launch browser (chrome + bundled): ${error?.message ?? "Unknown launch error"}`);
+      }
     }
   }
 
@@ -1085,19 +1145,22 @@ export class BrowserController {
   }
 
   async #launchPersistentContext(headless) {
-    const executablePath = chromium.executablePath();
-    const args = ["--no-sandbox", ...(this.stealth ? STEALTH_ARGS : [])];
+    const extras = this.#stealthLaunchExtras();
+    const baseOpts = {
+      headless,
+      viewport: { width: 1440, height: 980 },
+      ...extras,
+      ...(this.stealth ? { userAgent: STEALTH_USER_AGENT } : {})
+    };
+    // Prefer real Chrome; fall back to bundled Chromium if not installed.
     try {
-      this.context = await chromium.launchPersistentContext(this.userDataDir, {
-        headless,
-        executablePath,
-        args,
-        viewport: { width: 1440, height: 980 },
-        ...(this.stealth ? { userAgent: STEALTH_USER_AGENT } : {})
-      });
-    } catch (error) {
-      const message = error?.message ?? "Unknown launch error";
-      throw new Error(`Failed to launch persistent Chromium context: ${message}`);
+      this.context = await chromium.launchPersistentContext(this.userDataDir, { channel: "chrome", ...baseOpts });
+    } catch {
+      try {
+        this.context = await chromium.launchPersistentContext(this.userDataDir, { executablePath: chromium.executablePath(), ...baseOpts });
+      } catch (error) {
+        throw new Error(`Failed to launch persistent browser context (chrome + bundled): ${error?.message ?? "Unknown launch error"}`);
+      }
     }
   }
 

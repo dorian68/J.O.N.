@@ -162,6 +162,8 @@ import {
   listAvailableCliAgents
 } from "../workspace/cli-command-catalog.js";
 import { WorkspaceBrowserProvider } from "../browser/workspace-browser-provider.js";
+import { BrowserExtensionBridge, getBrowserExtensionBridgeInfo } from "../browser/browser-extension-bridge.js";
+import { BrowserExtensionController } from "../browser/browser-extension-controller.js";
 import { MobileDeviceRegistry } from "../mobile/mobile-device-registry.js";
 import { MobileGateway, MobileAuditLog } from "../mobile/mobile-gateway.js";
 import { MobileEventBuffer } from "../mobile/mobile-event-stream.js";
@@ -522,6 +524,26 @@ function shouldAttachRecentRunContext(message = "") {
 
 function isManualHandoffDoneMessage(message = "") {
   return /\b(c['’ ]?est fait|cest fait|j['’ ]?ai fait|j ai fini|fait|termin[eé]|continue|continuer|reprends?|resume|done|completed)\b/i.test(message);
+}
+
+function isAntiBotStillBlockedAfterManualResume(run = {}, handoff = {}) {
+  if (handoff?.type !== "captcha_or_automation_block") {
+    return false;
+  }
+  const metadata = run.metadata ?? {};
+  return metadata.entryPoint === "manual_browser_handoff_resume"
+    || metadata.orchestration?.selectedBy === "user_manual_handoff_done"
+    || metadata.missionSpec?.parameters?.browserAutonomy?.resumedAfterManualHandoff === true;
+}
+
+function manualBlockerDiagnosticsText(handoff = {}) {
+  const diagnostics = handoff.diagnostics ?? {};
+  const parts = [];
+  if (diagnostics.provider) parts.push(`source probable: ${diagnostics.provider}`);
+  if (diagnostics.cloudflareRayId) parts.push(`Ray ID: ${diagnostics.cloudflareRayId}`);
+  if (diagnostics.visibleIp) parts.push(`IP vue par le site: ${diagnostics.visibleIp}`);
+  if (diagnostics.observedHost) parts.push(`hôte: ${diagnostics.observedHost}`);
+  return parts.length ? `Diagnostic: ${parts.join(", ")}.` : "";
 }
 
 function missionFingerprint(value = "") {
@@ -1204,7 +1226,10 @@ async function launchScenarioForService(service, {
       const requestedSearchQuery = routeOverridesPreflight
         ? (missionSpec?.parameters?.browserLaunch?.searchQuery ?? preflight?.understanding?.browserSearchQuery ?? "")
         : (preflight?.understanding?.browserSearchQuery ?? missionSpec?.parameters?.browserLaunch?.searchQuery ?? "");
-      const requestedLaunchUrl = routeOverridesPreflight
+      const resumeCurrentBrowserSession = missionSpec?.parameters?.browserAutonomy?.resumeCurrentSession === true;
+      const requestedLaunchUrl = resumeCurrentBrowserSession
+        ? null
+        : routeOverridesPreflight
         ? (missionSpec?.parameters?.browserAutonomy?.startUrl
           ?? missionSpec?.parameters?.browserLaunch?.searchUrl
           ?? missionSpec?.parameters?.browserLaunch?.url
@@ -1303,6 +1328,9 @@ async function launchScenarioForService(service, {
             type: "browser_autonomy",
             allowlistedHosts,
             startUrl,
+            resumeCurrentSession: resumeCurrentBrowserSession,
+            useAttachedBrowserTab: missionSpec?.parameters?.browserAutonomy?.useAttachedBrowserTab === true,
+            attachedTabSessionId: missionSpec?.parameters?.browserAutonomy?.attachedTabSessionId ?? null,
             browserId: requestedBrowserId,
             searchQuery: requestedSearchQuery || null,
             targetSite: missionSpec?.parameters?.browserLaunch?.targetSite ?? null
@@ -1444,6 +1472,49 @@ export class OperatorService extends EventEmitter {
       computerProvider: resolvedComputerProvider,
       workspaceLauncher: (projectId, payload) => service?.startWorkspaceTerminalProcess(projectId, payload),
       browserLauncher: async (projectId, payload = {}) => {
+        const wantsAttachedTab = payload?.returnController
+          && (payload?.useAttachedBrowserTab === true || payload?.resumeCurrentSession === true || payload?.attachedTabSessionId);
+        if (wantsAttachedTab && service?.browserExtensionBridge) {
+          const candidates = service.listBrowserExtensionTabs({
+            projectId,
+            includeClosed: false,
+            limit: 10
+          }).filter((tab) => tab.connected);
+          const selected = payload.attachedTabSessionId
+            ? candidates.find((tab) => tab.id === payload.attachedTabSessionId)
+            : candidates[0];
+          if (selected) {
+            const controller = new BrowserExtensionController({
+              bridge: service.browserExtensionBridge,
+              tabSessionId: selected.id,
+              projectId,
+              runId: payload.runId ?? null,
+              allowlistedHosts: payload.allowlistedHosts ?? []
+            });
+            return {
+              session: {
+                id: `attached_${selected.id}`,
+                projectId,
+                runId: payload.runId ?? null,
+                mode: "attached_browser_tab",
+                status: "active",
+                currentUrl: selected.url ?? null,
+                currentTitle: selected.title ?? null,
+                openedAt: selected.attachedAt ?? nowIso(),
+                lastActivityAt: selected.lastSeenAt ?? nowIso(),
+                metadata: {
+                  tabSessionId: selected.id,
+                  browserTabId: selected.browserTabId,
+                  extensionInstanceId: selected.extensionInstanceId
+                }
+              },
+              controller,
+              targetId: selected.id,
+              persistent: true,
+              attachedBrowserTab: true
+            };
+          }
+        }
         const session = await service?.browserProvider.createSession({ projectId, ...payload });
         if (payload?.returnController && session?.id) {
           const handle = service?.browserProvider.getAutomationHandle(session.id);
@@ -1663,6 +1734,11 @@ export class OperatorService extends EventEmitter {
       defaultHeadless: true,
       onEvent: (event) => this.#handleBrowserEvent(event)
     });
+    this.browserExtensionBridge = new BrowserExtensionBridge({
+      database: this.runtimeHandle.database,
+      onEvent: (event) => this.emitStateChanged(event.type, event.payload),
+      resolveDefaultProjectId: () => this.listProjects()[0]?.id ?? null
+    });
     this.connectorRegistry = new ConnectorRegistry();
     this.mcpConnectors = new McpConnectorService({ env: this.env ?? process.env });
     this.bandwidthGovernor = new BandwidthGovernor();
@@ -1708,6 +1784,7 @@ export class OperatorService extends EventEmitter {
     for (const terminalId of this.externalTerminalPollers.keys()) {
       this.#stopExternalTerminalPolling(terminalId);
     }
+    this.browserExtensionBridge.close();
     await this.browserProvider.shutdownAllSessions().catch(() => {});
     this.cliTerminalSupervisor.close();
     this.ptyTerminalSupervisor.close();
@@ -3403,11 +3480,17 @@ export class OperatorService extends EventEmitter {
       .slice(-8);
     const activePlans = this.runtimeHandle.database.listWorkspacePlans(projectId, { conversationId }) ?? [];
     const activePlanIds = this.orchestratorLoop?.getActivePlanIds() ?? [];
+    const attachedBrowserTabs = this.listBrowserExtensionTabs({
+      projectId,
+      includeClosed: false,
+      limit: 20
+    });
     return {
       missionBrief,
       terminals,
       decisions,
       terminalEvents,
+      attachedBrowserTabs,
       availableCliAgents: this.getPublicCliAgentCatalog(),
       alerts,
       liveProcesses: this.cliTerminalSupervisor.list(),
@@ -3416,8 +3499,8 @@ export class OperatorService extends EventEmitter {
       summary: buildWorkspaceStateSummary({ missionBrief, terminals, decisions }),
       browserStrategy: {
         preferredMode: "workspace_browser_mode",
-        supportedModes: ["workspace_browser_mode", "system_browser_mode"],
-        rationale: "Workspace browser mode is preferred for traceable web work; system browser mode remains available for visible local desktop tasks with approvals."
+        supportedModes: ["workspace_browser_mode", "system_browser_mode", "attached_browser_tab"],
+        rationale: "Workspace browser mode is preferred for traceable web work; attached browser tabs are available when the user explicitly grants an existing Chrome tab to JON."
       },
       autonomyPolicy: {
         defaultMode: "assisted",
@@ -4115,6 +4198,53 @@ export class OperatorService extends EventEmitter {
       await this.browserProvider.navigate(session.id, url).catch(() => {});
     }
     return session;
+  }
+
+  attachBrowserExtensionWs(server) {
+    return this.browserExtensionBridge.attachToServer(server);
+  }
+
+  getBrowserExtensionHealth() {
+    return {
+      ...this.browserExtensionBridge.getHealth(),
+      info: getBrowserExtensionBridgeInfo()
+    };
+  }
+
+  listBrowserExtensionTabs({ projectId = null, includeClosed = false, limit = 50 } = {}) {
+    if (projectId && !this.runtimeHandle.database.getProject(projectId)) {
+      throw new Error(`Project not found: ${projectId}.`);
+    }
+    return this.browserExtensionBridge.listTabs({ projectId, includeClosed, limit });
+  }
+
+  listBrowserExtensionEvents({ projectId = null, tabSessionId = null, runId = null, limit = 100 } = {}) {
+    if (projectId && !this.runtimeHandle.database.getProject(projectId)) {
+      throw new Error(`Project not found: ${projectId}.`);
+    }
+    return this.browserExtensionBridge.listEvents({ projectId, tabSessionId, runId, limit });
+  }
+
+  async sendBrowserExtensionCommand(projectId, tabSessionId, payload = {}) {
+    if (projectId && !this.runtimeHandle.database.getProject(projectId)) {
+      throw new Error(`Project not found: ${projectId}.`);
+    }
+    const tab = this.browserExtensionBridge.getTab(tabSessionId);
+    if (projectId && tab?.projectId && tab.projectId !== projectId) {
+      const error = new Error(`Attached browser tab ${tabSessionId} does not belong to project ${projectId}.`);
+      error.code = "BROWSER_EXTENSION_PROJECT_MISMATCH";
+      throw error;
+    }
+    const command = payload.command ?? payload;
+    const result = await this.browserExtensionBridge.sendCommand(tabSessionId, command, {
+      projectId: projectId ?? tab?.projectId ?? null,
+      runId: payload.runId ?? null,
+      timeoutMs: payload.timeoutMs ?? undefined
+    });
+    return {
+      tab,
+      result
+    };
   }
 
   updateProjectAllowlistedDomains(projectId, domains) {
@@ -5055,6 +5185,12 @@ export class OperatorService extends EventEmitter {
       },
       operationalDeep,
       workspace,
+      browserExtension: {
+        health: this.getBrowserExtensionHealth(),
+        tabs: selectedProjectId
+          ? this.listBrowserExtensionTabs({ projectId: selectedProjectId, includeClosed: false, limit: 20 })
+          : this.listBrowserExtensionTabs({ includeClosed: false, limit: 20 })
+      },
         capabilityGraph: {
           summary: capabilityGraph.summary,
           preview: compactCapabilityGraphForPrompt(capabilityGraph.nodes, {
@@ -5147,9 +5283,25 @@ export class OperatorService extends EventEmitter {
       surfaces: plan.detectedSurfaces ?? []
     });
 
-    const phaseResults = [];
-    let carried = "";
-    for (let i = 0; i < plan.phases.length; i += 1) {
+    return this.runComposedFrom(projectId, {
+      plan,
+      objective,
+      conversationId,
+      startIndex: 0,
+      carried: "",
+      priorPhaseResults: []
+    });
+  }
+
+  // Runs the composed-mission phase loop starting at `startIndex`, threading the
+  // upstream `carried` data forward. Extracted from runComposedMission so the
+  // chain can be RE-ENTERED after a manual browser handoff is resolved (see
+  // continueComposedAfterResume). That re-entry is what makes a cross-surface
+  // mission actually finish its remaining phases once the human clears a login /
+  // CAPTCHA / Cloudflare wall, instead of stalling silently after phase 1.
+  async runComposedFrom(projectId, { plan, objective, conversationId = null, startIndex = 0, carried = "", priorPhaseResults = [] } = {}) {
+    const phaseResults = Array.isArray(priorPhaseResults) ? [...priorPhaseResults] : [];
+    for (let i = startIndex; i < plan.phases.length; i += 1) {
       const phase = plan.phases[i];
 
       // The objective stays short. Detailed guidance rides in constraints; the
@@ -5209,7 +5361,52 @@ export class OperatorService extends EventEmitter {
       if (phase.producesData) {
         carried = await this.extractRunDeliverableText(launch.runId);
       }
-      // Stop the chain if a phase did not complete cleanly.
+
+      // A PAUSED phase means "waiting for the human" (login / CAPTCHA / manual
+      // browser handoff) — it is NOT a failure. Persist the chain continuation
+      // onto the paused run so that when the user confirms "c'est fait", the
+      // existing handoff-resume completes this phase and we pick the chain back
+      // up from the NEXT phase with the freshly gathered data. Return an explicit
+      // awaiting_handoff state instead of a bare ok:false (which read as failure).
+      if (run && run.status === RUN_STATUS.PAUSED) {
+        const pausedRun = this.runtimeHandle.database.getRun(launch.runId);
+        this.runtimeHandle.database.updateRun(launch.runId, {
+          metadata: {
+            ...(pausedRun?.metadata ?? {}),
+            composedContinuation: {
+              objective,
+              conversationId,
+              plan: { multiSurface: true, phases: plan.phases, detectedSurfaces: plan.detectedSurfaces ?? [] },
+              nextPhaseIndex: i + 1,
+              pausedPhaseProducesData: phase.producesData === true,
+              carried,
+              phaseResults
+            }
+          }
+        });
+        this.emitStateChanged("mission.composed.awaiting_handoff", {
+          projectId,
+          pausedRunId: launch.runId,
+          phaseId: phase.id,
+          index: i + 1,
+          total: plan.phases.length,
+          remainingPhases: plan.phases.slice(i + 1).map((p) => p.id)
+        });
+        return {
+          runId: phaseResults[0]?.runId ?? null,
+          composed: true,
+          ok: false,
+          status: "awaiting_handoff",
+          awaitingHandoff: true,
+          pausedRunId: launch.runId,
+          pausedPhaseId: phase.id,
+          objective,
+          phases: phaseResults,
+          conversation: conversationId ? this.runtimeHandle.database.getConversation(conversationId) : null
+        };
+      }
+
+      // Any other non-completed status is a genuine stop.
       if (run && run.status !== "completed") break;
     }
 
@@ -5220,10 +5417,67 @@ export class OperatorService extends EventEmitter {
       runId: phaseResults[0]?.runId ?? null,
       composed: true,
       ok: allCompleted,
+      status: allCompleted ? "completed" : "failed",
       objective,
       phases: phaseResults,
       conversation: conversationId ? this.runtimeHandle.database.getConversation(conversationId) : null
     };
+  }
+
+  // Re-enters a composed mission after the user clears a manual browser handoff.
+  // Called once the handoff-resume run (relaunched by
+  // #maybeResumeManualBrowserHandoffFromConversation) settles. If that run paused
+  // again, we keep waiting; if it completed, we refresh the carried data from it
+  // and run the chain's remaining phases.
+  async continueComposedAfterResume(resumedRunId, continuation) {
+    if (!continuation) return null;
+    const run = this.runtimeHandle.database.getRun(resumedRunId);
+    if (!run) return null;
+
+    // Still blocked — re-persist the continuation onto the new paused run.
+    if (run.status === RUN_STATUS.PAUSED) {
+      const current = this.runtimeHandle.database.getRun(resumedRunId);
+      this.runtimeHandle.database.updateRun(resumedRunId, {
+        metadata: { ...(current?.metadata ?? {}), composedContinuation: continuation }
+      });
+      this.emitStateChanged("mission.composed.awaiting_handoff", {
+        projectId: run.projectId,
+        pausedRunId: resumedRunId,
+        phaseId: continuation.phaseResults?.at(-1)?.phaseId ?? null,
+        index: continuation.nextPhaseIndex,
+        total: continuation.plan?.phases?.length ?? null,
+        remainingPhases: (continuation.plan?.phases ?? []).slice(continuation.nextPhaseIndex).map((p) => p.id)
+      });
+      return { composed: true, status: "awaiting_handoff", awaitingHandoff: true, pausedRunId: resumedRunId };
+    }
+
+    // The resumed phase did not complete cleanly — stop the chain honestly.
+    if (run.status !== RUN_STATUS.COMPLETED) {
+      this.emitStateChanged("mission.composed.completed", {
+        projectId: run.projectId, ok: false, phases: continuation.phaseResults ?? []
+      });
+      return { composed: true, status: "failed", ok: false, phases: continuation.phaseResults ?? [] };
+    }
+
+    // The blocked phase finished after the handoff. The RESUMED run is the one
+    // that actually gathered the data, so refresh `carried` from it, and mark the
+    // previously-paused phase as completed before running the remaining phases.
+    let carried = continuation.carried ?? "";
+    if (continuation.pausedPhaseProducesData) {
+      const fresh = await this.extractRunDeliverableText(resumedRunId);
+      if (fresh) carried = fresh;
+    }
+    const priorResults = (continuation.phaseResults ?? []).map((entry, index, all) =>
+      index === all.length - 1 ? { ...entry, status: "completed", resumedRunId } : entry
+    );
+    return this.runComposedFrom(run.projectId, {
+      plan: continuation.plan,
+      objective: continuation.objective,
+      conversationId: continuation.conversationId,
+      startIndex: continuation.nextPhaseIndex,
+      carried,
+      priorPhaseResults: priorResults
+    });
   }
 
   async startMission(projectId, missionRequest) {
@@ -6353,20 +6607,39 @@ export class OperatorService extends EventEmitter {
       parameters: {}
     };
     const handoff = pendingRun.metadata?.manualBrowserHandoff ?? {};
+    const activeBrowserSession = this.browserProvider.getActiveSessionForProject(projectId);
+    let activeBrowserUrl = activeBrowserSession?.currentUrl ?? null;
+    let canResumeCurrentBrowserSession = false;
+    if (activeBrowserSession?.id) {
+      try {
+        const handle = this.browserProvider.getAutomationHandle(activeBrowserSession.id);
+        if (handle?.controller?.isOpen?.() && handle.targetId) {
+          const targetState = await handle.controller.getTargetState(handle.targetId).catch(() => null);
+          activeBrowserUrl = targetState?.url ?? activeBrowserUrl;
+          canResumeCurrentBrowserSession = Boolean(activeBrowserUrl && activeBrowserUrl !== "about:blank");
+        }
+      } catch {
+        canResumeCurrentBrowserSession = false;
+      }
+    }
     const originalUrl = originalMissionSpec.parameters?.browserLaunch?.url
       ?? originalMissionSpec.parameters?.browserAutonomy?.startUrl
       ?? handoff.observedUrl
       ?? null;
+    const originalParameters = originalMissionSpec.parameters ?? {};
     const resumeMissionSpec = normalizeMissionSpec({
       ...originalMissionSpec,
       parameters: {
-        ...(originalMissionSpec.parameters ?? {}),
+        ...originalParameters,
         browserAutonomy: {
-          ...(originalMissionSpec.parameters?.browserAutonomy ?? {}),
-          ...(originalUrl ? { startUrl: originalUrl } : {}),
+          ...(originalParameters.browserAutonomy ?? {}),
+          ...(canResumeCurrentBrowserSession
+            ? { resumeCurrentSession: true }
+            : originalUrl ? { startUrl: originalUrl } : {}),
           visible: true,
           mode: "coworker_browser_loop",
-          resumedAfterManualHandoff: true
+          resumedAfterManualHandoff: true,
+          ...(activeBrowserUrl ? { resumedFromUrl: activeBrowserUrl } : {})
         }
       }
     }, this.getMissionEntryContract());
@@ -6391,6 +6664,22 @@ export class OperatorService extends EventEmitter {
       recommendedByRunId: pendingRun.id
     });
 
+    // If this paused run was a phase of a cross-surface composed mission, carry
+    // the chain forward once the resumed phase settles: the existing resume only
+    // re-runs THIS web phase — without this hook the remaining (e.g. desktop)
+    // phases would never run after the human clears the blocker.
+    const composedContinuation = pendingRun.metadata?.composedContinuation ?? null;
+    if (composedContinuation) {
+      const completion = this.activeRuns.get(launch.runId);
+      Promise.resolve(completion)
+        .then(() => this.continueComposedAfterResume(launch.runId, composedContinuation))
+        .catch((error) => {
+          this.emitStateChanged("mission.composed.continuation_failed", {
+            projectId, pausedRunId: launch.runId, error: error?.message ?? String(error)
+          });
+        });
+    }
+
     this.runtimeHandle.database.updateRun(pendingRun.id, {
       status: RUN_STATUS.STOPPED,
       lifecycleStage: "manual_handoff_resumed",
@@ -6410,7 +6699,7 @@ export class OperatorService extends EventEmitter {
       resumedRunId: launch.runId
     }));
 
-    const reply = "C’est noté. Je reprends la mission à partir de l’étape utile, sans relancer la même boucle Google. Je vais observer le navigateur, vérifier si le blocage est levé, puis continuer jusqu’au prochain point qui nécessite ton aide.";
+    const reply = "C’est noté. Je reprends la mission depuis le même onglet navigateur, sans renaviguer vers l’ancienne page de blocage. Je vais observer l’état actuel, vérifier si le blocage est levé, puis continuer jusqu’au prochain point qui nécessite ton aide.";
     const turn = {
       id: createId("turn"),
       projectId,
@@ -7631,10 +7920,16 @@ export class OperatorService extends EventEmitter {
     const conversation = conversationId ? this.runtimeHandle.database.getConversation(conversationId) : null;
     if (!conversation) return;
 
+    if (isAntiBotStillBlockedAfterManualResume(run, handoff)) {
+      await this.#postManualBrowserHandoffStillBlockedNotice({ run, conversation, handoff });
+      return;
+    }
+
     const heuristicMessage = [
       `Je suis en pause dans le navigateur : ${handoff.reason ?? "une action manuelle est nécessaire."}`,
       handoff.userAction ?? "Fais l’action demandée dans le navigateur, puis réponds-moi \"c’est fait\".",
-      "Dès que tu me confirmes, je réobserve l’écran et je reprends la mission au lieu de relancer la même boucle."
+      "Garde cette fenêtre navigateur ouverte. Si tu as résolu l’action dans ton Chrome personnel, clique l’extension JON sur cet onglet avant de me dire \"c’est fait\".",
+      "Dès que tu me confirmes, je reprends l’onglet disponible, je réobserve l’écran, et je continue sans renaviguer vers l’ancienne page de blocage."
     ].filter(Boolean).join(" ");
 
     const recovery = await runReflectiveRecovery({
@@ -7716,6 +8011,84 @@ export class OperatorService extends EventEmitter {
       kind: "manual_browser_handoff"
     });
     this.emitStateChanged("conversation.manual_browser_handoff.posted", {
+      projectId: run.projectId,
+      conversationId: conversation.id,
+      runId
+    });
+  }
+
+  async #postManualBrowserHandoffStillBlockedNotice({ run, conversation, handoff }) {
+    const runId = run.id;
+    const diagnosticsText = manualBlockerDiagnosticsText(handoff);
+    const observedUrlText = handoff.observedUrl ? ` URL observée: ${handoff.observedUrl}.` : "";
+    const message = [
+      "J’ai repris dans le même onglet après ta validation, mais le navigateur voit encore la vérification anti-robot.",
+      diagnosticsText,
+      observedUrlText,
+      "Je ne vais pas te redemander la même validation en boucle.",
+      "À ce stade, l’adaptation sûre consiste à garder cette fenêtre ouverte: soit tu navigues manuellement jusqu’à la page cible dans ce même onglet puis tu me dis \"reprends\", soit tu attaches ton onglet Chrome personnel avec l’extension JON et tu me dis \"reprends\", soit on change de route légitime pour les données publiques, soit on considère que ce site refuse cette automatisation depuis ce réseau/profil."
+    ].filter(Boolean).join(" ");
+    const userAction = "Si le challenge reste visible, navigue manuellement jusqu’à la page cible dans cette même fenêtre, ou attache ton onglet Chrome personnel avec l’extension JON, puis dis \"reprends\". Si la page cible n’est pas atteignable manuellement, il faut changer de route légitime ou arrêter cette mission.";
+
+    this.runtimeHandle.database.insertConversationTurn(conversationTurnRecord({
+      projectId: run.projectId,
+      conversationId: conversation.id,
+      role: "assistant",
+      kind: "mission_paused",
+      content: message,
+      payload: {
+        conversationId: conversation.id,
+        intentType: "desktop_action",
+        action: "manual_browser_handoff_still_blocked",
+        uiBlocks: [{
+          type: "nextStepCard",
+          title: "Blocage toujours actif",
+          text: message,
+          runId,
+          status: "waiting_user"
+        }],
+        linkedRunId: runId,
+        manualBrowserHandoff: {
+          type: handoff.type ?? null,
+          reason: handoff.reason ?? null,
+          userAction,
+          observedUrl: handoff.observedUrl ?? null,
+          observedTitle: handoff.observedTitle ?? null,
+          diagnostics: handoff.diagnostics ?? null,
+          stillBlockedAfterManualConfirmation: true
+        }
+      },
+      metadata: {
+        generationMode: "manual_browser_handoff_still_blocked",
+        linkedRunId: runId
+      }
+    }));
+
+    this.#patchRunMetadata(runId, (metadata) => ({
+      ...metadata,
+      manualBrowserHandoff: {
+        ...(metadata.manualBrowserHandoff ?? {}),
+        userAction,
+        promptPostedAt: nowIso(),
+        stillBlockedNoticePostedAt: nowIso(),
+        stillBlockedAfterManualConfirmation: true
+      }
+    }));
+    this.runtimeHandle.database.updateConversation(conversation.id, {
+      metadata: {
+        ...(conversation.metadata ?? {}),
+        pendingManualBrowserHandoffRunId: runId
+      },
+      updatedAt: nowIso()
+    });
+    this.mobileEventBuffer?.pushRaw("jon.needs_user", {
+      projectId: run.projectId,
+      conversationId: conversation.id,
+      message,
+      runId,
+      kind: "manual_browser_handoff_still_blocked"
+    });
+    this.emitStateChanged("conversation.manual_browser_handoff.still_blocked", {
       projectId: run.projectId,
       conversationId: conversation.id,
       runId

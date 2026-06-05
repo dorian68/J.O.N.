@@ -43,6 +43,10 @@ const suites = [
     modulePath: "../../tests/composed-mission.test.js"
   },
   {
+    name: "composed-mission-handoff",
+    modulePath: "../../tests/composed-mission-handoff.test.js"
+  },
+  {
     name: "temporal-context",
     modulePath: "../../tests/temporal-context.test.js"
   },
@@ -105,6 +109,14 @@ const suites = [
   {
     name: "browser-run-watcher",
     modulePath: "../../tests/browser-run-watcher.test.js"
+  },
+  {
+    name: "browser-extension-bridge",
+    modulePath: "../../tests/browser-extension-bridge.test.js"
+  },
+  {
+    name: "browser-extension-controller",
+    modulePath: "../../tests/browser-extension-controller.test.js"
   },
   {
     name: "project-memory",

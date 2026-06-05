@@ -28,7 +28,8 @@ export async function run() {
     async extractRunDeliverableText(runId) {
       return runId === "run_1" ? "SEANCE 18:00 Dune; SEANCE 21:00 Oppenheimer" : "";
     },
-    runComposedMission: OperatorService.prototype.runComposedMission
+    runComposedMission: OperatorService.prototype.runComposedMission,
+    runComposedFrom: OperatorService.prototype.runComposedFrom
   };
 
   const result = await stub.runComposedMission("prj_test", {

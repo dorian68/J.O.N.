@@ -90,7 +90,42 @@ export class McpConnectorService {
   }
 
   // ── Local stdio MCP server (no OAuth) ─────────────────────────────────────
+  // SECURITY (audit T2): a client-supplied {command,args,env} would be arbitrary
+  // command execution. Stdio MCP is therefore DISABLED by default and, when
+  // enabled, only allowlisted server ids may run — never a raw client command.
+  #assertStdioAllowed(connection) {
+    const enabled = this.env.JON_ENABLE_MCP_STDIO === "true";
+    if (!enabled) {
+      throw Object.assign(new Error("Local stdio MCP servers are disabled. Set JON_ENABLE_MCP_STDIO=true to enable, then use an allowlisted server id."), { code: "MCP_STDIO_DISABLED" });
+    }
+    const allowlist = this.#stdioAllowlist();
+    const serverId = connection?.serverId ?? connection?.id ?? null;
+    const allowed = serverId ? allowlist[serverId] : null;
+    if (!allowed) {
+      throw Object.assign(new Error("Unknown or non-allowlisted stdio MCP server. A raw command/args cannot be supplied by the client; reference an allowlisted serverId."), { code: "MCP_STDIO_NOT_ALLOWLISTED" });
+    }
+    // Return the SERVER-DEFINED command/args/env — never the client's.
+    const envOut = {};
+    for (const key of allowed.allowedEnvKeys ?? []) {
+      if (this.env[key] != null) envOut[key] = this.env[key];
+    }
+    return { command: allowed.command, args: allowed.args ?? [], env: envOut, label: allowed.label ?? serverId, cwd: allowed.cwd ?? undefined };
+  }
+
+  #stdioAllowlist() {
+    // Allowlist from env JSON: { "<serverId>": { command, args, allowedEnvKeys, cwd, label } }
+    try {
+      const raw = this.env.JON_MCP_STDIO_ALLOWLIST;
+      if (raw) return JSON.parse(raw);
+    } catch { /* malformed -> empty allowlist (deny all) */ }
+    return {};
+  }
+
   async connectStdio(connectorId, connection) {
+    // Replace any client-provided command/args/env with the server-defined,
+    // allowlisted spec. Throws (403-mapped) when disabled or not allowlisted.
+    const safeConnection = this.#assertStdioAllowed(connection);
+    connection = safeConnection;
     try {
       const tools = await this.mcp.connect(connectorId, { transport: "stdio", ...connection });
       this._status.set(connectorId, { connected: true, tools, transport: "stdio" });

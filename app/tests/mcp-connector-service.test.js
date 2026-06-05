@@ -32,10 +32,15 @@ const inMemoryVault = () => new (class {
 
 export async function run() {
   const mgr = fakeManager();
-  const svc = new McpConnectorService({ env: {}, tokenVault: inMemoryVault(), mcpManager: mgr, registryPath: tmpRegistry });
+  // Secure stdio model: enabled + allowlisted server id (no raw client command).
+  const stdioEnv = {
+    JON_ENABLE_MCP_STDIO: "true",
+    JON_MCP_STDIO_ALLOWLIST: JSON.stringify({ local1: { command: "node", args: ["server.js"], label: "local1" } })
+  };
+  const svc = new McpConnectorService({ env: stdioEnv, tokenVault: inMemoryVault(), mcpManager: mgr, registryPath: tmpRegistry });
 
   // stdio connect → discovers tools, status reflects connection
-  const r = await svc.connectStdio("local1", { command: "node", args: ["server.js"] });
+  const r = await svc.connectStdio("local1", { serverId: "local1" });
   assert.equal(r.connected, true);
   assert.deepEqual(r.tools.map((t) => t.name), ["echo"]);
   const status = svc.status("local1");

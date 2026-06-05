@@ -10,6 +10,8 @@ import { APP_ROOT, DEFAULT_OPERATOR_PORT } from "../config.js";
 import { OperatorService } from "../service/operator-service.js";
 import { attachMobileTerminalWs } from "../mobile/mobile-terminal-ws.js";
 import { buildNetworkAdvice, buildMobileConnectivityReport, pickPrimaryLanIp } from "./network-advisor.js";
+import { resolveBindConfig, loadOrCreateDesktopToken, authorizeRequest } from "./desktop-auth.js";
+import { evaluateProductionReadiness } from "./production-readiness.js";
 import { CoworkSmokeBackofficeService } from "../smoke/cowork-smoke-pipeline.js";
 import { RealSurfaceSmokeBackofficeService } from "../smoke/real-surface-smoke-pipeline.js";
 
@@ -269,6 +271,18 @@ export async function createOperatorServer({
 
   operatorService.on("state.changed", handleStateChanged);
 
+  // Secure-by-default network model (audit T1). Loopback by default; LAN only on
+  // explicit opt-in, and then desktop routes require the desktop token.
+  const { bindHost, lanEnabled } = resolveBindConfig(process.env);
+  const desktopToken = loadOrCreateDesktopToken(process.env);
+
+  // Production readiness: refuse to start with an insecure config in production.
+  const readiness = evaluateProductionReadiness(process.env);
+  if (readiness.shouldRefuseStart) {
+    const failed = readiness.checks.filter((c) => c.status === "fail").map((c) => `${c.id}: ${c.detail}`).join("; ");
+    throw new Error(`[PRODUCTION READINESS] Refus de démarrer — checks en échec: ${failed}`);
+  }
+
   const requestHandler = async (request, response) => {
     try {
       if (!request.url) {
@@ -278,6 +292,15 @@ export async function createOperatorServer({
 
       const url = new URL(request.url, "http://127.0.0.1");
       const pathname = url.pathname;
+
+      // Central authorization gate. Public paths and loopback are allowed; LAN
+      // desktop routes require the desktop token; mobile routes fall through to
+      // their own session checks. One gate instead of scattered checks.
+      const authDecision = authorizeRequest(request, pathname, { desktopToken });
+      if (!authDecision.allowed) {
+        sendError(response, 401, "Authentication required for this route over the network.", { code: "DESKTOP_AUTH_REQUIRED" });
+        return;
+      }
 
       if (pathname === "/api/health" && request.method === "GET") {
         sendJson(response, 200, {
@@ -479,7 +502,10 @@ export async function createOperatorServer({
         const body = await readJsonBody(request);
         try {
           sendJson(response, 200, await operatorService.connectMcpStdio(body.connectorId, body.connection ?? body));
-        } catch (err) { sendError(response, 400, err.message, { code: err.code }); }
+        } catch (err) {
+          const status = (err.code === "MCP_STDIO_DISABLED" || err.code === "MCP_STDIO_NOT_ALLOWLISTED") ? 403 : 400;
+          sendError(response, status, err.message, { code: err.code });
+        }
         return;
       }
       const desktopMcpStatusRoute = matchRoute(pathname, /^\/api\/mcp\/(?<connectorId>[^/]+)\/status$/);
@@ -1269,8 +1295,10 @@ export async function createOperatorServer({
         response.writeHead(200, {
           "content-type": "text/event-stream; charset=utf-8",
           "cache-control": "no-cache",
-          connection: "keep-alive",
-          "access-control-allow-origin": "*"
+          connection: "keep-alive"
+          // No wildcard CORS (audit T20): the mobile UI is same-origin; dropping
+          // `Access-Control-Allow-Origin: *` prevents any website from opening
+          // this EventSource with a leaked query token.
         });
         response.write(": jon-mobile-events\n\n");
         const flushBuffer = () => {
@@ -1503,7 +1531,8 @@ export async function createOperatorServer({
         try {
           sendJson(response, 200, await operatorService.connectMcpStdio(body.connectorId, body.connection ?? body));
         } catch (err) {
-          sendError(response, 400, err.message, { code: err.code });
+          const status = (err.code === "MCP_STDIO_DISABLED" || err.code === "MCP_STDIO_NOT_ALLOWLISTED") ? 403 : 400;
+          sendError(response, status, err.message, { code: err.code });
         }
         return;
       }
@@ -1600,18 +1629,21 @@ export async function createOperatorServer({
       }
 
       if (pathname === "/api/mobile/admin/devices" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
         sendJson(response, 200, operatorService.mobileDeviceRegistry.listDevices());
         return;
       }
 
       const mobileRevokeDeviceRoute = matchRoute(pathname, /^\/api\/mobile\/admin\/devices\/(?<deviceId>[^/]+)\/revoke$/);
       if (mobileRevokeDeviceRoute && request.method === "POST") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
         const ok = operatorService.revokeMobileDevice(mobileRevokeDeviceRoute.deviceId);
         sendJson(response, 200, { revoked: ok });
         return;
       }
 
       if (pathname === "/api/mobile/admin/audit" && request.method === "GET") {
+        if (!mobileSession) { sendError(response, 401, "Invalid or expired session"); return; }
         sendJson(response, 200, operatorService.mobileAuditLog.list({ limit: 100 }));
         return;
       }
@@ -1865,12 +1897,9 @@ export async function createOperatorServer({
     ? https.createServer({ key: tlsCredentials.key, cert: tlsCredentials.cert }, requestHandler)
     : http.createServer(requestHandler);
 
-  // Default: bind on all interfaces so mobile can connect without config.
-  // Set COWORK_BIND_HOST=127.0.0.1 to restrict to localhost only.
-  // Set COWORK_LAN=1 to force LAN exposure even if a shell sets COWORK_BIND_HOST.
-  const bindHost = process.env.COWORK_LAN === "1"
-    ? "0.0.0.0"
-    : (process.env.COWORK_BIND_HOST ?? "0.0.0.0");
+  // bindHost / lanEnabled were resolved above (secure-by-default: loopback unless
+  // JON_ALLOW_LAN=true or COWORK_LAN=1). LAN exposure also requires the desktop
+  // token for desktop routes (enforced by the central authorization gate).
   await new Promise((resolve) => server.listen(port, bindHost, resolve));
   attachMobileTerminalWs(server, {
     validateSession: (token) => operatorService.validateMobileSession(token),
@@ -1889,8 +1918,11 @@ export async function createOperatorServer({
   if (tlsCredentials) {
     console.log(`[TLS] HTTPS on ${bindHost}:${actualPort} — cert: ${path.join(TLS_DIR, "jon-local.crt")}`);
   }
-  if (bindHost === "0.0.0.0") {
+  if (lanEnabled) {
     console.log(`[LAN] Mobile: ${scheme}://${serverInfo.lanIp}:${actualPort}/mobile/`);
+    console.log(`[LAN] Desktop routes over the network require the desktop token (x-jon-desktop-token / Bearer). Token stored in ~/.cowork/desktop-token`);
+  } else {
+    console.log(`[SECURE] Bound to loopback ${bindHost}:${actualPort} (LAN disabled). Set JON_ALLOW_LAN=true to expose to the network.`);
   }
 
   // Startup self-test: surface broken subsystems immediately instead of failing

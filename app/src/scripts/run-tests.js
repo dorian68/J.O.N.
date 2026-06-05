@@ -55,6 +55,10 @@ const suites = [
     modulePath: "../../tests/mobile-connectivity.test.js"
   },
   {
+    name: "security",
+    modulePath: "../../tests/security.test.js"
+  },
+  {
     name: "temporal-context",
     modulePath: "../../tests/temporal-context.test.js"
   },

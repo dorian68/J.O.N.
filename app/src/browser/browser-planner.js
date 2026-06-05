@@ -45,16 +45,22 @@ const SAFE_PROTOCOLS = new Set(["http:", "https:", "about:"]);
 const FORBIDDEN_WEB_TERMS = [
   /\benter\b.{0,40}\b(password|credential|token)\b/i,
   /\b(type|fill|submit)\b.{0,40}\b(password|credential|token)\b/i,
-  /\b(payment|purchase|buy)\b/i,
+  // Block actual payment ACTIONS, not incidental reading of payment info
+  // (e.g. "read the amount due" / "do not pay" must be allowed).
+  /\b(make|complete|confirm|submit|process|authori[sz]e|click(?:\s+\w+){0,3}\s+to\s+pay)\b.{0,30}\b(payment|purchase|checkout|order|transaction)\b/i,
+  /\b(pay now|buy now|place (?:an )?order|proceed to checkout|complete (?:the )?purchase)\b/i,
   /\b(bypass|solve|evade|avoid)\b.{0,40}\b(captcha|anti[- ]?bot|bot detection|fingerprint)\b/i,
   /\bstealth\b/i,
   /\bfingerprint\b.{0,30}\bevasion\b/i,
   /\bspoof/i
 ];
 
-function malformed(message) {
+function malformed(message, { hard = false } = {}) {
   return Object.assign(new Error(message), {
-    category: "malformed_output"
+    category: "malformed_output",
+    // hard = a safety/structural violation that must reject the WHOLE plan
+    // (unknown action, forbidden wording). Soft failures only drop the step.
+    hard
   });
 }
 
@@ -113,7 +119,7 @@ function guardrailStep(action, patch = {}) {
   };
 }
 
-function ensureBrowserGuardrailSteps(steps, startUrl) {
+function ensureBrowserGuardrailSteps(steps, startUrl, { resumeCurrentSession = false } = {}) {
   const output = [...steps];
 
   if (!output.some((step) => step.action === "open_session")) {
@@ -122,7 +128,7 @@ function ensureBrowserGuardrailSteps(steps, startUrl) {
       label: "Open controlled browser session"
     }));
   }
-  if (startUrl && startUrl !== "about:blank" && !output.some((step) => step.action === "navigate" && step.target?.url === startUrl)) {
+  if (!resumeCurrentSession && startUrl && startUrl !== "about:blank" && !output.some((step) => step.action === "navigate" && step.target?.url === startUrl)) {
     const openIndex = Math.max(0, output.findIndex((step) => step.action === "open_session"));
     output.splice(openIndex + 1, 0, guardrailStep("navigate", {
       id: "navigate_start",
@@ -353,10 +359,10 @@ function normalizeStep(step, index, allowlistedHosts) {
   }
   const action = cleanText(step.action ?? step.primitive, 80);
   if (!BROWSER_PLAN_ACTIONS.includes(action)) {
-    throw malformed(`Unsupported browser plan action: ${action}.`);
+    throw malformed(`Unsupported browser plan action: ${action}.`, { hard: true });
   }
   if (containsForbiddenWebTerm(step) && action !== "stop_manual_handoff") {
-    throw malformed("Browser plan includes forbidden stealth, credential, payment, or bypass wording.");
+    throw malformed("Browser plan includes forbidden stealth, credential, payment, or bypass wording.", { hard: true });
   }
   const target = step.target && typeof step.target === "object" && !Array.isArray(step.target) ? step.target : {};
   const selector = tryNormalizeSelectorSpec(step.selector ?? target.selector ?? target, `step ${index + 1}`);
@@ -417,9 +423,9 @@ export function validateBrowserPlanOutput(output, context = {}) {
   if (!output || typeof output !== "object" || Array.isArray(output)) {
     throw malformed("Browser plan output must be an object.");
   }
-  if (containsForbiddenWebTerm(output.steps)) {
-    throw malformed("Browser plan must not include stealth, anti-bot bypass, credentials, payments, or evasion.");
-  }
+  // Forbidden wording (stealth / payment ACTIONS / credential entry) is handled
+  // per-step below: the offending step is dropped (so it never executes) instead
+  // of discarding the whole plan. This keeps safety while preserving the plan.
 
   const contextHosts = normalizeHosts(context.allowlistedHosts ?? context.allowlistedDomains ?? []);
   const plannedHosts = normalizeHosts(output.allowlistedHosts ?? []);
@@ -431,9 +437,33 @@ export function validateBrowserPlanOutput(output, context = {}) {
     allowlistedHosts.push(deriveHost(startUrl));
   }
 
+  // Resilient step validation: a single malformed step must NOT discard the whole
+  // LLM plan (which previously forced a generic deterministic fallback). Drop the
+  // offending steps, keep the valid ones, and only fail if nothing usable remains.
+  const rawSteps = Array.isArray(output.steps) ? output.steps : [];
+  const validSteps = [];
+  const droppedSteps = [];
+  for (let index = 0; index < rawSteps.length; index += 1) {
+    try {
+      validSteps.push(normalizeStep(rawSteps[index], index, allowlistedHosts));
+    } catch (error) {
+      // Hard violations (unknown action, forbidden wording) reject the whole plan
+      // (fail-closed safety). Soft failures only drop the offending step.
+      if (error.hard) throw error;
+      droppedSteps.push({ index, reason: error.message });
+    }
+  }
+  // If the model produced steps but every one was invalid, the output is genuinely
+  // malformed → fall back. An empty plan (no steps at all) is acceptable: the
+  // guardrail steps below provide a safe minimal session.
+  if (rawSteps.length > 0 && validSteps.length === 0) {
+    throw malformed(`All ${rawSteps.length} browser plan steps were invalid (e.g. ${droppedSteps[0]?.reason ?? "unknown"}).`);
+  }
+
   const steps = ensureBrowserGuardrailSteps(
-    (Array.isArray(output.steps) ? output.steps : []).map((step, index) => normalizeStep(step, index, allowlistedHosts)),
-    startUrl
+    validSteps,
+    startUrl,
+    { resumeCurrentSession: context.resumeCurrentSession === true }
   );
   if (steps.length === 0) {
     throw malformed("Browser plan requires at least one step.");
@@ -449,6 +479,7 @@ export function validateBrowserPlanOutput(output, context = {}) {
     requiresClarification: Boolean(output.requiresClarification),
     clarificationQuestion: Boolean(output.requiresClarification) ? cleanText(output.clarificationQuestion, 220) : "",
     steps,
+    droppedSteps,
     verificationGoals: stringArray(output.verificationGoals, { maxItems: 8 }),
     expectedEvidence: stringArray(output.expectedEvidence, { maxItems: 8 }),
     blockersToDetect: stringArray(output.blockersToDetect, { maxItems: 8 }),
@@ -463,6 +494,9 @@ function selectorFromInput(value) {
 }
 
 function defaultStartUrl(input = {}) {
+  if (input.resumeCurrentSession === true) {
+    return "about:blank";
+  }
   return input.startUrl ?? input.url ?? input.allowedUrls?.[0] ?? input.allowlistedUrls?.[0] ?? "about:blank";
 }
 
@@ -482,7 +516,7 @@ export function buildDeterministicBrowserPlan(input = {}) {
     }
   ];
 
-  if (startUrl && startUrl !== "about:blank") {
+  if (input.resumeCurrentSession !== true && startUrl && startUrl !== "about:blank") {
     steps.push({
       id: "navigate_start",
       action: "navigate",
@@ -566,7 +600,7 @@ export function buildDeterministicBrowserPlan(input = {}) {
     riskLevel: "low"
   });
 
-  if (startUrl && startUrl !== "about:blank") {
+  if (input.resumeCurrentSession !== true && startUrl && startUrl !== "about:blank") {
     steps.push({
       id: "verify_url",
       action: "verify_outcome",
@@ -731,7 +765,7 @@ export async function generateBrowserPlan({
           version: "1.0.0",
           bindings: {
             mission: input.mission ?? "",
-            startUrl: input.startUrl ?? input.url ?? "",
+            startUrl: input.resumeCurrentSession === true ? "" : input.startUrl ?? input.url ?? "",
             allowlistedHosts: JSON.stringify(input.allowlistedHosts ?? input.allowlistedDomains ?? []),
             currentBrowserState: JSON.stringify(input.currentBrowserState ?? null),
             currentDomSnapshot: JSON.stringify(input.currentDomSnapshot ?? null),

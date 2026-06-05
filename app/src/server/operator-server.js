@@ -9,6 +9,7 @@ import QRCode from "qrcode";
 import { APP_ROOT, DEFAULT_OPERATOR_PORT } from "../config.js";
 import { OperatorService } from "../service/operator-service.js";
 import { attachMobileTerminalWs } from "../mobile/mobile-terminal-ws.js";
+import { buildNetworkAdvice } from "./network-advisor.js";
 import { CoworkSmokeBackofficeService } from "../smoke/cowork-smoke-pipeline.js";
 import { RealSurfaceSmokeBackofficeService } from "../smoke/real-surface-smoke-pipeline.js";
 
@@ -303,8 +304,63 @@ export async function createOperatorServer({
       if (pathname === "/api/health" && request.method === "GET") {
         sendJson(response, 200, {
           status: "ok",
-          fixtureBaseUrl: operatorService.fixtureManifest.baseUrl
+          fixtureBaseUrl: operatorService.fixtureManifest.baseUrl,
+          browserExtension: operatorService.getBrowserExtensionHealth()
         });
+        return;
+      }
+
+      if (pathname === "/api/browser-extension/health" && request.method === "GET") {
+        sendJson(response, 200, operatorService.getBrowserExtensionHealth());
+        return;
+      }
+
+      if (pathname === "/api/browser-extension/tabs" && request.method === "GET") {
+        try {
+          sendJson(response, 200, {
+            tabs: operatorService.listBrowserExtensionTabs({
+              projectId: url.searchParams.get("projectId"),
+              includeClosed: url.searchParams.get("includeClosed") === "1",
+              limit: url.searchParams.get("limit") ?? 50
+            })
+          });
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+
+      if (pathname === "/api/browser-extension/events" && request.method === "GET") {
+        try {
+          sendJson(response, 200, {
+            events: operatorService.listBrowserExtensionEvents({
+              projectId: url.searchParams.get("projectId"),
+              tabSessionId: url.searchParams.get("tabSessionId"),
+              runId: url.searchParams.get("runId"),
+              limit: url.searchParams.get("limit") ?? 100
+            })
+          });
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code });
+        }
+        return;
+      }
+
+      const browserExtensionTabCommandRoute = matchRoute(pathname, /^\/api\/browser-extension\/tabs\/(?<tabSessionId>[^/]+)\/command$/);
+      if (browserExtensionTabCommandRoute && request.method === "POST") {
+        const body = await readJsonBody(request);
+        try {
+          sendJson(response, 200, await operatorService.sendBrowserExtensionCommand(
+            body.projectId ?? url.searchParams.get("projectId") ?? null,
+            decodeURIComponent(browserExtensionTabCommandRoute.tabSessionId),
+            body
+          ));
+        } catch (err) {
+          const status = err.code === "BROWSER_EXTENSION_TAB_NOT_CONNECTED" ? 409
+            : err.code === "BROWSER_EXTENSION_TAB_NOT_FOUND" ? 404
+              : 400;
+          sendError(response, status, err.message, { code: err.code });
+        }
         return;
       }
 
@@ -1100,15 +1156,24 @@ export async function createOperatorServer({
       // ─── Mobile Gateway Routes ────────────────────────────────────────
 
       if (pathname === "/api/mobile/server-info" && request.method === "GET") {
-        const { scheme: si_scheme, port: si_port, lanIp } = serverInfo;
+        const { scheme: si_scheme, port: si_port } = serverInfo;
+        // Recompute the LAN IP per request so a DHCP reassignment doesn't leave
+        // the advertised URL/QR pointing at a stale address (a silent "mobile
+        // can't connect" cause). Refresh the cache too for log consistency.
+        const lanIp = getLanIp();
+        serverInfo.lanIp = lanIp;
         const publicUrl = process.env.COWORK_PUBLIC_URL ?? null;
+        const network = buildNetworkAdvice(os.networkInterfaces(), {
+          scheme: si_scheme, port: si_port, primaryLanIp: lanIp
+        });
         sendJson(response, 200, {
           scheme: si_scheme,
           lanUrl: `${si_scheme}://${lanIp}:${si_port}`,
           mobileUrl: `${si_scheme}://${lanIp}:${si_port}/mobile/`,
           publicUrl,
           tls: Boolean(tlsCredentials),
-          lanEnabled: bindHost === "0.0.0.0"
+          lanEnabled: bindHost === "0.0.0.0",
+          network
         });
         return;
       }
@@ -1116,19 +1181,33 @@ export async function createOperatorServer({
       if (pathname === "/api/mobile/pairing/start" && request.method === "POST") {
         try {
           const pairing = operatorService.startMobilePairing();
-          const { scheme: si_scheme, port: si_port, lanIp } = serverInfo;
+          const { scheme: si_scheme, port: si_port } = serverInfo;
+          const lanIp = getLanIp();
+          serverInfo.lanIp = lanIp;
           const publicUrl = process.env.COWORK_PUBLIC_URL ?? null;
           const lanBase = `${si_scheme}://${lanIp}:${si_port}`;
           const pairingUrl = `${publicUrl ?? lanBase}/mobile/?code=${pairing.pairingCode}`;
           let qrDataUri = null;
           try { qrDataUri = await QRCode.toDataURL(pairingUrl, { margin: 2, width: 240 }); } catch {}
+
+          // VPN-aware pairing advice: warn if a VPN is active and offer alternate
+          // (Tailscale) URLs/QRs that survive LAN isolation.
+          const network = buildNetworkAdvice(os.networkInterfaces(), {
+            scheme: si_scheme, port: si_port, primaryLanIp: lanIp, pairingCode: pairing.pairingCode
+          });
+          for (const alternate of network.alternates ?? []) {
+            try { alternate.qrDataUri = await QRCode.toDataURL(alternate.pairingUrl, { margin: 2, width: 240 }); }
+            catch { alternate.qrDataUri = null; }
+          }
+
           sendJson(response, 200, {
             ...pairing,
             lanUrl: lanBase,
             publicUrl,
             pairingUrl,
             qrDataUri,
-            lanEnabled: bindHost === "0.0.0.0"
+            lanEnabled: bindHost === "0.0.0.0",
+            network
           });
         } catch (err) {
           sendError(response, 400, err.message);
@@ -1804,6 +1883,7 @@ export async function createOperatorServer({
     validateSession: (token) => operatorService.validateMobileSession(token),
     screenStream: { captureFrame: () => operatorService.captureScreenFrame() }
   });
+  operatorService.attachBrowserExtensionWs(server);
   const address = server.address();
   const actualPort = typeof address === "object" && address ? address.port : port;
   const actualHost = typeof address === "object" && address ? address.address : bindHost;

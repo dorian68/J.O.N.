@@ -11517,6 +11517,38 @@ function PairDeviceModal({ t, onClose }) {
 							" pour activer l'accès réseau."
 						] })]
 					}) : null,
+					pairingData.network?.warning ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "pair-modal-lan-warning",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: [
+							"⚠ VPN détecté (",
+							pairingData.network.warning.vpn,
+							")"
+						] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: pairingData.network.warning.message })]
+					}) : null,
+					(pairingData.network?.alternates ?? []).map((alt) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "pair-modal-alternate",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "pair-modal-alternate-head",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("strong", { children: ["Route alternative · ", alt.label] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "pair-qr-hint",
+									children: alt.reason
+								})]
+							}),
+							alt.qrDataUri ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+								src: alt.qrDataUri,
+								alt: `QR ${alt.label}`,
+								className: "pair-qr-img pair-qr-img-sm"
+							}) : null,
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+								className: "pair-modal-url",
+								href: alt.mobileUrl,
+								target: "_blank",
+								rel: "noreferrer",
+								children: alt.mobileUrl
+							})
+						]
+					}, alt.address)),
 					pairingData.qrDataUri ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 						className: "pair-modal-qr",
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
@@ -18947,6 +18979,7 @@ function BrowserSurfacePanel({ projectId, dashboard, onToggle, t }) {
 	const [loading, setLoading] = (0, import_react.useState)(false);
 	const [starting, setStarting] = (0, import_react.useState)(false);
 	const [startError, setStartError] = (0, import_react.useState)(null);
+	const [attachedAction, setAttachedAction] = (0, import_react.useState)(null);
 	(0, import_react.useEffect)(() => {
 		if (!projectId) {
 			setState(null);
@@ -18982,8 +19015,25 @@ function BrowserSurfacePanel({ projectId, dashboard, onToggle, t }) {
 			setStarting(false);
 		}
 	}
+	async function handleObserveAttachedTab(tab) {
+		if (!projectId || !tab?.id || attachedAction) return;
+		setAttachedAction(tab.id);
+		try {
+			await api(`/api/browser-extension/tabs/${encodeURIComponent(tab.id)}/command`, {
+				method: "POST",
+				body: JSON.stringify({
+					projectId,
+					action: "observe",
+					timeoutMs: 8e3
+				})
+			});
+		} catch {} finally {
+			setAttachedAction(null);
+		}
+	}
 	const active = state?.activeSession ?? null;
 	const recent = state?.recentSessions ?? [];
+	const attachedTabs = dashboard?.browserExtension?.tabs ?? dashboard?.workspace?.attachedBrowserTabs ?? [];
 	function statusBadge(status) {
 		if (status === "active") return "ok";
 		if (status === "navigating") return "warn";
@@ -19090,6 +19140,43 @@ function BrowserSurfacePanel({ projectId, dashboard, onToggle, t }) {
 						children: startError
 					}) : null
 				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "browser-panel-attached",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "browser-panel-section-head",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "browser-history-label",
+						children: "Onglets attaches"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "browser-panel-count",
+						children: attachedTabs.length
+					})]
+				}), attachedTabs.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "browser-panel-hint",
+					children: "Aucun onglet Chrome attache."
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "browser-attached-list",
+					children: attachedTabs.slice(0, 5).map((tab) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+						className: "browser-attached-entry",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "browser-attached-main",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `browser-status-dot ${tab.connected ? "ok" : tab.status === "disconnected" ? "warn" : "muted"}` }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+								title: tab.title || tab.url || tab.id,
+								children: tab.title || tab.url || tab.id
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								title: tab.url || "",
+								children: tab.url || tab.status
+							})] })]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ghost small",
+							disabled: !tab.connected || attachedAction === tab.id,
+							onClick: () => handleObserveAttachedTab(tab),
+							children: attachedAction === tab.id ? "..." : "Observer"
+						})]
+					}, tab.id))
+				})]
 			}),
 			recent.length > 0 && !active ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 				className: "browser-panel-recent",

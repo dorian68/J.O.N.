@@ -47,6 +47,10 @@ const suites = [
     modulePath: "../../tests/composed-mission-handoff.test.js"
   },
   {
+    name: "network-advisor",
+    modulePath: "../../tests/network-advisor.test.js"
+  },
+  {
     name: "temporal-context",
     modulePath: "../../tests/temporal-context.test.js"
   },

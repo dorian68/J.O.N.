@@ -5895,12 +5895,76 @@ button.tiny.danger:hover {
 }
 
 .browser-panel-history,
-.browser-panel-recent {
+.browser-panel-recent,
+.browser-panel-attached {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
   padding: 0.5rem 0;
   border-top: 1px solid var(--border);
+}
+
+.browser-panel-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.browser-panel-count {
+  font-size: 0.68rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+.browser-attached-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.browser-attached-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-strong);
+}
+
+.browser-attached-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.browser-attached-main > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.browser-attached-main strong,
+.browser-attached-main span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.browser-attached-main strong {
+  font-size: 0.78rem;
+}
+
+.browser-attached-main span {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-family: Consolas, monospace;
 }
 
 .browser-history-label {
@@ -6108,6 +6172,26 @@ button.tiny.danger:hover {
   color: var(--muted);
   text-align: center;
 }
+
+.pair-modal-alternate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--bg-soft, rgba(255, 255, 255, 0.03));
+}
+.pair-modal-alternate-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  text-align: center;
+}
+.pair-modal-alternate-head strong { font-size: 0.82rem; color: var(--accent); }
+.pair-qr-img-sm { width: 140px; height: 140px; }
 
 /* ─── SettingsModal ──────────────────────────────────────────────── */
 .settings-toggle-list {

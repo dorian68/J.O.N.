@@ -744,6 +744,26 @@ function PairDeviceModal({ t, onClose }) {
               </div>
             ) : null}
 
+            {pairingData.network?.warning ? (
+              <div className="pair-modal-lan-warning">
+                <strong>⚠ VPN détecté ({pairingData.network.warning.vpn})</strong>
+                <span>{pairingData.network.warning.message}</span>
+              </div>
+            ) : null}
+
+            {(pairingData.network?.alternates ?? []).map((alt) => (
+              <div className="pair-modal-alternate" key={alt.address}>
+                <div className="pair-modal-alternate-head">
+                  <strong>Route alternative · {alt.label}</strong>
+                  <span className="pair-qr-hint">{alt.reason}</span>
+                </div>
+                {alt.qrDataUri ? (
+                  <img src={alt.qrDataUri} alt={`QR ${alt.label}`} className="pair-qr-img pair-qr-img-sm" />
+                ) : null}
+                <a className="pair-modal-url" href={alt.mobileUrl} target="_blank" rel="noreferrer">{alt.mobileUrl}</a>
+              </div>
+            ))}
+
             {pairingData.qrDataUri ? (
               <div className="pair-modal-qr">
                 <img src={pairingData.qrDataUri} alt="QR pairing" className="pair-qr-img" />
@@ -5881,6 +5901,7 @@ function BrowserSurfacePanel({ projectId, dashboard, onToggle, t }) {
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState(null);
+  const [attachedAction, setAttachedAction] = useState(null);
 
   useEffect(() => {
     if (!projectId) { setState(null); return; }
@@ -5907,8 +5928,28 @@ function BrowserSurfacePanel({ projectId, dashboard, onToggle, t }) {
     }
   }
 
+  async function handleObserveAttachedTab(tab) {
+    if (!projectId || !tab?.id || attachedAction) return;
+    setAttachedAction(tab.id);
+    try {
+      await api(`/api/browser-extension/tabs/${encodeURIComponent(tab.id)}/command`, {
+        method: "POST",
+        body: JSON.stringify({
+          projectId,
+          action: "observe",
+          timeoutMs: 8000
+        })
+      });
+    } catch {
+      // The audit endpoint records the failure path; the panel stays compact.
+    } finally {
+      setAttachedAction(null);
+    }
+  }
+
   const active = state?.activeSession ?? null;
   const recent = state?.recentSessions ?? [];
+  const attachedTabs = dashboard?.browserExtension?.tabs ?? dashboard?.workspace?.attachedBrowserTabs ?? [];
 
   function statusBadge(status) {
     if (status === "active") return "ok";
@@ -5980,6 +6021,38 @@ function BrowserSurfacePanel({ projectId, dashboard, onToggle, t }) {
           {startError ? <p className="browser-panel-error">{startError}</p> : null}
         </div>
       )}
+
+      <section className="browser-panel-attached">
+        <div className="browser-panel-section-head">
+          <p className="browser-history-label">Onglets attaches</p>
+          <span className="browser-panel-count">{attachedTabs.length}</span>
+        </div>
+        {attachedTabs.length === 0 ? (
+          <p className="browser-panel-hint">Aucun onglet Chrome attache.</p>
+        ) : (
+          <div className="browser-attached-list">
+            {attachedTabs.slice(0, 5).map((tab) => (
+              <article key={tab.id} className="browser-attached-entry">
+                <div className="browser-attached-main">
+                  <span className={`browser-status-dot ${tab.connected ? "ok" : tab.status === "disconnected" ? "warn" : "muted"}`} />
+                  <div>
+                    <strong title={tab.title || tab.url || tab.id}>{tab.title || tab.url || tab.id}</strong>
+                    <span title={tab.url || ""}>{tab.url || tab.status}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="ghost small"
+                  disabled={!tab.connected || attachedAction === tab.id}
+                  onClick={() => handleObserveAttachedTab(tab)}
+                >
+                  {attachedAction === tab.id ? "..." : "Observer"}
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       {recent.length > 0 && !active ? (
         <section className="browser-panel-recent">

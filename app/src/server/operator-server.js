@@ -12,6 +12,7 @@ import { attachMobileTerminalWs } from "../mobile/mobile-terminal-ws.js";
 import { buildNetworkAdvice, buildMobileConnectivityReport, pickPrimaryLanIp } from "./network-advisor.js";
 import { resolveBindConfig, loadOrCreateDesktopToken, authorizeRequest } from "./desktop-auth.js";
 import { evaluateProductionReadiness } from "./production-readiness.js";
+import { buildExtensionZip, validateExtension } from "../browser/chrome-extension-package.js";
 import { CoworkSmokeBackofficeService } from "../smoke/cowork-smoke-pipeline.js";
 import { RealSurfaceSmokeBackofficeService } from "../smoke/real-surface-smoke-pipeline.js";
 
@@ -312,7 +313,27 @@ export async function createOperatorServer({
       }
 
       if (pathname === "/api/browser-extension/health" && request.method === "GET") {
-        sendJson(response, 200, operatorService.getBrowserExtensionHealth());
+        const health = operatorService.getBrowserExtensionHealth();
+        let packaged = null;
+        try { const v = validateExtension(); packaged = { valid: v.valid, version: v.version, name: v.name }; } catch { packaged = { valid: false }; }
+        sendJson(response, 200, { ...health, packaged });
+        return;
+      }
+
+      // Download the Chrome extension as a zip (auth-gated by the central gate).
+      if (pathname === "/api/browser-extension/download" && request.method === "GET") {
+        try {
+          const { buffer, version } = buildExtensionZip();
+          response.writeHead(200, {
+            "content-type": "application/zip",
+            "content-disposition": `attachment; filename="jon-chrome-extension-v${version}.zip"`,
+            "content-length": buffer.length,
+            "cache-control": "no-store"
+          });
+          response.end(buffer);
+        } catch (err) {
+          sendError(response, 500, err.message, { code: err.code });
+        }
         return;
       }
 

@@ -361,6 +361,11 @@ function normalizeStep(step, index, allowlistedHosts) {
   if (!BROWSER_PLAN_ACTIONS.includes(action)) {
     throw malformed(`Unsupported browser plan action: ${action}.`, { hard: true });
   }
+  // SECURITY (audit T3): arbitrary-code actions are rejected from plans unless
+  // explicitly enabled. Hard failure so the whole plan is rejected, not silently dropped.
+  if ((action === "evaluate_script" || action === "cdp_command") && process.env.JON_ENABLE_BROWSER_EVAL !== "true") {
+    throw malformed(`Browser action "${action}" is disabled for safety (set JON_ENABLE_BROWSER_EVAL=true to allow).`, { hard: true });
+  }
   if (containsForbiddenWebTerm(step) && action !== "stop_manual_handoff") {
     throw malformed("Browser plan includes forbidden stealth, credential, payment, or bypass wording.", { hard: true });
   }

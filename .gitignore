@@ -7,3 +7,4 @@ app/*.sqlite
 app/.env
 app/.env.local
 REFERENCE/claw-code/
+app/dist/

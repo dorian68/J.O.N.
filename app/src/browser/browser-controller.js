@@ -21,13 +21,12 @@ const STEALTH_ARGS = [
   "--disable-dev-shm-usage",
 ];
 
-// Playwright adds these by default and they leak automation; strip them so
-// passive bot checks (e.g. Cloudflare "Just a moment…") clear without a loop.
+// Optional diagnostics/compatibility mode only. It is disabled by default
+// because mutating browser APIs can make challenge outcomes harder to reason about.
 const STEALTH_IGNORE_DEFAULT_ARGS = ["--enable-automation"];
 
-// Injected before any page script — masks the common automation fingerprints
-// that bot-detection (Cloudflare/Turnstile) keys on. Real Chrome (channel) plus
-// these usually lets managed challenges auto-resolve with no user action.
+// Injected before any page script when COWORK_BROWSER_STEALTH=1. This must not be
+// used as a recovery path for anti-bot, CAPTCHA, or Cloudflare blockers.
 const STEALTH_INIT_SCRIPT = `
   Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
   if (!window.chrome) { window.chrome = { runtime: {} }; }
@@ -610,6 +609,11 @@ export class BrowserController {
   }
 
   async evaluateScript(targetId, { expression, arg = null } = {}) {
+    // SECURITY (audit T3): arbitrary in-page JS is disabled unless explicitly
+    // enabled. This is the hard backstop regardless of what a plan requests.
+    if (process.env.JON_ENABLE_BROWSER_EVAL !== "true") {
+      throw Object.assign(new Error("Browser script evaluation is disabled (set JON_ENABLE_BROWSER_EVAL=true to allow)."), { code: "BROWSER_EVAL_DISABLED" });
+    }
     const page = this.#getPage(targetId);
     const source = String(expression ?? "").trim();
     if (!source) {
@@ -639,6 +643,11 @@ export class BrowserController {
   }
 
   async dispatchCdpCommand(targetId, { method, params = {} } = {}) {
+    // SECURITY (audit T3): raw CDP commands bypass the URL allowlist and can do
+    // almost anything; disabled unless explicitly enabled.
+    if (process.env.JON_ENABLE_BROWSER_EVAL !== "true") {
+      throw Object.assign(new Error("Raw CDP commands are disabled (set JON_ENABLE_BROWSER_EVAL=true to allow)."), { code: "BROWSER_CDP_DISABLED" });
+    }
     const page = this.#getPage(targetId);
     const cdpMethod = String(method ?? "").trim();
     if (!cdpMethod) {

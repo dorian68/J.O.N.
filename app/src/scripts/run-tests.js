@@ -59,6 +59,10 @@ const suites = [
     modulePath: "../../tests/security.test.js"
   },
   {
+    name: "browser-extension-package",
+    modulePath: "../../tests/browser-extension-package.test.js"
+  },
+  {
     name: "temporal-context",
     modulePath: "../../tests/temporal-context.test.js"
   },

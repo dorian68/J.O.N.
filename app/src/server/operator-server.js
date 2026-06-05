@@ -1746,6 +1746,14 @@ export async function createOperatorServer({
         return;
       }
 
+      // Desktop: list a run's artifacts with their downloadable deliverables
+      // (audit F1 — the desktop deliverables panel called this missing route).
+      const runArtifactsListRoute = matchRoute(pathname, /^\/api\/runs\/(?<runId>[^/]+)\/artifacts$/);
+      if (runArtifactsListRoute && request.method === "GET") {
+        sendJson(response, 200, operatorService.listRunArtifactsWithDeliverables(runArtifactsListRoute.runId));
+        return;
+      }
+
       const artifactRoute = matchRoute(pathname, /^\/api\/runs\/(?<runId>[^/]+)\/artifacts\/(?<artifactId>[^/]+)\/content$/);
       if (artifactRoute && request.method === "GET") {
         const artifactContent = await operatorService.readArtifactContent(artifactRoute.runId, artifactRoute.artifactId);

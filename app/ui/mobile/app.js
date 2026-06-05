@@ -1185,7 +1185,7 @@ function TasksTab({ projectId, token, events, approvals, onApprovalResolved }) {
     h("div", { className: "new-task-card" },
       h("textarea", {
         className: "mobile-textarea",
-        placeholder: "Nouvelle tâche ou automatisation…",
+        placeholder: "Décris une tâche à exécuter maintenant…",
         rows: 3,
         value: objective,
         onChange: (e) => setObjective(e.target.value)
@@ -2814,11 +2814,11 @@ function McpOAuthCard({ token }) {
     try {
       const res = await apiPost("/api/mobile/mcp/remote/connect", { connectorId: server.id, server: server.id }, token);
       if (res.connected) { await refreshManaged(); return; }
-      if (res.authorizeUrl) window.open(res.authorizeUrl, "_blank", "noopener");
-      for (let i = 0; i < 90; i += 1) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const st = await apiGet(`/api/mobile/mcp/${server.id}/status`, token).catch(() => null);
-        if (st) { setStatuses((p) => ({ ...p, [server.id]: st })); if (st.connected || st.phase === "error") break; }
+      // F3: OAuth completes via a loopback callback on the DESKTOP host, which the
+      // phone cannot reach. Be honest instead of polling into a silent timeout.
+      if (res.authorizeUrl) {
+        setError(`La connexion OAuth de « ${server.label ?? server.id} » doit être terminée sur JON Desktop (la fenêtre d'autorisation s'ouvre sur l'ordinateur). Ouvre Réglages → Connecteurs sur le bureau, autorise, puis reviens ici.`);
+        return;
       }
       await refreshManaged();
     } catch (e) { setError(e.message); } finally { setBusyId(null); }

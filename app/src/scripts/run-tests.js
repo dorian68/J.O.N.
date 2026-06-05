@@ -67,6 +67,10 @@ const suites = [
     modulePath: "../../tests/core-reliability.test.js"
   },
   {
+    name: "product-coherence",
+    modulePath: "../../tests/product-coherence.test.js"
+  },
+  {
     name: "temporal-context",
     modulePath: "../../tests/temporal-context.test.js"
   },

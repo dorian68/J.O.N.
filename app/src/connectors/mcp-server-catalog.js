@@ -113,13 +113,20 @@ function urlEnvKey(id) {
 // operator can set COWORK_MCP_<ID>_URL.
 export function listMcpServerCatalog({ env = process.env } = {}) {
   return CATALOG.map((entry) => {
-    const url = env[urlEnvKey(entry.id)] ?? entry.url ?? null;
+    const envUrl = env[urlEnvKey(entry.id)] ?? null;
+    const url = envUrl ?? entry.url ?? null;
+    // Honest status (audit F2): only entries with a real endpoint are
+    // "available". The rest are "coming_soon" instead of masquerading as working
+    // integrations. The UI must keep "Connecter" disabled unless available.
+    const status = url ? "available" : "coming_soon";
     return {
       id: entry.id,
       label: entry.label,
       category: entry.category,
       url,
-      connectable: Boolean(url)
+      connectable: Boolean(url),
+      status,
+      configuredViaEnv: Boolean(envUrl)
     };
   });
 }

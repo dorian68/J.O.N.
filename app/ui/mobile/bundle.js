@@ -21325,7 +21325,7 @@ ${h.join(`
 			}, "Stop") : null);
 		}), (0, import_react.createElement)("div", { className: "new-task-card" }, (0, import_react.createElement)("textarea", {
 			className: "mobile-textarea",
-			placeholder: "Nouvelle tâche ou automatisation…",
+			placeholder: "Décris une tâche à exécuter maintenant…",
 			rows: 3,
 			value: objective,
 			onChange: (e) => setObjective(e.target.value)
@@ -22860,17 +22860,10 @@ ${h.join(`
 					await refreshManaged();
 					return;
 				}
-				if (res.authorizeUrl) window.open(res.authorizeUrl, "_blank", "noopener");
-				for (let i = 0; i < 90; i += 1) {
-					await new Promise((r) => setTimeout(r, 2e3));
-					const st = await apiGet(`/api/mobile/mcp/${server.id}/status`, token).catch(() => null);
-					if (st) {
-						setStatuses((p) => ({
-							...p,
-							[server.id]: st
-						}));
-						if (st.connected || st.phase === "error") break;
-					}
+				if (res.authorizeUrl) {
+					var _server$label;
+					setError(`La connexion OAuth de « ${(_server$label = server.label) !== null && _server$label !== void 0 ? _server$label : server.id} » doit être terminée sur JON Desktop (la fenêtre d'autorisation s'ouvre sur l'ordinateur). Ouvre Réglages → Connecteurs sur le bureau, autorise, puis reviens ici.`);
+					return;
 				}
 				await refreshManaged();
 			} catch (e) {

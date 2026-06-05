@@ -11690,7 +11690,8 @@ function McpManagerSection() {
 		}
 	}
 	const connectedIds = new Set(connectors.filter((c) => c.connected).map((c) => c.id));
-	const filtered = catalog.filter((s) => !search || (s.label + s.category).toLowerCase().includes(search.toLowerCase()));
+	const filtered = catalog.filter((s) => !search || (s.label + s.category).toLowerCase().includes(search.toLowerCase())).sort((a, b) => Number(b.connectable) - Number(a.connectable) || a.label.localeCompare(b.label));
+	const availableCount = catalog.filter((s) => s.connectable).length;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 		style: { marginBottom: "20px" },
 		children: [
@@ -11701,13 +11702,20 @@ function McpManagerSection() {
 				},
 				children: "Connecteurs & Tools (MCP)"
 			}),
-			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
 				style: {
 					fontSize: "12px",
 					color: "var(--muted)",
 					marginBottom: "8px"
 				},
-				children: "Choisis un service, autorise-le — JON découvre ses tools (OAuth + sauvegarde locale chiffrée). Partagé avec JON mobile."
+				children: [
+					availableCount,
+					" service",
+					availableCount > 1 ? "s" : "",
+					" connectable",
+					availableCount > 1 ? "s" : "",
+					" maintenant (OAuth + sauvegarde locale chiffrée). Les autres sont « bientôt disponibles ». Partagé avec JON mobile."
+				]
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
 				className: "settings-domains-textarea",
@@ -11741,7 +11749,7 @@ function McpManagerSection() {
 										color: "var(--muted)",
 										fontSize: "11px"
 									},
-									children: connected ? "· connecté" : `· ${s.category}${s.connectable ? "" : " · endpoint à configurer"}`
+									children: connected ? "· connecté" : `· ${s.category}${s.connectable ? "" : " · bientôt disponible"}`
 								})
 							]
 						}), connected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
@@ -13129,6 +13137,27 @@ function App() {
 					]
 				})]
 			}),
+			(() => {
+				const mode = dashboard?.llmGatewayStatus?.effectiveMode;
+				if (mode === "mock_only" || mode === "degraded_mock_only") return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mock-mode-banner",
+					style: {
+						background: "rgba(210,153,34,0.14)",
+						border: "1px solid rgba(210,153,34,0.45)",
+						color: "var(--text)",
+						padding: "8px 14px",
+						margin: "0 0 8px",
+						borderRadius: "8px",
+						fontSize: "12.5px"
+					},
+					children: [
+						"⚠ ",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Mode simulation (mock)" }),
+						" — aucun fournisseur LLM réel n'est configuré : JON ne raisonne pas réellement. Configure une clé dans ⚙ Réglages pour des résultats réels."
+					]
+				});
+				return null;
+			})(),
 			pairModalOpen ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PairDeviceModal, {
 				t,
 				onClose: () => setPairModalOpen(false)
@@ -18594,6 +18623,9 @@ var DELIVERABLE_LABELS = {
 };
 function RunDeliverables({ runId }) {
 	const [artifacts, setArtifacts] = (0, import_react.useState)(null);
+	const [runStatus, setRunStatus] = (0, import_react.useState)(null);
+	const [recovering, setRecovering] = (0, import_react.useState)(false);
+	const [recoverMsg, setRecoverMsg] = (0, import_react.useState)(null);
 	(0, import_react.useEffect)(() => {
 		if (!runId) return void 0;
 		let cancelled = false;
@@ -18602,29 +18634,77 @@ function RunDeliverables({ runId }) {
 		}).catch(() => {
 			if (!cancelled) setArtifacts([]);
 		});
+		api(`/api/runs/${runId}`).then((d) => {
+			if (!cancelled) setRunStatus(d?.run?.status ?? d?.status ?? null);
+		}).catch(() => {});
 		return () => {
 			cancelled = true;
 		};
 	}, [runId]);
+	async function recover() {
+		setRecovering(true);
+		setRecoverMsg(null);
+		try {
+			await api(`/api/runs/${runId}/recover`, { method: "POST" });
+			setRecoverMsg("Reprise demandée — JON continue la mission.");
+		} catch (e) {
+			setRecoverMsg(`Échec reprise : ${e.message}`);
+		} finally {
+			setRecovering(false);
+		}
+	}
+	const canRecover = [
+		"paused",
+		"awaiting_handoff",
+		"waiting_for_input",
+		"failed",
+		"blocked",
+		"stopped"
+	].includes(String(runStatus ?? ""));
 	const withDeliverables = (artifacts ?? []).filter((a) => a.deliverables && a.deliverables.length > 0);
-	if (withDeliverables.length === 0) return null;
+	if (withDeliverables.length === 0 && !canRecover) return null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 		className: "activity-section deliverables-section",
-		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Livrables" }), withDeliverables.map((artifact) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-			className: "deliverable-row",
-			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-				className: "deliverable-title",
-				children: artifact.title
-			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-				className: "deliverable-actions",
-				children: artifact.deliverables.map((d) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
-					className: "deliverable-dl",
-					href: `/api/runs/${runId}/artifacts/${artifact.id}/deliverable/${d.format}`,
-					download: true,
-					children: ["↓ ", DELIVERABLE_LABELS[d.format] ?? d.format.toUpperCase()]
-				}, d.format))
-			})]
-		}, artifact.id))]
+		children: [
+			canRecover ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "recover-row",
+				style: {
+					display: "flex",
+					alignItems: "center",
+					gap: "10px",
+					marginBottom: "10px"
+				},
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "secondary small",
+					disabled: recovering,
+					onClick: recover,
+					children: recovering ? "Reprise…" : "▶ Reprendre la mission"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					style: {
+						fontSize: "12px",
+						color: "var(--muted)"
+					},
+					children: recoverMsg ?? `Statut : ${runStatus}`
+				})]
+			}) : null,
+			withDeliverables.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", { children: "Livrables" }) : null,
+			withDeliverables.map((artifact) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "deliverable-row",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "deliverable-title",
+					children: artifact.title
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "deliverable-actions",
+					children: artifact.deliverables.map((d) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+						className: "deliverable-dl",
+						href: `/api/runs/${runId}/artifacts/${artifact.id}/deliverable/${d.format}`,
+						download: true,
+						children: ["↓ ", DELIVERABLE_LABELS[d.format] ?? d.format.toUpperCase()]
+					}, d.format))
+				})]
+			}, artifact.id))
+		]
 	});
 }
 function ArtifactCardBlock({ block }) {

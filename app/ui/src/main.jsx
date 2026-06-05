@@ -851,13 +851,17 @@ function McpManagerSection() {
   }
 
   const connectedIds = new Set(connectors.filter((c) => c.connected).map((c) => c.id));
-  const filtered = catalog.filter((s) => !search || (s.label + s.category).toLowerCase().includes(search.toLowerCase()));
+  const filtered = catalog
+    .filter((s) => !search || (s.label + s.category).toLowerCase().includes(search.toLowerCase()))
+    // Honest ordering (F2): connectable/available services first, "coming soon" last.
+    .sort((a, b) => (Number(b.connectable) - Number(a.connectable)) || a.label.localeCompare(b.label));
+  const availableCount = catalog.filter((s) => s.connectable).length;
 
   return (
     <section style={{ marginBottom: "20px" }}>
       <h3 style={{ fontSize: "13px", marginBottom: "6px" }}>Connecteurs &amp; Tools (MCP)</h3>
       <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "8px" }}>
-        Choisis un service, autorise-le — JON découvre ses tools (OAuth + sauvegarde locale chiffrée). Partagé avec JON mobile.
+        {availableCount} service{availableCount > 1 ? "s" : ""} connectable{availableCount > 1 ? "s" : ""} maintenant (OAuth + sauvegarde locale chiffrée). Les autres sont « bientôt disponibles ». Partagé avec JON mobile.
       </p>
       <input className="settings-domains-textarea" style={{ minHeight: 0, height: "30px", marginBottom: "8px" }}
         placeholder="Rechercher un service…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -867,7 +871,7 @@ function McpManagerSection() {
           return (
             <div key={s.id} className="settings-toggle-row" style={{ alignItems: "center" }}>
               <span className="settings-toggle-label">
-                {s.label} <span style={{ color: "var(--muted)", fontSize: "11px" }}>{connected ? "· connecté" : `· ${s.category}${s.connectable ? "" : " · endpoint à configurer"}`}</span>
+                {s.label} <span style={{ color: "var(--muted)", fontSize: "11px" }}>{connected ? "· connecté" : `· ${s.category}${s.connectable ? "" : " · bientôt disponible"}`}</span>
               </span>
               {connected
                 ? <button type="button" className="ghost small" disabled={busy === s.id} onClick={() => disconnect(s.id)}>Déconnecter</button>
@@ -1992,6 +1996,18 @@ function App() {
           <a className="secondary small link-button" href="/admin">{t.openAdmin}</a>
         </div>
       </header>
+
+      {(() => {
+        const mode = dashboard?.llmGatewayStatus?.effectiveMode;
+        if (mode === "mock_only" || mode === "degraded_mock_only") {
+          return (
+            <div className="mock-mode-banner" style={{ background: "rgba(210,153,34,0.14)", border: "1px solid rgba(210,153,34,0.45)", color: "var(--text)", padding: "8px 14px", margin: "0 0 8px", borderRadius: "8px", fontSize: "12.5px" }}>
+              ⚠ <strong>Mode simulation (mock)</strong> — aucun fournisseur LLM réel n'est configuré : JON ne raisonne pas réellement. Configure une clé dans ⚙ Réglages pour des résultats réels.
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {pairModalOpen ? <PairDeviceModal t={t} onClose={() => setPairModalOpen(false)} /> : null}
       {settingsOpen ? (
@@ -5476,6 +5492,9 @@ const DELIVERABLE_LABELS = { pdf: "PDF", docx: "Word", xlsx: "Excel" };
 // work without auth headers.
 function RunDeliverables({ runId }) {
   const [artifacts, setArtifacts] = useState(null);
+  const [runStatus, setRunStatus] = useState(null);
+  const [recovering, setRecovering] = useState(false);
+  const [recoverMsg, setRecoverMsg] = useState(null);
 
   useEffect(() => {
     if (!runId) return undefined;
@@ -5483,15 +5502,37 @@ function RunDeliverables({ runId }) {
     api(`/api/runs/${runId}/artifacts`)
       .then((list) => { if (!cancelled) setArtifacts(Array.isArray(list) ? list : []); })
       .catch(() => { if (!cancelled) setArtifacts([]); });
+    api(`/api/runs/${runId}`)
+      .then((d) => { if (!cancelled) setRunStatus(d?.run?.status ?? d?.status ?? null); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [runId]);
 
+  async function recover() {
+    setRecovering(true); setRecoverMsg(null);
+    try {
+      await api(`/api/runs/${runId}/recover`, { method: "POST" });
+      setRecoverMsg("Reprise demandée — JON continue la mission.");
+    } catch (e) { setRecoverMsg(`Échec reprise : ${e.message}`); }
+    finally { setRecovering(false); }
+  }
+
+  // F6: a paused/awaiting/failed run can be explicitly resumed from the desktop.
+  const canRecover = ["paused", "awaiting_handoff", "waiting_for_input", "failed", "blocked", "stopped"].includes(String(runStatus ?? ""));
   const withDeliverables = (artifacts ?? []).filter((a) => a.deliverables && a.deliverables.length > 0);
-  if (withDeliverables.length === 0) return null;
+  if (withDeliverables.length === 0 && !canRecover) return null;
 
   return (
     <section className="activity-section deliverables-section">
-      <h3>Livrables</h3>
+      {canRecover ? (
+        <div className="recover-row" style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+          <button type="button" className="secondary small" disabled={recovering} onClick={recover}>
+            {recovering ? "Reprise…" : "▶ Reprendre la mission"}
+          </button>
+          <span style={{ fontSize: "12px", color: "var(--muted)" }}>{recoverMsg ?? `Statut : ${runStatus}`}</span>
+        </div>
+      ) : null}
+      {withDeliverables.length > 0 ? <h3>Livrables</h3> : null}
       {withDeliverables.map((artifact) => (
         <div className="deliverable-row" key={artifact.id}>
           <span className="deliverable-title">{artifact.title}</span>

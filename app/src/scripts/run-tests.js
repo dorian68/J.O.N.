@@ -51,6 +51,10 @@ const suites = [
     modulePath: "../../tests/network-advisor.test.js"
   },
   {
+    name: "mobile-connectivity",
+    modulePath: "../../tests/mobile-connectivity.test.js"
+  },
+  {
     name: "temporal-context",
     modulePath: "../../tests/temporal-context.test.js"
   },
@@ -373,6 +377,10 @@ const suites = [
   {
     name: "session-budget-rolling-window",
     modulePath: "../../tests/session-budget-rolling-window.test.js"
+  },
+  {
+    name: "computer-control-promise-normalization",
+    modulePath: "../../tests/computer-control-promise-normalization.test.js"
   },
   {
     name: "mobile-ui-smoke",

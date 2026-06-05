@@ -22,6 +22,7 @@
     "debug:mission": "node src/scripts/run-jon-campaign.js --flow=mission-research",
     "debug:mission:live": "node src/scripts/run-jon-campaign.js --flow=mission-research-live",
     "debug:desktop": "node src/scripts/run-jon-campaign.js --flow=desktop-provider",
+    "debug:mobile": "node src/scripts/run-mobile-doctor.js",
     "preoperator:server": "npm run ui:build --silent && npm run ui:build:mobile --silent",
     "fixtures:server": "node src/scripts/start-fixture-server.js",
     "operator:server": "node src/scripts/start-operator-server.js",

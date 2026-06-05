@@ -9,39 +9,17 @@ import QRCode from "qrcode";
 import { APP_ROOT, DEFAULT_OPERATOR_PORT } from "../config.js";
 import { OperatorService } from "../service/operator-service.js";
 import { attachMobileTerminalWs } from "../mobile/mobile-terminal-ws.js";
-import { buildNetworkAdvice } from "./network-advisor.js";
+import { buildNetworkAdvice, buildMobileConnectivityReport, pickPrimaryLanIp } from "./network-advisor.js";
 import { CoworkSmokeBackofficeService } from "../smoke/cowork-smoke-pipeline.js";
 import { RealSurfaceSmokeBackofficeService } from "../smoke/real-surface-smoke-pipeline.js";
 
 const COWORK_HOME = process.env.COWORK_HOME ?? path.join(os.homedir(), ".cowork");
 const TLS_DIR = path.join(COWORK_HOME, "tls");
 
+// Single source of truth lives in network-advisor (shared with the mobile
+// connectivity doctor). Kept as a thin wrapper so existing call sites are stable.
 function getLanIp() {
-  const ifaces = os.networkInterfaces();
-  const candidates = [];
-  for (const [name, list] of Object.entries(ifaces)) {
-    for (const iface of list) {
-      if (iface.family !== "IPv4" || iface.internal) continue;
-      if (iface.address.startsWith("169.254.")) continue;
-      const score = scoreLanAddress(iface.address, name);
-      candidates.push({ address: iface.address, score });
-    }
-  }
-  candidates.sort((a, b) => b.score - a.score);
-  if (candidates[0]) return candidates[0].address;
-  return "127.0.0.1";
-}
-
-function scoreLanAddress(address, interfaceName = "") {
-  let score = 0;
-  if (/^192\.168\./.test(address)) score += 100;
-  if (/^10\./.test(address)) score += 95;
-  const secondOctet = Number(address.split(".")[1]);
-  if (/^172\./.test(address) && secondOctet >= 16 && secondOctet <= 31) score += 95;
-  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(address)) score += 20;
-  if (/wi-?fi|ethernet/i.test(interfaceName)) score += 25;
-  if (/tailscale|wsl|hyper-v|vethernet|virtual|vpn|bluetooth|hotspot/i.test(interfaceName)) score -= 50;
-  return score;
+  return pickPrimaryLanIp(os.networkInterfaces());
 }
 
 const UI_ROOT = path.join(APP_ROOT, "ui");
@@ -1175,6 +1153,21 @@ export async function createOperatorServer({
           lanEnabled: bindHost === "0.0.0.0",
           network
         });
+        return;
+      }
+
+      // Mobile connectivity doctor — no session required (you need it precisely
+      // when you cannot connect). Returns ranked reachable URLs + pass/warn/fail
+      // checks so the "why can't my phone reach JON" question is answered by JON
+      // itself instead of manual archaeology.
+      if (pathname === "/api/mobile/connectivity" && request.method === "GET") {
+        const { scheme: si_scheme, port: si_port } = serverInfo;
+        const report = buildMobileConnectivityReport(os.networkInterfaces(), {
+          bindHost,
+          scheme: si_scheme,
+          port: si_port
+        });
+        sendJson(response, 200, report);
         return;
       }
 

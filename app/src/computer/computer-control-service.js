@@ -27,11 +27,23 @@ export class ComputerControlService {
     this.provider = provider;
   }
 
-  listVisibleWindows() {
+  // These two forward to the provider. Some providers (real PowerShell) return a
+  // Promise; others (controlled/simulated, FakeWindowProvider) return a value
+  // synchronously. The runtime uses `.catch()` on the result in many places, so
+  // normalize to a Promise here — otherwise sync providers crash with
+  // "detectActiveWindow(...).catch is not a function" the moment a desktop run
+  // reaches them. `await` works equally on both, so callers are unaffected.
+  // These two forward to the provider. Some providers (real PowerShell) return a
+  // Promise; others (controlled/simulated, FakeWindowProvider) return a value
+  // synchronously. The runtime uses `.catch()` on the result in many places, so
+  // these are `async`: that normalizes the return to a Promise AND funnels a
+  // synchronous provider throw into a rejection. Without this, sync providers
+  // crash a desktop run with "detectActiveWindow(...).catch is not a function".
+  async listVisibleWindows() {
     return this.provider.listVisibleWindows();
   }
 
-  detectActiveWindow() {
+  async detectActiveWindow() {
     return this.provider.detectActiveWindow();
   }
 

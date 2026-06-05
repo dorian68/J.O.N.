@@ -886,6 +886,54 @@ function McpManagerSection() {
   );
 }
 
+function BrowserAutomationSection() {
+  const [health, setHealth] = useState(null);
+  const [err, setErr] = useState(null);
+
+  async function refresh() {
+    try { setHealth(await api("/api/browser-extension/health")); }
+    catch (e) { setErr(e.message); }
+  }
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const connectedTabs = health?.connectedTabs ?? 0;
+  const connected = connectedTabs > 0;
+  const version = health?.packaged?.version ?? null;
+  const lastHeartbeat = health?.lastHeartbeatAt ?? health?.lastSeenAt ?? null;
+
+  return (
+    <section style={{ marginBottom: "20px" }}>
+      <h3 style={{ fontSize: "13px", marginBottom: "6px" }}>Browser Automation (extension Chrome)</h3>
+      <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "10px" }}>
+        Permet à JON de piloter un onglet Chrome déjà ouvert. Télécharge, dézippe, puis charge l'extension non empaquetée.
+      </p>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "10px" }}>
+        <a className="ghost small" href="/api/browser-extension/download" download
+           style={{ textDecoration: "none", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "8px" }}>
+          ⬇ Download Chrome Extension
+        </a>
+        <span className={`status-pill status-${connected ? "connected" : "idle"}`}>
+          {connected ? `Connecté (${connectedTabs} onglet${connectedTabs > 1 ? "s" : ""})` : "Déconnecté"}
+        </span>
+        {version ? <span style={{ fontSize: "11px", color: "var(--muted)" }}>v{version}</span> : null}
+        {lastHeartbeat ? <span style={{ fontSize: "11px", color: "var(--muted)" }}>heartbeat {new Date(lastHeartbeat).toLocaleTimeString()}</span> : null}
+      </div>
+      <ol style={{ fontSize: "11.5px", color: "var(--muted)", margin: "0 0 6px 16px", padding: 0, lineHeight: 1.6 }}>
+        <li>Télécharge puis dézippe le fichier.</li>
+        <li>Ouvre <code>chrome://extensions</code>, active « Mode développeur ».</li>
+        <li>« Charger l'extension non empaquetée » → choisis le dossier dézippé.</li>
+        <li>Clique l'icône JON sur l'onglet à piloter. Le statut passe à « Connecté ».</li>
+      </ol>
+      <p style={{ fontSize: "11px", color: "var(--muted)" }}>Détails : <code>docs/chrome-extension-installation.md</code></p>
+      {err ? <p style={{ fontSize: "12px", color: "var(--danger, #d9534f)" }}>{err}</p> : null}
+    </section>
+  );
+}
+
 function SettingsModal({ t, projectId, agentConfiguration, availableApplications, availableBrowsers, project, llmGatewayStatus, onClose }) {
   const existing = agentConfiguration?.guardrails ?? {};
   const [trustedApps, setTrustedApps] = useState(() => new Set(existing.trustedApplications ?? []));
@@ -1007,6 +1055,8 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
         </div>
 
         <McpManagerSection />
+
+        <BrowserAutomationSection />
 
         {availableApplications.length > 0 ? (
           <section style={{ marginBottom: "20px" }}>

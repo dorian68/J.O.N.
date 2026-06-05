@@ -11782,6 +11782,120 @@ function McpManagerSection() {
 		]
 	});
 }
+function BrowserAutomationSection() {
+	const [health, setHealth] = (0, import_react.useState)(null);
+	const [err, setErr] = (0, import_react.useState)(null);
+	async function refresh() {
+		try {
+			setHealth(await api("/api/browser-extension/health"));
+		} catch (e) {
+			setErr(e.message);
+		}
+	}
+	(0, import_react.useEffect)(() => {
+		refresh();
+		const id = setInterval(refresh, 5e3);
+		return () => clearInterval(id);
+	}, []);
+	const connectedTabs = health?.connectedTabs ?? 0;
+	const connected = connectedTabs > 0;
+	const version = health?.packaged?.version ?? null;
+	const lastHeartbeat = health?.lastHeartbeatAt ?? health?.lastSeenAt ?? null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		style: { marginBottom: "20px" },
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+				style: {
+					fontSize: "13px",
+					marginBottom: "6px"
+				},
+				children: "Browser Automation (extension Chrome)"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				style: {
+					fontSize: "12px",
+					color: "var(--muted)",
+					marginBottom: "10px"
+				},
+				children: "Permet à JON de piloter un onglet Chrome déjà ouvert. Télécharge, dézippe, puis charge l'extension non empaquetée."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				style: {
+					display: "flex",
+					gap: "8px",
+					alignItems: "center",
+					flexWrap: "wrap",
+					marginBottom: "10px"
+				},
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+						className: "ghost small",
+						href: "/api/browser-extension/download",
+						download: true,
+						style: {
+							textDecoration: "none",
+							padding: "6px 10px",
+							border: "1px solid var(--border)",
+							borderRadius: "8px"
+						},
+						children: "⬇ Download Chrome Extension"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: `status-pill status-${connected ? "connected" : "idle"}`,
+						children: connected ? `Connecté (${connectedTabs} onglet${connectedTabs > 1 ? "s" : ""})` : "Déconnecté"
+					}),
+					version ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						style: {
+							fontSize: "11px",
+							color: "var(--muted)"
+						},
+						children: ["v", version]
+					}) : null,
+					lastHeartbeat ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						style: {
+							fontSize: "11px",
+							color: "var(--muted)"
+						},
+						children: ["heartbeat ", new Date(lastHeartbeat).toLocaleTimeString()]
+					}) : null
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ol", {
+				style: {
+					fontSize: "11.5px",
+					color: "var(--muted)",
+					margin: "0 0 6px 16px",
+					padding: 0,
+					lineHeight: 1.6
+				},
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Télécharge puis dézippe le fichier." }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [
+						"Ouvre ",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { children: "chrome://extensions" }),
+						", active « Mode développeur »."
+					] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "« Charger l'extension non empaquetée » → choisis le dossier dézippé." }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: "Clique l'icône JON sur l'onglet à piloter. Le statut passe à « Connecté »." })
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				style: {
+					fontSize: "11px",
+					color: "var(--muted)"
+				},
+				children: ["Détails : ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("code", { children: "docs/chrome-extension-installation.md" })]
+			}),
+			err ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				style: {
+					fontSize: "12px",
+					color: "var(--danger, #d9534f)"
+				},
+				children: err
+			}) : null
+		]
+	});
+}
 function SettingsModal({ t, projectId, agentConfiguration, availableApplications, availableBrowsers, project, llmGatewayStatus, onClose }) {
 	const existing = agentConfiguration?.guardrails ?? {};
 	const [trustedApps, setTrustedApps] = (0, import_react.useState)(() => new Set(existing.trustedApplications ?? []));
@@ -11907,6 +12021,7 @@ function SettingsModal({ t, projectId, agentConfiguration, availableApplications
 					})]
 				}),
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(McpManagerSection, {}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(BrowserAutomationSection, {}),
 				availableApplications.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
 					style: { marginBottom: "20px" },
 					children: [

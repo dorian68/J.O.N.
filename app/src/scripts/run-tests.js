@@ -367,6 +367,10 @@ const suites = [
     modulePath: "../../tests/mobile-gateway.test.js"
   },
   {
+    name: "mobile-session-persistence",
+    modulePath: "../../tests/mobile-session-persistence.test.js"
+  },
+  {
     name: "mobile-ui-smoke",
     modulePath: "../../tests/mobile-ui-smoke.test.js"
   },

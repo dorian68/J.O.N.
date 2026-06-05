@@ -1742,8 +1742,10 @@ export class OperatorService extends EventEmitter {
     this.connectorRegistry = new ConnectorRegistry();
     this.mcpConnectors = new McpConnectorService({ env: this.env ?? process.env });
     this.bandwidthGovernor = new BandwidthGovernor();
-    this.mobileDeviceRegistry = new MobileDeviceRegistry();
-    this.mobileAuditLog = new MobileAuditLog();
+    // Persist paired devices + sessions so a JON restart (or the session TTL)
+    // does not silently log out the phone — the #1 "mobile ne marche plus" cause.
+    this.mobileDeviceRegistry = new MobileDeviceRegistry({ store: this.runtimeHandle.database });
+    this.mobileAuditLog = new MobileAuditLog({ store: this.runtimeHandle.database });
     this.mobileEventBuffer = new MobileEventBuffer();
     this.mobileGateway = new MobileGateway({
       deviceRegistry: this.mobileDeviceRegistry,

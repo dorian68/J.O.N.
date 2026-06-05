@@ -370,6 +370,45 @@ export class PrototypeDatabase {
       CREATE INDEX IF NOT EXISTS idx_workspace_browser_sessions_project_activity
       ON workspace_browser_sessions(project_id, last_activity_at DESC);
 
+      CREATE TABLE IF NOT EXISTS browser_extension_tabs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT,
+        extension_instance_id TEXT,
+        browser_tab_id TEXT,
+        window_id TEXT,
+        url TEXT,
+        title TEXT,
+        status TEXT NOT NULL,
+        metadata_json TEXT,
+        attached_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_browser_extension_tabs_project_seen
+      ON browser_extension_tabs(project_id, last_seen_at DESC);
+
+      CREATE TABLE IF NOT EXISTS browser_extension_events (
+        id TEXT PRIMARY KEY,
+        tab_session_id TEXT,
+        project_id TEXT,
+        run_id TEXT,
+        event_type TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        action_id TEXT,
+        payload_json TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(tab_session_id) REFERENCES browser_extension_tabs(id) ON DELETE SET NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,
+        FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE SET NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_browser_extension_events_tab_created
+      ON browser_extension_events(tab_session_id, created_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_browser_extension_events_project_created
+      ON browser_extension_events(project_id, created_at DESC);
+
       CREATE TABLE IF NOT EXISTS mobile_devices (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -393,6 +432,17 @@ export class PrototypeDatabase {
 
       CREATE INDEX IF NOT EXISTS idx_mobile_audit_log_device_created
       ON mobile_audit_log(device_id, created_at DESC);
+
+      CREATE TABLE IF NOT EXISTS mobile_sessions (
+        token_hash TEXT PRIMARY KEY,
+        device_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        last_used_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_mobile_sessions_device
+      ON mobile_sessions(device_id);
 
       CREATE TABLE IF NOT EXISTS workspace_plans (
         id TEXT PRIMARY KEY,
@@ -999,6 +1049,76 @@ export class PrototypeDatabase {
     }));
   }
 
+  // ── Mobile devices + sessions (persisted so pairing survives a restart) ──────
+  upsertMobileDevice(device) {
+    this.db.prepare(`
+      INSERT INTO mobile_devices (id, name, fingerprint, status, paired_at, last_seen_at, revoked_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        fingerprint = excluded.fingerprint,
+        status = excluded.status,
+        paired_at = excluded.paired_at,
+        last_seen_at = excluded.last_seen_at,
+        revoked_at = excluded.revoked_at
+    `).run(
+      device.id,
+      device.name ?? "Mobile",
+      device.fingerprint ?? null,
+      device.status,
+      device.pairedAt,
+      device.lastSeenAt,
+      device.revokedAt ?? null
+    );
+  }
+
+  listMobileDevices() {
+    return this.db.prepare(`SELECT * FROM mobile_devices`).all().map((row) => ({
+      id: row.id,
+      name: row.name,
+      fingerprint: row.fingerprint ?? null,
+      status: row.status,
+      pairedAt: row.paired_at,
+      lastSeenAt: row.last_seen_at,
+      revokedAt: row.revoked_at ?? null
+    }));
+  }
+
+  upsertMobileSession(session) {
+    this.db.prepare(`
+      INSERT INTO mobile_sessions (token_hash, device_id, created_at, expires_at, last_used_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(token_hash) DO UPDATE SET
+        device_id = excluded.device_id,
+        expires_at = excluded.expires_at,
+        last_used_at = excluded.last_used_at
+    `).run(
+      session.tokenHash,
+      session.deviceId,
+      session.createdAt,
+      session.expiresAt,
+      session.lastUsedAt
+    );
+  }
+
+  listMobileSessions() {
+    return this.db.prepare(`SELECT * FROM mobile_sessions`).all().map((row) => ({
+      tokenHash: row.token_hash,
+      deviceId: row.device_id,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+      lastUsedAt: row.last_used_at
+    }));
+  }
+
+  deleteMobileSession(tokenHash) {
+    this.db.prepare(`DELETE FROM mobile_sessions WHERE token_hash = ?`).run(tokenHash);
+  }
+
+  deleteMobileSessionsForDevice(deviceId) {
+    this.db.prepare(`DELETE FROM mobile_sessions WHERE device_id = ?`).run(deviceId);
+  }
+
   upsertWorkspaceBrowserSession(session) {
     const now = session.lastActivityAt ?? new Date().toISOString();
     this.db.prepare(`
@@ -1043,6 +1163,121 @@ export class PrototypeDatabase {
     return rows.map((row) => this.#browserSessionFromRow(row));
   }
 
+  upsertBrowserExtensionTab(tab) {
+    const now = tab.lastSeenAt ?? new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO browser_extension_tabs (
+        id, project_id, extension_instance_id, browser_tab_id, window_id,
+        url, title, status, metadata_json, attached_at, last_seen_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        project_id = excluded.project_id,
+        extension_instance_id = excluded.extension_instance_id,
+        browser_tab_id = excluded.browser_tab_id,
+        window_id = excluded.window_id,
+        url = excluded.url,
+        title = excluded.title,
+        status = excluded.status,
+        metadata_json = excluded.metadata_json,
+        last_seen_at = excluded.last_seen_at
+    `).run(
+      tab.id,
+      tab.projectId ?? null,
+      tab.extensionInstanceId ?? null,
+      tab.browserTabId != null ? String(tab.browserTabId) : null,
+      tab.windowId != null ? String(tab.windowId) : null,
+      tab.url ?? null,
+      tab.title ?? null,
+      tab.status ?? "attached",
+      stringifyJson(tab.metadata ?? {}),
+      tab.attachedAt ?? now,
+      now
+    );
+    return this.getBrowserExtensionTab(tab.id);
+  }
+
+  getBrowserExtensionTab(tabSessionId) {
+    const row = this.db.prepare(`SELECT * FROM browser_extension_tabs WHERE id = ?`).get(tabSessionId);
+    return row ? this.#browserExtensionTabFromRow(row) : null;
+  }
+
+  listBrowserExtensionTabs({ projectId = null, includeClosed = false, limit = 50 } = {}) {
+    const where = [];
+    const params = [];
+    if (projectId) {
+      where.push("project_id = ?");
+      params.push(projectId);
+    }
+    if (!includeClosed) {
+      where.push("status != 'closed'");
+    }
+    const cappedLimit = Math.max(1, Math.min(Number.parseInt(String(limit), 10) || 50, 500));
+    const sql = `
+      SELECT * FROM browser_extension_tabs
+      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY last_seen_at DESC, rowid DESC
+      LIMIT ?
+    `;
+    return this.db.prepare(sql).all(...params, cappedLimit).map((row) => this.#browserExtensionTabFromRow(row));
+  }
+
+  insertBrowserExtensionEvent(event) {
+    this.db.prepare(`
+      INSERT INTO browser_extension_events (
+        id, tab_session_id, project_id, run_id, event_type, direction,
+        action_id, payload_json, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      event.id,
+      event.tabSessionId ?? null,
+      event.projectId ?? null,
+      event.runId ?? null,
+      event.eventType,
+      event.direction ?? "inbound",
+      event.actionId ?? null,
+      stringifyJson(event.payload ?? {}),
+      event.createdAt
+    );
+    return event;
+  }
+
+  listBrowserExtensionEvents({ tabSessionId = null, projectId = null, runId = null, limit = 100 } = {}) {
+    const where = [];
+    const params = [];
+    if (tabSessionId) {
+      where.push("tab_session_id = ?");
+      params.push(tabSessionId);
+    }
+    if (projectId) {
+      where.push("project_id = ?");
+      params.push(projectId);
+    }
+    if (runId) {
+      where.push("run_id = ?");
+      params.push(runId);
+    }
+    const cappedLimit = Math.max(1, Math.min(Number.parseInt(String(limit), 10) || 100, 1000));
+    const sql = `
+      SELECT * FROM browser_extension_events
+      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY created_at DESC, rowid DESC
+      LIMIT ?
+    `;
+    return this.db.prepare(sql).all(...params, cappedLimit).map((row) => ({
+      id: row.id,
+      tabSessionId: row.tab_session_id ?? null,
+      projectId: row.project_id ?? null,
+      runId: row.run_id ?? null,
+      eventType: row.event_type,
+      direction: row.direction,
+      actionId: row.action_id ?? null,
+      payload: parseJson(row.payload_json, {}),
+      createdAt: row.created_at
+    })).reverse();
+  }
+
   #browserSessionFromRow(row) {
     return {
       id: row.id,
@@ -1057,6 +1292,22 @@ export class PrototypeDatabase {
       metadata: parseJson(row.metadata_json, null),
       openedAt: row.opened_at,
       lastActivityAt: row.last_activity_at
+    };
+  }
+
+  #browserExtensionTabFromRow(row) {
+    return {
+      id: row.id,
+      projectId: row.project_id ?? null,
+      extensionInstanceId: row.extension_instance_id ?? null,
+      browserTabId: row.browser_tab_id ?? null,
+      windowId: row.window_id ?? null,
+      url: row.url ?? null,
+      title: row.title ?? null,
+      status: row.status,
+      metadata: parseJson(row.metadata_json, {}),
+      attachedAt: row.attached_at,
+      lastSeenAt: row.last_seen_at
     };
   }
 

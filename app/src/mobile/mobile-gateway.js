@@ -168,15 +168,24 @@ function redactParams(commandType, params) {
 }
 
 export class MobileAuditLog {
-  constructor({ maxEntries = 2000 } = {}) {
+  constructor({ maxEntries = 2000, store = null } = {}) {
     this.entries = [];
     this.maxEntries = maxEntries;
+    this.store = store;
   }
 
   record(entry) {
     this.entries.push(entry);
     if (this.entries.length > this.maxEntries) {
       this.entries.shift();
+    }
+    // Write through so the mobile audit trail survives a restart and can be
+    // inspected from the DB (previously in-memory only — the logs vanished).
+    try {
+      this.store?.insertMobileAuditEntry?.(entry);
+      entry._persisted = true;
+    } catch {
+      // best-effort; never let logging break a request
     }
   }
 

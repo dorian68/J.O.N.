@@ -149,6 +149,7 @@ function browserManualHandoffFromResult(result = {}) {
     userAction,
     observedUrl,
     observedTitle,
+    diagnostics: blocker.diagnostics ?? null,
     detectedAt: nowIso(),
     retryableAfterUserAction: blocker.retryableAfterUserAction !== false
   };
@@ -2120,13 +2121,19 @@ export class PrototypeAgent {
             allowlistedHosts,
             headless: false,
             persistent: true,
+            resumeCurrentSession: desktopAction?.resumeCurrentSession === true,
+            useAttachedBrowserTab: desktopAction?.useAttachedBrowserTab === true,
+            attachedTabSessionId: desktopAction?.attachedTabSessionId ?? null,
             returnController: true
           });
           browserController = browserHandle?.controller ?? null;
-          this.#recordEvent(run.id, createEvent("workspace.browser.session_attached", EVENT_ACTOR.BROWSER, "Browser autonomy attached to the persistent JON browser session.", {
+          this.#recordEvent(run.id, createEvent("workspace.browser.session_attached", EVENT_ACTOR.BROWSER, browserHandle?.attachedBrowserTab
+            ? "Browser autonomy attached to a user-granted Chrome tab."
+            : "Browser autonomy attached to the persistent JON browser session.", {
             sessionId: browserHandle?.session?.id ?? null,
             persistent: browserHandle?.persistent === true,
-            targetId: browserHandle?.targetId ?? null
+            targetId: browserHandle?.targetId ?? null,
+            mode: browserHandle?.attachedBrowserTab ? "attached_browser_tab" : "workspace_browser"
           }));
         } catch (error) {
           this.#recordEvent(run.id, createEvent("workspace.browser.session_attach_failed", EVENT_ACTOR.BROWSER, "Browser autonomy could not attach to the persistent JON browser session; falling back to a local controller.", {
@@ -2143,6 +2150,20 @@ export class PrototypeAgent {
         projectId: project.id,
         runId: run.id,
         evidenceRoot: evidenceDir,
+        // Attribute browser_autonomy planner/replanner LLM calls to this run so
+        // token usage and cost are recorded (previously lost).
+        recordLlmCall: (callRecord) => {
+          try {
+            this.database.insertLlmCall(callRecord);
+            this.#recordEvent(run.id, createEvent("llm.call.completed", EVENT_ACTOR.AGENT, "LLM call completed: browser_plan.", {
+              llmCallId: callRecord.id,
+              callType: callRecord.callType ?? "browser_plan",
+              providerAlias: callRecord.providerAlias,
+              modelAlias: callRecord.modelAlias,
+              latencyMs: callRecord.latencyMs
+            }));
+          } catch { /* accounting must never break the run */ }
+        },
         describeVisualFrame: browserVisionPolicy.enabled
           ? async ({ frame, screenshotBase64, change, phase, step, visionDetail }) => this.#describeBrowserVisualFrame({
             run,
@@ -2233,7 +2254,8 @@ export class PrototypeAgent {
         browserWatchScreenshotWidth: browserVisionPolicy.screenshotWidth,
         maxMultimodalVisionFrames: desktopAction?.maxMultimodalVisionFrames ?? browserVisionPolicy.maxFramesPerRun,
         browserVisionPolicy,
-        closeBrowser: browserHandle?.persistent ? false : desktopAction?.closeBrowser ?? false
+        closeBrowser: browserHandle?.persistent ? false : desktopAction?.closeBrowser ?? false,
+        resumeCurrentSession: desktopAction?.resumeCurrentSession === true
       });
 
       for (const evidenceRecord of result.evidence ?? []) {
@@ -2353,6 +2375,7 @@ export class PrototypeAgent {
           userAction: manualHandoff.userAction,
           observedUrl: manualHandoff.observedUrl,
           observedTitle: manualHandoff.observedTitle,
+          diagnostics: manualHandoff.diagnostics ?? null,
           retryableAfterUserAction: manualHandoff.retryableAfterUserAction
         }));
       }

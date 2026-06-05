@@ -95,7 +95,8 @@ export class BrowserOperator {
     runId = createId("browser_run"),
     evidenceRoot,
     onEvent = null,
-    describeVisualFrame = null
+    describeVisualFrame = null,
+    recordLlmCall = null
   } = {}) {
     if (!browserController) {
       throw new Error("BrowserOperator requires a BrowserController.");
@@ -107,7 +108,16 @@ export class BrowserOperator {
     this.evidenceRoot = evidenceRoot;
     this.onEvent = typeof onEvent === "function" ? onEvent : null;
     this.describeVisualFrame = typeof describeVisualFrame === "function" ? describeVisualFrame : null;
+    // Persist planner/replanner LLM calls so browser_autonomy token usage is
+    // attributed to the run (otherwise these calls were never recorded).
+    this.recordLlmCall = typeof recordLlmCall === "function" ? recordLlmCall : null;
     this.visualFrameDescriptionCount = 0;
+  }
+
+  #persistLlmCall(callRecord) {
+    if (callRecord && this.recordLlmCall) {
+      try { this.recordLlmCall(callRecord); } catch { /* never break the run on accounting */ }
+    }
   }
 
   async runMission(input = {}) {
@@ -119,6 +129,7 @@ export class BrowserOperator {
       runId: this.runId,
       input
     });
+    this.#persistLlmCall(planResult.callRecord);
     const plan = planResult.output;
     const execution = {
       id: this.runId,
@@ -446,6 +457,7 @@ export class BrowserOperator {
       });
       return false;
     }
+    this.#persistLlmCall(replanResult.callRecord);
 
     // Filter out open_session — the browser session is already active during a replan.
     const newSteps = (replanResult.output?.steps ?? []).filter((s) => s.action !== "open_session");
@@ -952,7 +964,14 @@ export class BrowserOperator {
   }
 
   #requireTarget(targetId) {
-    const resolved = targetId ?? this.browser.activeTargetId ?? this.browser.listTargets()?.[0]?.id ?? null;
+    const targets = this.browser.listTargets?.() ?? [];
+    const requestedStillExists = targetId && targets.some((target) => target.id === targetId);
+    const activeStillExists = this.browser.activeTargetId && targets.some((target) => target.id === this.browser.activeTargetId);
+    const resolved = requestedStillExists
+      ? targetId
+      : activeStillExists
+      ? this.browser.activeTargetId
+      : targets[0]?.id ?? null;
     if (!resolved) {
       throw new Error("Browser operator has no active target. The plan must open a session before acting.");
     }

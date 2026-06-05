@@ -9,6 +9,7 @@ import { generateJonificationManifest } from "./manifest-generator.js";
 import { validateManifest } from "./manifest-validator.js";
 import { simulateWorkflow } from "./workflow-simulator.js";
 import { listJonifiedApps, getJonifiedApp } from "./registry.js";
+import { resolveJonifiedAppForMission } from "./mission-resolver.js";
 
 const nowIso = () => null; // timestamps injected by caller to keep this pure/deterministic
 
@@ -28,7 +29,29 @@ export async function jonifyFromUrl(url, { browserController = null, businessPur
   return { observation, manifest, validation };
 }
 
-export { simulateWorkflow };
+export { simulateWorkflow, resolveJonifiedAppForMission };
+
+// Given a mission, resolve the JON-ified app + workflow and DRY-RUN it. V1 never
+// executes app tools — it returns what JON would do, missing inputs and required
+// confirmations, so the planner can decide / ask the user.
+export function planJonifyMission(objective, { loadManifests = null } = {}) {
+  const manifests = (loadManifests ? loadManifests() : listJonifiedApps().map((a) => getJonifiedApp(a.appId)))
+    .filter(Boolean);
+  const match = resolveJonifiedAppForMission(objective, manifests);
+  if (!match) return { matched: false, reason: "Aucune app JON-ifiée ne correspond à cette mission.", knownApps: manifests.map((m) => m.app?.id) };
+  const app = manifests.find((m) => m.app?.id === match.appId);
+  const simulation = match.workflow ? simulateWorkflow(app, match.workflow.id) : null;
+  return {
+    matched: true,
+    appId: match.appId,
+    appName: match.appName,
+    workflow: match.workflow,
+    reason: match.reason,
+    simulation,
+    executionMode: "simulate_only_v1", // real execution arrives in V3
+    alternatives: match.alternatives
+  };
+}
 
 // Context provider for the planner/operator: what JON knows about jonified apps.
 export function jonifyContextProvider({ currentApp = null } = {}) {

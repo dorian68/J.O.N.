@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { jonifyFromHtml, simulateWorkflow } from "../src/jonify/index.js";
+import { jonifyFromHtml, simulateWorkflow, planJonifyMission } from "../src/jonify/index.js";
+import { resolveJonifiedAppForMission } from "../src/jonify/mission-resolver.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(HERE, "..", "fixtures", "jonify", "sample-crm.html");
@@ -60,6 +61,23 @@ export async function run() {
 
   // 12. Safety contract present
   assert.ok((manifest.safety.globalRules ?? []).length >= 3, "global safety rules present");
+
+  // 13. Mission resolver: a NL mission maps to this app + the right workflow.
+  const match = resolveJonifiedAppForMission("va dans mon CRM et crée un lead", [manifest]);
+  assert.ok(match, "mission resolved to a jonified app");
+  assert.equal(match.appId, manifest.app.id, "resolved to the CRM app");
+  assert.ok(match.workflow, "a workflow was selected");
+  assert.equal(match.workflow.id, "create-object-workflow", "create intent → create workflow");
+
+  // 14. planJonifyMission dry-runs the matched workflow (no execution in V1).
+  const plan = planJonifyMission("supprime un lead dans le CRM", { loadManifests: () => [manifest] });
+  assert.equal(plan.matched, true);
+  assert.equal(plan.workflow.id, "delete-workflow", "delete intent → delete workflow");
+  assert.equal(plan.executionMode, "simulate_only_v1");
+  assert.equal(plan.simulation.maxRisk, "critical", "delete workflow is critical (confirmation required)");
+
+  // No match for an unrelated mission.
+  assert.equal(resolveJonifiedAppForMission("règle la luminosité de l'écran", [manifest]), null, "unrelated mission → no match");
 
   return {
     interactive: interactive.length,

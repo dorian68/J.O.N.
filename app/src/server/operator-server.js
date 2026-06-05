@@ -13,7 +13,7 @@ import { buildNetworkAdvice, buildMobileConnectivityReport, pickPrimaryLanIp } f
 import { resolveBindConfig, loadOrCreateDesktopToken, authorizeRequest } from "./desktop-auth.js";
 import { evaluateProductionReadiness } from "./production-readiness.js";
 import { buildExtensionZip, validateExtension } from "../browser/chrome-extension-package.js";
-import { jonifyFromHtml, simulateWorkflow } from "../jonify/index.js";
+import { jonifyFromHtml, simulateWorkflow, planJonifyMission } from "../jonify/index.js";
 import { observeHtml } from "../jonify/app-observer.js";
 import { registerJonifiedApp, listJonifiedApps, getJonifiedApp } from "../jonify/registry.js";
 import { CoworkSmokeBackofficeService } from "../smoke/cowork-smoke-pipeline.js";
@@ -347,6 +347,12 @@ export async function createOperatorServer({
       }
       if (pathname === "/api/jonify/apps" && request.method === "GET") {
         sendJson(response, 200, { apps: listJonifiedApps() });
+        return;
+      }
+      // Resolve a mission → matched JON-ified app + workflow (dry-run, no execution in V1).
+      if (pathname === "/api/jonify/resolve" && request.method === "POST") {
+        try { sendJson(response, 200, planJonifyMission(String((await readJsonBody(request)).objective ?? ""))); }
+        catch (err) { sendError(response, 400, err.message); }
         return;
       }
       const jonifyAppRoute = matchRoute(pathname, /^\/api\/jonify\/apps\/(?<appId>[^/]+)$/);

@@ -32,17 +32,17 @@ Verdict vivant de la mise en production. Mis à jour à chaque lot.
 | Budget tokens fenêtre glissante (pas de brick) | ✅ |
 | Suite de tests verte | ✅ 108 suites |
 
-## Checklist cohérence produit (Lot 4 — À FAIRE)
+## Checklist cohérence produit (Lot 4 — FAIT, commit adfca0d)
 
 | Check | État |
 |---|---|
-| Livrables téléchargeables sur desktop (F1) | ❌ route liste absente |
-| Catalogue MCP honnête (statuts) (F2) | ❌ ~76% décoratif |
-| OAuth MCP mobile : refus propre / desktop (F3) | ❌ timeout silencieux |
-| « Automatisation » honnête ou scheduler (F5) | ❌ one-shot |
-| Bouton reprise mission desktop (F6) | ❌ |
-| Bannière mode mock dans la conversation (F9) | ❌ |
-| Self-check visible sur desktop (F7) | ❌ |
+| Livrables téléchargeables sur desktop (F1) | ✅ route `GET /api/runs/:id/artifacts` + panneau |
+| Catalogue MCP honnête (statuts) (F2) | ✅ available/coming_soon, tri, bouton gaté |
+| OAuth MCP mobile : message « continue on desktop » (F3) | ✅ plus de timeout silencieux |
+| « Automatisation » honnête (F5) | ✅ label « tâche à exécuter maintenant » |
+| Bouton reprise mission desktop (F6) | ✅ « Reprendre la mission » → /recover |
+| Bannière mode mock dans la conversation (F9) | ✅ |
+| Self-check visible sur desktop (F7) | 🟡 exposé via API ; carte UI desktop optionnelle (backlog) |
 
 ## Checklist packaging / livraison (Lot 5 — partiel)
 
@@ -51,8 +51,9 @@ Verdict vivant de la mise en production. Mis à jour à chaque lot.
 | Extension Chrome téléchargeable + doc | ✅ |
 | `docs/chrome-extension-installation.md` | ✅ |
 | `docs/mobile-access.md` | ✅ |
-| Release checklist + guide démarrage | ❌ |
-| Mode `JON_PRODUCTION` documenté (.env example) | 🟡 |
+| Release checklist + guide démarrage | ✅ `docs/release-checklist.md` |
+| Mode `JON_PRODUCTION` documenté (.env example) | ✅ `.env.example` (JON_* sécurité) |
+| `smoke:journey` (golden path bout-en-bout) | ✅ |
 
 ## Refus de démarrage en production si :
 - une route sensible reste sans auth ;

@@ -13,6 +13,9 @@ import { buildNetworkAdvice, buildMobileConnectivityReport, pickPrimaryLanIp } f
 import { resolveBindConfig, loadOrCreateDesktopToken, authorizeRequest } from "./desktop-auth.js";
 import { evaluateProductionReadiness } from "./production-readiness.js";
 import { buildExtensionZip, validateExtension } from "../browser/chrome-extension-package.js";
+import { jonifyFromHtml, simulateWorkflow } from "../jonify/index.js";
+import { observeHtml } from "../jonify/app-observer.js";
+import { registerJonifiedApp, listJonifiedApps, getJonifiedApp } from "../jonify/registry.js";
 import { CoworkSmokeBackofficeService } from "../smoke/cowork-smoke-pipeline.js";
 import { RealSurfaceSmokeBackofficeService } from "../smoke/real-surface-smoke-pipeline.js";
 
@@ -309,6 +312,56 @@ export async function createOperatorServer({
           fixtureBaseUrl: operatorService.fixtureManifest.baseUrl,
           browserExtension: operatorService.getBrowserExtensionHealth()
         });
+        return;
+      }
+
+      // ── JON-ify App (auto-discovery) — auth-gated by the central gate ──────────
+      async function jonifyLoadHtml(body) {
+        if (body?.html) return { html: body.html, url: body.url ?? null };
+        if (body?.url) {
+          const res = await fetch(body.url, { redirect: "follow" });
+          if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status}`);
+          return { html: await res.text(), url: body.url };
+        }
+        throw new Error("Provide html or url.");
+      }
+      if (pathname === "/api/jonify/observe" && request.method === "POST") {
+        try { const { html, url } = await jonifyLoadHtml(await readJsonBody(request)); sendJson(response, 200, observeHtml(html, { url }).pages[0].summary); }
+        catch (err) { sendError(response, 400, err.message); }
+        return;
+      }
+      if (pathname === "/api/jonify/generate" && request.method === "POST") {
+        try {
+          const body = await readJsonBody(request);
+          const { html, url } = await jonifyLoadHtml(body);
+          const { manifest, validation } = jonifyFromHtml(html, { url, businessPurpose: body.purpose ?? null });
+          if (body.register && validation.valid) registerJonifiedApp(manifest);
+          sendJson(response, 200, { manifest, validation });
+        } catch (err) { sendError(response, 400, err.message); }
+        return;
+      }
+      if (pathname === "/api/jonify/register" && request.method === "POST") {
+        try { sendJson(response, 201, registerJonifiedApp((await readJsonBody(request)).manifest)); }
+        catch (err) { sendError(response, 400, err.message); }
+        return;
+      }
+      if (pathname === "/api/jonify/apps" && request.method === "GET") {
+        sendJson(response, 200, { apps: listJonifiedApps() });
+        return;
+      }
+      const jonifyAppRoute = matchRoute(pathname, /^\/api\/jonify\/apps\/(?<appId>[^/]+)$/);
+      if (jonifyAppRoute && request.method === "GET") {
+        const app = getJonifiedApp(jonifyAppRoute.appId);
+        if (!app) { sendError(response, 404, "JON-ified app not found"); return; }
+        sendJson(response, 200, app);
+        return;
+      }
+      const jonifySimRoute = matchRoute(pathname, /^\/api\/jonify\/apps\/(?<appId>[^/]+)\/simulate-workflow$/);
+      if (jonifySimRoute && request.method === "POST") {
+        const app = getJonifiedApp(jonifySimRoute.appId);
+        if (!app) { sendError(response, 404, "JON-ified app not found"); return; }
+        const body = await readJsonBody(request);
+        sendJson(response, 200, simulateWorkflow(app, body.workflowId));
         return;
       }
 

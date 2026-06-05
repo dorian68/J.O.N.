@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Acme CRM — Dashboard</title>
+</head>
+<body data-app="acme-crm">
+  <nav aria-label="Primary">
+    <a href="/dashboard" data-testid="nav-dashboard">Dashboard</a>
+    <a href="/leads" data-testid="nav-leads">Leads</a>
+    <a href="/settings" data-testid="nav-settings">Settings</a>
+  </nav>
+
+  <main>
+    <h1>Dashboard</h1>
+    <p>Overview of your recent activity and pipeline.</p>
+
+    <section aria-label="actions">
+      <button data-testid="create-lead">New Lead</button>
+      <button data-testid="export-report">Export report</button>
+      <input type="search" name="q" placeholder="Search leads" data-testid="search" />
+      <button data-testid="search-btn">Search</button>
+    </section>
+
+    <section aria-label="lead-form" hidden>
+      <h2>Create lead</h2>
+      <form data-testid="lead-form" action="/leads" method="post">
+        <label>Name <input type="text" name="name" required /></label>
+        <label>Email <input type="email" name="email" required /></label>
+        <label>Company <input type="text" name="company" /></label>
+        <button type="submit" data-testid="submit-lead">Save lead</button>
+      </form>
+    </section>
+
+    <section aria-label="lead-row">
+      <button data-testid="send-email">Send email</button>
+      <button data-testid="delete-lead">Delete lead</button>
+    </section>
+
+    <div class="banner success" role="status" hidden>Lead created successfully</div>
+    <div class="banner error" role="alert" hidden>Something went wrong</div>
+  </main>
+</body>
+</html>

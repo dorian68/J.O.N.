@@ -20266,15 +20266,16 @@ ${h.join(`
 		"dashboard",
 		"control",
 		"tabs",
-		"terminal",
-		"tasks"
+		"tasks",
+		"plus"
 	];
 	var TAB_LABELS = {
 		dashboard: "Accueil",
 		control: "Contrôle",
 		tabs: "Onglets",
 		terminal: "Terminal",
-		tasks: "Tâches"
+		tasks: "Tâches",
+		plus: "Plus"
 	};
 	var IC = (d, extra = {}) => (0, import_react.createElement)("svg", {
 		width: 20,
@@ -20330,7 +20331,24 @@ ${h.join(`
 			x2: 20,
 			y2: 19
 		})]),
-		tasks: IC([(0, import_react.createElement)("path", { d: "M9 11l3 3L22 4" }), (0, import_react.createElement)("path", { d: "M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" })])
+		tasks: IC([(0, import_react.createElement)("path", { d: "M9 11l3 3L22 4" }), (0, import_react.createElement)("path", { d: "M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" })]),
+		plus: IC([
+			(0, import_react.createElement)("circle", {
+				cx: 5,
+				cy: 12,
+				r: 1.6
+			}),
+			(0, import_react.createElement)("circle", {
+				cx: 12,
+				cy: 12,
+				r: 1.6
+			}),
+			(0, import_react.createElement)("circle", {
+				cx: 19,
+				cy: 12,
+				r: 1.6
+			})
+		])
 	};
 	var SVG = {
 		send: IC([(0, import_react.createElement)("line", {
@@ -20797,6 +20815,22 @@ ${h.join(`
 			clearTimeout(timer);
 		}
 	}
+	async function downloadDeliverable(path, fileName, token) {
+		const res = await fetch(`${BASE}${path}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+		if (!res.ok) throw makeApiError("Téléchargement impossible", {
+			status: res.status,
+			code: "DOWNLOAD_ERROR"
+		});
+		const blob = await res.blob();
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = fileName || "deliverable";
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		setTimeout(() => URL.revokeObjectURL(url), 4e3);
+	}
 	function validateMobileSession(token) {
 		return apiGet("/api/mobile/session/status", token);
 	}
@@ -20967,6 +21001,17 @@ ${h.join(`
 		if (/^(localhost|(?:\d{1,3}\.){3}\d{1,3})(?::\d+)?(?:[/?#].*)?$/i.test(raw)) return `http://${raw}`;
 		if (/^[^\s/]+\.[^\s]+(?:[/?#].*)?$/i.test(raw)) return `https://${raw}`;
 		return `https://www.google.com/search?q=${encodeURIComponent(raw)}`;
+	}
+	function formatTime(ts) {
+		if (!ts) return "";
+		const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1e3);
+		if (diff < 30) return "";
+		if (diff < 90) return "à l'instant";
+		if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+		return new Date(ts).toLocaleTimeString("fr-FR", {
+			hour: "2-digit",
+			minute: "2-digit"
+		});
 	}
 	function PairingScreen({ onPaired, notice = null }) {
 		const urlCode = getCodeFromUrl();
@@ -21168,19 +21213,7 @@ ${h.join(`
 		const activeRuns = runs.filter((run) => ["running", "paused"].includes(run.status));
 		const latestTasks = runs.slice(0, 4);
 		const activeTerminals = terminals.filter((t) => t.status !== "detached");
-		return (0, import_react.createElement)("div", { className: "tab-content dashboard-tab" }, (0, import_react.createElement)("div", { className: "dashboard-hero" }, (0, import_react.createElement)("div", null, (0, import_react.createElement)("p", { className: "eyebrow" }, "JON OS Agent"), (0, import_react.createElement)("h2", null, "Mon Ordinateur"), (0, import_react.createElement)("span", { className: "online-pill" }, (control === null || control === void 0 ? void 0 : control.active) ? "Browser actif" : "En ligne")), (0, import_react.createElement)("div", { className: "dashboard-hero-side" }, (0, import_react.createElement)("div", { className: "jon-orb-small" }, "JON"))), error ? (0, import_react.createElement)("div", { className: "inline-error" }, error) : null, (0, import_react.createElement)("div", { className: "dashboard-metrics" }, (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Sessions"), (0, import_react.createElement)("strong", null, String(activeTerminals.length + ((control === null || control === void 0 ? void 0 : control.active) ? 1 : 0)))), (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Tâches"), (0, import_react.createElement)("strong", null, String(activeRuns.length))), (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Appareils"), (0, import_react.createElement)("strong", null, String((_status$devices$lengt = status === null || status === void 0 || (_status$devices = status.devices) === null || _status$devices === void 0 ? void 0 : _status$devices.length) !== null && _status$devices$lengt !== void 0 ? _status$devices$lengt : 0)))), (0, import_react.createElement)("div", { className: "section dashboard-config-section" }, (0, import_react.createElement)("button", {
-			className: `dashboard-config-toggle ${showSettings ? "active" : ""}`,
-			onClick: () => setShowSettings((v) => !v),
-			"aria-label": "Configuration de l’agent"
-		}, SVG.settings, (0, import_react.createElement)("span", null, "Configuration"), (0, import_react.createElement)("span", { className: "dashboard-config-chevron" }, showSettings ? "▲" : "▼")), showSettings ? (0, import_react.createElement)("div", { className: "dashboard-settings-card" }, (0, import_react.createElement)(MoreTab, {
-			projectId,
-			token,
-			session,
-			events,
-			onDisconnect,
-			pollingInterval,
-			onPollingIntervalChange
-		})) : null), (0, import_react.createElement)("div", { className: "quick-command-card" }, (0, import_react.createElement)("textarea", {
+		return (0, import_react.createElement)("div", { className: "tab-content dashboard-tab" }, (0, import_react.createElement)("div", { className: "dashboard-hero" }, (0, import_react.createElement)("div", null, (0, import_react.createElement)("p", { className: "eyebrow" }, "JON OS Agent"), (0, import_react.createElement)("h2", null, "Mon Ordinateur"), (0, import_react.createElement)("span", { className: "online-pill" }, (control === null || control === void 0 ? void 0 : control.active) ? "Browser actif" : "En ligne")), (0, import_react.createElement)("div", { className: "dashboard-hero-side" }, (0, import_react.createElement)("div", { className: "jon-orb-small" }, "JON"))), error ? (0, import_react.createElement)("div", { className: "inline-error" }, error) : null, (0, import_react.createElement)("div", { className: "dashboard-metrics" }, (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Sessions"), (0, import_react.createElement)("strong", null, String(activeTerminals.length + ((control === null || control === void 0 ? void 0 : control.active) ? 1 : 0)))), (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Tâches"), (0, import_react.createElement)("strong", null, String(activeRuns.length))), (0, import_react.createElement)("div", null, (0, import_react.createElement)("span", null, "Appareils"), (0, import_react.createElement)("strong", null, String((_status$devices$lengt = status === null || status === void 0 || (_status$devices = status.devices) === null || _status$devices === void 0 ? void 0 : _status$devices.length) !== null && _status$devices$lengt !== void 0 ? _status$devices$lengt : 0)))), (0, import_react.createElement)("div", { className: "quick-command-card" }, (0, import_react.createElement)("textarea", {
 			className: "mobile-textarea",
 			placeholder: "Demander à JON d’agir sur ton ordinateur…",
 			value: objective,
@@ -22380,6 +22413,7 @@ ${h.join(`
 				targetId: tab.id
 			}, `observe-${tab.id}`),
 			disabled: busy !== null,
+			"aria-label": "Observer l'onglet (DOM + capture)",
 			title: "Observer — extrait DOM + screenshot"
 		}, busy === `observe-${tab.id}` ? "…" : "👁"), (0, import_react.createElement)("button", {
 			className: "mobile-btn ghost small",
@@ -22387,14 +22421,18 @@ ${h.join(`
 				type: "reloadTab",
 				targetId: tab.id
 			}, `reload-${tab.id}`),
-			disabled: busy !== null
+			disabled: busy !== null,
+			"aria-label": "Recharger l'onglet",
+			title: "Recharger"
 		}, "↺"), (0, import_react.createElement)("button", {
 			className: "mobile-btn outline-danger small",
 			onClick: () => tabAction({
 				type: "closeTab",
 				targetId: tab.id
 			}, `close-${tab.id}`),
-			disabled: busy !== null
+			disabled: busy !== null,
+			"aria-label": "Fermer l'onglet",
+			title: "Fermer"
 		}, "×")), tab.active && (0, import_react.createElement)("div", { className: "browser-tab-nav-row" }, (0, import_react.createElement)("input", {
 			className: "mobile-input small",
 			placeholder: "Naviguer vers…",
@@ -22415,6 +22453,7 @@ ${h.join(`
 			className: "mobile-btn accent small",
 			onClick: () => runTabMission(tab.id),
 			disabled: busy !== null || !tabInstruction.trim(),
+			"aria-label": "Lancer l'agent sur cet onglet",
 			title: "Automatiser cette tâche en langage naturel (agent)"
 		}, busy === `mission-${tab.id}` ? "…" : "🤖")), tab.active && missionInfo && (0, import_react.createElement)("div", { className: "browser-tab-mission-note" }, `Agent lancé : « ${missionInfo.instruction.slice(0, 60)} »`), tab.active && missionInfo && (0, import_react.createElement)(AgenticLog, { events })))), observation && (0, import_react.createElement)("div", { className: "browser-observation-card" }, (0, import_react.createElement)("div", { className: "browser-obs-header" }, (0, import_react.createElement)("span", { className: "browser-obs-title" }, "Dernière observation"), (0, import_react.createElement)("span", { className: "browser-obs-url" }, ((_observation$url = observation.url) !== null && _observation$url !== void 0 ? _observation$url : "").slice(0, 60)), (0, import_react.createElement)("button", {
 			className: "mobile-btn ghost small",
@@ -22624,6 +22663,53 @@ ${h.join(`
 			height: 40
 		})), (0, import_react.createElement)("p", { className: "empty-title" }, "Aucun terminal actif")) : null);
 	}
+	var DELIVERABLE_LABELS = {
+		pdf: "PDF",
+		docx: "Word",
+		xlsx: "Excel"
+	};
+	function DeliverableDownloads({ projectId, runId, token }) {
+		const [artifacts, setArtifacts] = (0, import_react.useState)(null);
+		const [error, setError] = (0, import_react.useState)(null);
+		(0, import_react.useEffect)(() => {
+			let cancelled = false;
+			apiGet(`/api/mobile/projects/${projectId}/runs/${runId}/artifacts`, token).then((list) => {
+				if (!cancelled) setArtifacts(Array.isArray(list) ? list : []);
+			}).catch(() => {
+				if (!cancelled) setArtifacts([]);
+			});
+			return () => {
+				cancelled = true;
+			};
+		}, [
+			projectId,
+			runId,
+			token
+		]);
+		if (!artifacts || artifacts.length === 0) return null;
+		const withDeliverables = artifacts.filter((a) => a.deliverables && a.deliverables.length > 0);
+		if (withDeliverables.length === 0) return null;
+		async function download(artifactId, format, title, ext) {
+			try {
+				setError(null);
+				await downloadDeliverable(`/api/mobile/runs/${runId}/artifacts/${artifactId}/deliverable/${format}`, `${title}.${ext}`, token);
+			} catch (e) {
+				var _e$message;
+				setError((_e$message = e === null || e === void 0 ? void 0 : e.message) !== null && _e$message !== void 0 ? _e$message : "Téléchargement impossible");
+			}
+		}
+		return (0, import_react.createElement)("div", { className: "deliverables-block" }, (0, import_react.createElement)("p", { className: "card-section-title" }, "Livrables"), withDeliverables.map((artifact) => (0, import_react.createElement)("div", {
+			key: artifact.id,
+			className: "deliverable-row"
+		}, (0, import_react.createElement)("span", { className: "deliverable-title" }, artifact.title), (0, import_react.createElement)("div", { className: "deliverable-actions" }, artifact.deliverables.map((d) => {
+			var _DELIVERABLE_LABELS$d;
+			return (0, import_react.createElement)("button", {
+				key: d.format,
+				className: "mobile-btn ghost small",
+				onClick: () => download(artifact.id, d.format, artifact.title, d.ext)
+			}, `↓ ${(_DELIVERABLE_LABELS$d = DELIVERABLE_LABELS[d.format]) !== null && _DELIVERABLE_LABELS$d !== void 0 ? _DELIVERABLE_LABELS$d : d.format.toUpperCase()}`);
+		})))), error ? (0, import_react.createElement)("p", { className: "deliverable-error" }, error) : null);
+	}
 	var SURFACE_LABEL_FR = {
 		browser: "Web",
 		desktop: "Bureau",
@@ -22648,6 +22734,31 @@ ${h.join(`
 		}
 		const label = (_ref25 = (_SURFACE_LABEL_FR$p$s = SURFACE_LABEL_FR[p.surface]) !== null && _SURFACE_LABEL_FR$p$s !== void 0 ? _SURFACE_LABEL_FR$p$s : p.surface) !== null && _ref25 !== void 0 ? _ref25 : "";
 		return (0, import_react.createElement)("div", { className: "composed-banner active" }, `${p.index && p.total ? `Phase ${p.index}/${p.total}` : "Phase"} · ${label} — ${composed.type === "mission.composed.phase_completed" ? "terminée" : "en cours"}`);
+	}
+	function ResultatsTab({ projectId, token, events }) {
+		const [runs, setRuns] = (0, import_react.useState)([]);
+		(0, import_react.useEffect)(() => {
+			apiGet(`/api/mobile/projects/${projectId}/runs`, token).then(setRuns).catch(() => {});
+		}, [
+			projectId,
+			token,
+			events.length
+		]);
+		const done = runs.filter((r) => r.status === "completed" || r.status === "failed" || r.summary);
+		return (0, import_react.createElement)("div", { className: "tab-content" }, done.length === 0 ? (0, import_react.createElement)("div", { className: "empty-state" }, (0, import_react.createElement)("div", { className: "empty-icon" }, IC([(0, import_react.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), (0, import_react.createElement)("polyline", { points: "14 2 14 8 20 8" })], {
+			width: 40,
+			height: 40
+		})), (0, import_react.createElement)("p", { className: "empty-title" }, "Aucun résultat"), (0, import_react.createElement)("p", { className: "empty-sub" }, "Les résultats apparaissent une fois les missions terminées")) : done.map((run) => {
+			var _STATUS_FR$run$status3;
+			return (0, import_react.createElement)("div", {
+				key: run.id,
+				className: `run-card status-${run.status}`
+			}, (0, import_react.createElement)("div", { className: "run-card-top" }, (0, import_react.createElement)("span", { className: `status-dot ${run.status}` }), (0, import_react.createElement)("span", { className: "run-status-label" }, (_STATUS_FR$run$status3 = STATUS_FR[run.status]) !== null && _STATUS_FR$run$status3 !== void 0 ? _STATUS_FR$run$status3 : run.status), (0, import_react.createElement)("span", { className: "run-ts" }, run.updatedAt ? formatTime(run.updatedAt) : "")), (0, import_react.createElement)("p", { className: "run-mission" }, run.mission), run.summary ? (0, import_react.createElement)("p", { className: "run-summary" }, run.summary) : null, run.status === "completed" ? (0, import_react.createElement)(DeliverableDownloads, {
+				projectId,
+				runId: run.id,
+				token
+			}) : null);
+		}));
 	}
 	function SelfCheckCard({ token }) {
 		var _report$checks;
@@ -22903,25 +23014,103 @@ ${h.join(`
 			disabled: busy || !name.trim()
 		}, busy ? "Ajout…" : "Ajouter le connecteur"), error ? (0, import_react.createElement)("div", { className: "inline-error" }, error) : null, saved ? (0, import_react.createElement)("div", { className: "llm-field-status ready" }, "Connecteur ajouté au graphe de capacités") : null));
 	}
-	function MoreTab({ projectId, token, session, events, onDisconnect, pollingInterval, onPollingIntervalChange }) {
-		const [view, setView] = (0, import_react.useState)("params");
-		return (0, import_react.createElement)("div", { className: "more-tab-wrap" }, (0, import_react.createElement)("div", { className: "more-segment" }, (0, import_react.createElement)("button", {
-			className: view === "params" ? "active" : "",
-			onClick: () => setView("params")
-		}, "Paramètres"), (0, import_react.createElement)("button", {
-			className: view === "connectors" ? "active" : "",
-			onClick: () => setView("connectors")
-		}, "Connecteurs"), (0, import_react.createElement)("button", {
-			className: view === "admin" ? "active" : "",
-			onClick: () => setView("admin")
-		}, "Admin")), view === "params" ? (0, import_react.createElement)(ParametresTab, {
-			pollingInterval,
-			onPollingIntervalChange
-		}) : view === "connectors" ? (0, import_react.createElement)(ConnecteursTab, { token }) : (0, import_react.createElement)(AdminTab, {
-			token,
-			session,
-			onDisconnect
-		}));
+	var PLUS_ITEMS = [
+		{
+			id: "results",
+			label: "Résultats",
+			desc: "Livrables téléchargeables (PDF, Word, Excel)",
+			icon: () => IC([
+				(0, import_react.createElement)("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+				(0, import_react.createElement)("polyline", { points: "14 2 14 8 20 8" }),
+				(0, import_react.createElement)("line", {
+					x1: 12,
+					y1: 18,
+					x2: 12,
+					y2: 12
+				}),
+				(0, import_react.createElement)("polyline", { points: "9 15 12 18 15 15" })
+			], {
+				width: 22,
+				height: 22
+			})
+		},
+		{
+			id: "connectors",
+			label: "Connecteurs & Tools",
+			desc: "Brancher un service via MCP / OAuth",
+			icon: () => IC([
+				(0, import_react.createElement)("path", { d: "M9 2v6" }),
+				(0, import_react.createElement)("path", { d: "M15 2v6" }),
+				(0, import_react.createElement)("path", { d: "M6 8h12v3a6 6 0 0 1-12 0z" }),
+				(0, import_react.createElement)("path", { d: "M12 17v5" })
+			], {
+				width: 22,
+				height: 22
+			})
+		},
+		{
+			id: "terminal",
+			label: "Terminal",
+			desc: "Shell distant interactif",
+			icon: () => SVG.terminal
+		},
+		{
+			id: "params",
+			label: "Paramètres",
+			desc: "Cadence d'écran, préférences",
+			icon: () => SVG.settings
+		},
+		{
+			id: "admin",
+			label: "Admin",
+			desc: "Session, appareils, auto-test système",
+			icon: () => IC([(0, import_react.createElement)("path", { d: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" })], {
+				width: 22,
+				height: 22
+			})
+		}
+	];
+	function PlusTab({ projectId, token, events, session, onDisconnect, pollingInterval, onPollingIntervalChange }) {
+		const [view, setView] = (0, import_react.useState)(null);
+		if (view) {
+			var _item$label;
+			const item = PLUS_ITEMS.find((i) => i.id === view);
+			let body = null;
+			if (view === "results") body = (0, import_react.createElement)(ResultatsTab, {
+				projectId,
+				token,
+				events
+			});
+			else if (view === "connectors") body = (0, import_react.createElement)(ConnecteursTab, { token });
+			else if (view === "terminal") body = (0, import_react.createElement)(TerminalsTab, {
+				projectId,
+				token,
+				events
+			});
+			else if (view === "params") body = (0, import_react.createElement)(ParametresTab, {
+				pollingInterval,
+				onPollingIntervalChange
+			});
+			else if (view === "admin") body = (0, import_react.createElement)(AdminTab, {
+				token,
+				session,
+				onDisconnect
+			});
+			return (0, import_react.createElement)("div", { className: "tab-content plus-tab" }, (0, import_react.createElement)("button", {
+				className: "plus-back",
+				onClick: () => setView(null),
+				"aria-label": "Retour"
+			}, SVG.back, (0, import_react.createElement)("span", null, (_item$label = item === null || item === void 0 ? void 0 : item.label) !== null && _item$label !== void 0 ? _item$label : "Retour")), body);
+		}
+		return (0, import_react.createElement)("div", { className: "tab-content plus-tab" }, (0, import_react.createElement)("p", {
+			className: "card-section-title",
+			style: { padding: "2px 2px 4px" }
+		}, "Plus"), (0, import_react.createElement)("div", { className: "plus-grid" }, PLUS_ITEMS.map((item) => (0, import_react.createElement)("button", {
+			key: item.id,
+			className: "plus-entry",
+			onClick: () => setView(item.id),
+			"aria-label": item.label
+		}, (0, import_react.createElement)("span", { className: "plus-entry-icon" }, item.icon()), (0, import_react.createElement)("span", { className: "plus-entry-text" }, (0, import_react.createElement)("strong", null, item.label), (0, import_react.createElement)("small", null, item.desc)), (0, import_react.createElement)("span", { className: "plus-entry-chev" }, SVG.forward)))));
 	}
 	function useEventStream(token, onEvent, onStatus) {
 		const onEventRef = (0, import_react.useRef)(onEvent);
@@ -23158,16 +23347,23 @@ ${h.join(`
 			projectId,
 			token: sessionToken,
 			events
-		}), activeTab === "terminal" && (0, import_react.createElement)(TerminalsTab, {
-			projectId,
-			token: sessionToken,
-			events
 		}), activeTab === "tasks" && (0, import_react.createElement)(TasksTab, {
 			projectId,
 			token: sessionToken,
 			events,
 			approvals: pendingApprovals,
 			onApprovalResolved: handleApprovalResolved
+		}), activeTab === "plus" && (0, import_react.createElement)(PlusTab, {
+			projectId,
+			token: sessionToken,
+			events,
+			session,
+			onDisconnect: () => dropSessionToPairing(null),
+			pollingInterval,
+			onPollingIntervalChange: (v) => {
+				setPollingInterval(v);
+				savePollingInterval(v);
+			}
 		})), (0, import_react.createElement)("nav", { className: "mobile-tabs" }, TABS.map((tab) => (0, import_react.createElement)("button", {
 			key: tab,
 			className: `mobile-tab ${activeTab === tab ? "active" : ""}`,

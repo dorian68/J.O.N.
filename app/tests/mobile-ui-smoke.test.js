@@ -116,7 +116,9 @@ export async function run() {
     await tabsPane.getByText("Session active").waitFor({ state: "visible", timeout: 15000 });
     await tabsPane.locator(".browser-tab-card.active").waitFor({ state: "visible", timeout: 15000 });
     assert.equal(await tabsPane.locator(".browser-tab-card").filter({ hasText: "about:blank" }).count(), 1);
-    await page.locator(".mobile-tab").filter({ hasText: "Terminal" }).click();
+    // Terminal now lives under the "Plus" hub (IA refresh) — reach it there.
+    await page.locator(".mobile-tab").filter({ hasText: "Plus" }).click();
+    await page.locator(".plus-entry").filter({ hasText: "Terminal" }).click();
     await page.getByText("Shell interactif").waitFor({ state: "visible", timeout: 10000 });
 
     assert.deepEqual(pageErrors, []);

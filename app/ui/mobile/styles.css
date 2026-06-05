@@ -16,7 +16,7 @@
   /* Text */
   --text:           #dde7f5;
   --text-2:         #96adca;
-  --muted:          #4e6585;
+  --muted:          #6f87a8;
 
   /* Accent — electric blue */
   --accent:         #4f8ef7;
@@ -206,10 +206,9 @@ html, body {
 .mobile-tab.active .tab-icon-wrap { background: var(--accent-dim); }
 
 .mobile-tab .tab-label {
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
   line-height: 1;
 }
 
@@ -286,8 +285,11 @@ html, body {
 
 .mobile-btn:active:not(:disabled) { transform: scale(0.97); }
 .mobile-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.mobile-btn:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }
 .mobile-btn.full-width { width: 100%; }
-.mobile-btn.small { padding: 8px 14px; font-size: 13px; border-radius: 8px; }
+/* Touch targets: keep a comfortable minimum even for compact buttons. */
+.mobile-btn { min-height: 44px; }
+.mobile-btn.small { padding: 9px 14px; font-size: 13px; border-radius: 8px; min-height: 40px; }
 
 .mobile-btn.primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-light));
@@ -2940,3 +2942,32 @@ html, body {
 .ctrl-plan-card { margin-top: 10px; background: rgba(168,85,247,0.10); border: 1px solid rgba(168,85,247,0.3); border-radius: 10px; padding: 10px 12px; }
 .ctrl-plan-steps { margin: 6px 0 10px; padding-left: 18px; font-size: 13px; }
 .ctrl-plan-steps li { margin: 3px 0; }
+
+/* ─── "Plus" hub ──────────────────────────────────────────────────────── */
+.plus-grid { display: flex; flex-direction: column; gap: 10px; }
+.plus-entry {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 14px 16px; min-height: 64px;
+  color: var(--text); cursor: pointer; text-align: left;
+  transition: border-color 0.15s, transform 0.08s;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.plus-entry:active { transform: scale(0.985); }
+.plus-entry:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }
+.plus-entry-icon {
+  flex: 0 0 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+  border-radius: 12px; background: var(--accent-dim); color: var(--accent-light);
+}
+.plus-entry-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.plus-entry-text strong { font-size: 15px; font-weight: 600; }
+.plus-entry-text small { font-size: 12.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plus-entry-chev { flex: 0 0 auto; color: var(--muted); }
+.plus-back {
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  background: var(--surface-3); border: 1px solid var(--border-mid); color: var(--text-2);
+  border-radius: var(--r-sm); padding: 9px 14px; min-height: 40px; font-size: 14px; font-weight: 600;
+  cursor: pointer; margin-bottom: 4px; -webkit-tap-highlight-color: transparent;
+}
+.plus-back:active { transform: scale(0.97); }
+.plus-back:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }

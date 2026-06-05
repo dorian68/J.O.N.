@@ -15,8 +15,8 @@ function stripAnsi(text) {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const TABS = ["dashboard", "control", "tabs", "terminal", "tasks"];
-const TAB_LABELS = { dashboard: "Accueil", control: "Contrôle", tabs: "Onglets", terminal: "Terminal", tasks: "Tâches" };
+const TABS = ["dashboard", "control", "tabs", "tasks", "plus"];
+const TAB_LABELS = { dashboard: "Accueil", control: "Contrôle", tabs: "Onglets", terminal: "Terminal", tasks: "Tâches", plus: "Plus" };
 
 const IC = (d, extra = {}) =>
   h("svg", { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", ...extra }, ...d);
@@ -26,7 +26,8 @@ const TAB_ICONS = {
   control: IC([h("rect", { x: 3, y: 4, width: 18, height: 14, rx: 2 }), h("circle", { cx: 8, cy: 18, r: 1 }), h("circle", { cx: 16, cy: 18, r: 1 }), h("path", { d: "M12 14v4" })]),
   tabs: IC([h("rect", { x: 4, y: 5, width: 16, height: 12, rx: 2 }), h("path", { d: "M8 5V3h8v2" }), h("path", { d: "M8 21h8" })]),
   terminal: IC([h("polyline", { points: "4 17 10 11 4 5" }), h("line", { x1: 12, y1: 19, x2: 20, y2: 19 })]),
-  tasks: IC([h("path", { d: "M9 11l3 3L22 4" }), h("path", { d: "M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" })])
+  tasks: IC([h("path", { d: "M9 11l3 3L22 4" }), h("path", { d: "M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" })]),
+  plus: IC([h("circle", { cx: 5, cy: 12, r: 1.6 }), h("circle", { cx: 12, cy: 12, r: 1.6 }), h("circle", { cx: 19, cy: 12, r: 1.6 })])
 };
 
 const SVG = {
@@ -961,23 +962,8 @@ function DashboardTab({ projectId, token, events, session, onDisconnect, polling
       h("div", null, h("span", null, "Appareils"), h("strong", null, String(status?.devices?.length ?? 0)))
     ),
 
-    // ── Configuration — dédiée, hors entête et hors branding ──────────────────
-    h("div", { className: "section dashboard-config-section" },
-      h("button", {
-        className: `dashboard-config-toggle ${showSettings ? "active" : ""}`,
-        onClick: () => setShowSettings((v) => !v),
-        "aria-label": "Configuration de l’agent"
-      },
-        SVG.settings,
-        h("span", null, "Configuration"),
-        h("span", { className: "dashboard-config-chevron" }, showSettings ? "▲" : "▼")
-      ),
-      showSettings
-        ? h("div", { className: "dashboard-settings-card" },
-            h(MoreTab, { projectId, token, session, events, onDisconnect, pollingInterval, onPollingIntervalChange })
-          )
-        : null
-    ),
+    // Configuration / connecteurs / admin sont désormais dans l'onglet « Plus »
+    // (accès direct, non enterré) — Accueil reste un tableau de bord épuré.
 
     h("div", { className: "quick-command-card" },
       h("textarea", {
@@ -2287,14 +2273,16 @@ function BrowserTabsTab({ projectId, token, events }) {
                   className: "mobile-btn ghost small",
                   onClick: () => tabAction({ type: "observeTab", targetId: tab.id }, `observe-${tab.id}`),
                   disabled: busy !== null,
+                  "aria-label": "Observer l'onglet (DOM + capture)",
                   title: "Observer — extrait DOM + screenshot"
                 }, busy === `observe-${tab.id}` ? "…" : "👁"),
                 h("button", {
                   className: "mobile-btn ghost small",
                   onClick: () => tabAction({ type: "reloadTab", targetId: tab.id }, `reload-${tab.id}`),
-                  disabled: busy !== null
+                  disabled: busy !== null,
+                  "aria-label": "Recharger l'onglet", title: "Recharger"
                 }, "↺"),
-                h("button", { className: "mobile-btn outline-danger small", onClick: () => tabAction({ type: "closeTab", targetId: tab.id }, `close-${tab.id}`), disabled: busy !== null }, "×")
+                h("button", { className: "mobile-btn outline-danger small", onClick: () => tabAction({ type: "closeTab", targetId: tab.id }, `close-${tab.id}`), disabled: busy !== null, "aria-label": "Fermer l'onglet", title: "Fermer" }, "×")
               ),
               // Navigate URL input for this tab
               tab.active && h("div", { className: "browser-tab-nav-row" },
@@ -2324,6 +2312,7 @@ function BrowserTabsTab({ projectId, token, events }) {
                   className: "mobile-btn accent small",
                   onClick: () => runTabMission(tab.id),
                   disabled: busy !== null || !tabInstruction.trim(),
+                  "aria-label": "Lancer l'agent sur cet onglet",
                   title: "Automatiser cette tâche en langage naturel (agent)"
                 }, busy === `mission-${tab.id}` ? "…" : "🤖")
               ),
@@ -3012,6 +3001,53 @@ function MoreTab({ projectId, token, session, events, onDisconnect, pollingInter
   );
 }
 
+// "Plus" hub — surfaces every secondary destination as a first-class entry so
+// nothing is buried: Résultats (deliverables), Connecteurs (MCP/OAuth),
+// Terminal, Paramètres, Admin. Tapping an entry opens it with a back header.
+const PLUS_ITEMS = [
+  { id: "results", label: "Résultats", desc: "Livrables téléchargeables (PDF, Word, Excel)", icon: () => IC([h("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }), h("polyline", { points: "14 2 14 8 20 8" }), h("line", { x1: 12, y1: 18, x2: 12, y2: 12 }), h("polyline", { points: "9 15 12 18 15 15" })], { width: 22, height: 22 }) },
+  { id: "connectors", label: "Connecteurs & Tools", desc: "Brancher un service via MCP / OAuth", icon: () => IC([h("path", { d: "M9 2v6" }), h("path", { d: "M15 2v6" }), h("path", { d: "M6 8h12v3a6 6 0 0 1-12 0z" }), h("path", { d: "M12 17v5" })], { width: 22, height: 22 }) },
+  { id: "terminal", label: "Terminal", desc: "Shell distant interactif", icon: () => SVG.terminal },
+  { id: "params", label: "Paramètres", desc: "Cadence d'écran, préférences", icon: () => SVG.settings },
+  { id: "admin", label: "Admin", desc: "Session, appareils, auto-test système", icon: () => IC([h("path", { d: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" })], { width: 22, height: 22 }) }
+];
+
+function PlusTab({ projectId, token, events, session, onDisconnect, pollingInterval, onPollingIntervalChange }) {
+  const [view, setView] = useState(null);
+
+  if (view) {
+    const item = PLUS_ITEMS.find((i) => i.id === view);
+    let body = null;
+    if (view === "results") body = h(ResultatsTab, { projectId, token, events });
+    else if (view === "connectors") body = h(ConnecteursTab, { token });
+    else if (view === "terminal") body = h(TerminalsTab, { projectId, token, events });
+    else if (view === "params") body = h(ParametresTab, { pollingInterval, onPollingIntervalChange });
+    else if (view === "admin") body = h(AdminTab, { token, session, onDisconnect });
+    return h("div", { className: "tab-content plus-tab" },
+      h("button", { className: "plus-back", onClick: () => setView(null), "aria-label": "Retour" },
+        SVG.back, h("span", null, item?.label ?? "Retour")
+      ),
+      body
+    );
+  }
+
+  return h("div", { className: "tab-content plus-tab" },
+    h("p", { className: "card-section-title", style: { padding: "2px 2px 4px" } }, "Plus"),
+    h("div", { className: "plus-grid" },
+      PLUS_ITEMS.map((item) =>
+        h("button", { key: item.id, className: "plus-entry", onClick: () => setView(item.id), "aria-label": item.label },
+          h("span", { className: "plus-entry-icon" }, item.icon()),
+          h("span", { className: "plus-entry-text" },
+            h("strong", null, item.label),
+            h("small", null, item.desc)
+          ),
+          h("span", { className: "plus-entry-chev" }, SVG.forward)
+        )
+      )
+    )
+  );
+}
+
 // ─── SSE hook ─────────────────────────────────────────────────────────────────
 
 function useEventStream(token, onEvent, onStatus) {
@@ -3248,8 +3284,16 @@ function App() {
       }),
       activeTab === "control" && h(ControlTab, { projectId, token: sessionToken, events, pollingInterval }),
       activeTab === "tabs" && h(BrowserTabsTab, { projectId, token: sessionToken, events }),
-      activeTab === "terminal" && h(TerminalsTab, { projectId, token: sessionToken, events }),
-      activeTab === "tasks" && h(TasksTab, { projectId, token: sessionToken, events, approvals: pendingApprovals, onApprovalResolved: handleApprovalResolved })
+      activeTab === "tasks" && h(TasksTab, { projectId, token: sessionToken, events, approvals: pendingApprovals, onApprovalResolved: handleApprovalResolved }),
+      activeTab === "plus" && h(PlusTab, {
+        projectId,
+        token: sessionToken,
+        events,
+        session,
+        onDisconnect: () => dropSessionToPairing(null),
+        pollingInterval,
+        onPollingIntervalChange: (v) => { setPollingInterval(v); savePollingInterval(v); }
+      })
     ),
     h("nav", { className: "mobile-tabs" },
       TABS.map((tab) =>

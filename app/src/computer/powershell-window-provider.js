@@ -31,6 +31,26 @@ const ALLOWED_HOTKEY_NAMED = new Set([
   "ctrl+shift+t", "ctrl+shift+n", "alt+f4", "alt+tab"
 ]);
 
+// SECURITY (audit T10): a launch URL is passed to Start-Process arguments. A
+// value starting with "-"/"--" would be interpreted as a Chromium switch
+// (e.g. --load-extension, --app), not a navigation target. Only allow http(s)
+// (and about:blank); reject dangerous schemes and flag-like values.
+export function sanitizeLaunchUrl(url) {
+  const raw = String(url ?? "").trim().slice(0, 2048);
+  if (!raw || raw.toLowerCase() === "about:blank") return "about:blank";
+  if (raw.startsWith("-")) {
+    throw Object.assign(new Error(`Refused browser launch URL that looks like a command-line flag: ${raw.slice(0, 40)}`), { code: "UNSAFE_LAUNCH_URL" });
+  }
+  let parsed;
+  try { parsed = new URL(raw); } catch {
+    throw Object.assign(new Error(`Refused invalid browser launch URL: ${raw.slice(0, 40)}`), { code: "UNSAFE_LAUNCH_URL" });
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw Object.assign(new Error(`Refused browser launch URL scheme "${parsed.protocol}" (only http/https allowed).`), { code: "UNSAFE_LAUNCH_URL" });
+  }
+  return parsed.toString();
+}
+
 function validateWindowHandle(windowId) {
   if (windowId == null) return null;
   const str = String(windowId).trim();
@@ -205,7 +225,10 @@ class PersistentPsProcess {
       const timer = setTimeout(() => {
         if (this._pending.has(id)) {
           this._pending.delete(id);
-          reject(new Error(`PS daemon timeout (${Math.round(PS_DAEMON_TIMEOUT_MS / 1000)}s) for action: ${command.action ?? "unknown"}`));
+          // The command WAS written to the daemon stdin, so it may still execute
+          // late. Mark sent:true so the caller won't blindly re-run a destructive
+          // action via the single-shot fallback (audit T9 double-actuation).
+          reject(Object.assign(new Error(`PS daemon timeout (${Math.round(PS_DAEMON_TIMEOUT_MS / 1000)}s) for action: ${command.action ?? "unknown"}`), { code: "PS_DAEMON_TIMEOUT", sent: true }));
         }
       }, PS_DAEMON_TIMEOUT_MS);
       this._pending.set(id, {
@@ -278,6 +301,20 @@ function singleShotHotAction(command) {
 // Send a hot-path action through the fast daemon, automatically falling back to
 // the single-shot path if the daemon is unavailable or fails. Once the daemon
 // proves broken it disables itself, so steady-state cost is one path only.
+// Actions that are safe to re-run if the daemon timed out after dispatch.
+// Everything else mutates the desktop and must NOT be auto-retried after a
+// timeout (the daemon may have already actuated it) — audit T9.
+const IDEMPOTENT_HOT_ACTIONS = new Set(["ping", "captureScreen"]);
+
+// Pure decision (exported for tests): may we re-run this action via the
+// single-shot fallback after a daemon error? No, when the action was already
+// dispatched (timeout) AND is destructive — re-running would actuate twice.
+export function canRetryHotActionAfterError(action, error) {
+  const dispatched = error?.sent === true;
+  if (dispatched && !IDEMPOTENT_HOT_ACTIONS.has(action)) return false;
+  return true;
+}
+
 async function sendHotAction(command) {
   if (_daemon.isDisabled()) {
     return singleShotHotAction(command);
@@ -288,6 +325,14 @@ async function sendHotAction(command) {
     // Self-correction: daemon failed -> mark it broken and use the proven path.
     if (!_daemon.isDisabled()) {
       _daemon.disable(`send_failed: ${daemonError?.message ?? daemonError}`);
+    }
+    // T9: if the command was already dispatched (timeout) and is destructive,
+    // do NOT re-run it via single-shot — that would actuate twice.
+    if (!canRetryHotActionAfterError(command.action, daemonError)) {
+      throw Object.assign(
+        new Error(`Desktop action "${command.action}" timed out after dispatch; not retried to avoid double-actuation.`),
+        { code: "DESKTOP_ACTION_TIMEOUT_NO_RETRY" }
+      );
     }
     return singleShotHotAction(command);
   }
@@ -348,7 +393,7 @@ export class PowerShellWindowProvider {
   async launchBrowser(browserId, { url = null } = {}) {
     const args = ["-Action", "launchBrowser", "-BrowserId", String(browserId ?? "").slice(0, 60)];
     if (url) {
-      args.push("-LaunchUrl", String(url).slice(0, 2048));
+      args.push("-LaunchUrl", sanitizeLaunchUrl(url));
     }
     return runPowerShell(args);
   }

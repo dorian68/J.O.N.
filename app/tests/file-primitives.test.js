@@ -6,6 +6,11 @@ import { executeFilePrimitive } from "../src/computer/file-primitives.js";
 
 export async function run() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "cowork-file-primitives-"));
+  // The temp root lives under AppData on Windows; confine JON to it explicitly so
+  // the file-primitive path guard treats it as the sandbox (audit T11).
+  const prevWorkspace = process.env.JON_WORKSPACE_ROOT;
+  process.env.JON_WORKSPACE_ROOT = root;
+  try {
   const runDir = path.join(root, "run");
   const filePath = path.join(root, "notes.txt");
   const renamedPath = path.join(root, "notes-renamed.txt");
@@ -56,4 +61,8 @@ export async function run() {
   }, { runDir, baseDir: root }), /user profile root|protected root/i);
 
   await fs.rm(root, { recursive: true, force: true });
+  } finally {
+    if (prevWorkspace === undefined) delete process.env.JON_WORKSPACE_ROOT;
+    else process.env.JON_WORKSPACE_ROOT = prevWorkspace;
+  }
 }

@@ -2164,6 +2164,8 @@ export class PrototypeAgent {
             }));
           } catch { /* accounting must never break the run */ }
         },
+        // Emergency stop now reaches the browser loop too (audit T8).
+        shouldAbort: () => this.isRunAborted(run.id),
         describeVisualFrame: browserVisionPolicy.enabled
           ? async ({ frame, screenshotBase64, change, phase, step, visionDetail }) => this.#describeBrowserVisualFrame({
             run,
@@ -2273,6 +2275,19 @@ export class PrototypeAgent {
             createdAt: nowIso()
           });
         }
+      }
+
+      // Emergency-stop finalization for the browser surface (audit T8): the
+      // operator loop bailed out, so stage the run as stopped and clear the flag.
+      if (result.status === "stopped" || this.isRunAborted(run.id)) {
+        this.#clearAbort(run.id);
+        this.#recordEvent(run.id, createEvent("run.stopped", EVENT_ACTOR.OPERATOR, "Run stopped by operator (emergency stop).", { surface: "browser" }));
+        await this.#stageRun(run.id, {
+          status: RUN_STATUS.STOPPED,
+          lifecycleStage: "stopped",
+          summary: "Run stopped by operator (emergency stop)."
+        }, "run.stopped", "Run stopped by operator (emergency stop).");
+        return this.database.getRun(run.id);
       }
 
       const stepCount = result.stepResults?.length ?? 0;
@@ -5955,7 +5970,7 @@ export class PrototypeAgent {
     observationTimeline = null
   }) {
     const [activeWindow, visibleWindows] = await Promise.all([
-      Promise.resolve(this.computer.detectActiveWindow()).catch(() => null),
+      this.computer.detectActiveWindow().catch(() => null),
       Promise.resolve(this.computer.listVisibleWindows()).catch(() => [])
     ]);
     const visibleWindowIds = new Set(visibleWindows.map((windowState) => windowState.id).filter(Boolean));
@@ -6081,7 +6096,7 @@ export class PrototypeAgent {
     remainingSteps
   }) {
     const visibleWindows = await Promise.resolve(this.computer.listVisibleWindows()).catch(() => []);
-    const activeWindow = await Promise.resolve(this.computer.detectActiveWindow()).catch(() => currentWindow);
+    const activeWindow = await this.computer.detectActiveWindow().catch(() => currentWindow);
     const activeAccessibilityBefore = activeWindow?.id
       ? await this.computer.inspectAccessibilityTree(activeWindow.id).catch((inspectError) => ({
         available: false,
@@ -6207,7 +6222,7 @@ export class PrototypeAgent {
       role: step.target?.role ?? step.input?.role ?? null,
       automationId: step.target?.automationId ?? step.input?.automationId ?? null
     };
-    const activeWindow = await Promise.resolve(this.computer.detectActiveWindow()).catch(() => null);
+    const activeWindow = await this.computer.detectActiveWindow().catch(() => null);
     const observedWindows = visibleWindows.length > 0
       ? visibleWindows
       : await Promise.resolve(this.computer.listVisibleWindows()).catch(() => []);
@@ -6245,7 +6260,7 @@ export class PrototypeAgent {
         await Promise.resolve(this.computer.focusWindow(windowState.id)).catch(() => null);
       }
       const clickResult = await this.computer.clickPoint(windowState.id, semanticResolution.target.center);
-      const recoveredWindow = await Promise.resolve(this.computer.detectActiveWindow()).catch(() => windowState);
+      const recoveredWindow = await this.computer.detectActiveWindow().catch(() => windowState);
       const perceptionAfter = recoveredWindow?.id
         ? await this.computer.inspectVisibleUi(recoveredWindow.id).catch((inspectError) => ({
           available: false,

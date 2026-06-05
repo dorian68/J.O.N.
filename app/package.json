@@ -26,6 +26,7 @@
     "build:chrome-extension": "node src/scripts/package-chrome-extension.js",
     "package:chrome-extension": "node src/scripts/package-chrome-extension.js --package",
     "smoke:browser-extension": "node src/scripts/run-browser-extension-smoke.js",
+    "smoke:core-reliability": "node src/scripts/run-core-reliability-smoke.js",
     "smoke:security": "node src/scripts/run-security-smoke.js",
     "smoke:production-readiness": "node src/scripts/run-production-readiness.js",
     "preoperator:server": "npm run ui:build --silent && npm run ui:build:mobile --silent",

@@ -96,7 +96,8 @@ export class BrowserOperator {
     evidenceRoot,
     onEvent = null,
     describeVisualFrame = null,
-    recordLlmCall = null
+    recordLlmCall = null,
+    shouldAbort = null
   } = {}) {
     if (!browserController) {
       throw new Error("BrowserOperator requires a BrowserController.");
@@ -111,6 +112,9 @@ export class BrowserOperator {
     // Persist planner/replanner LLM calls so browser_autonomy token usage is
     // attributed to the run (otherwise these calls were never recorded).
     this.recordLlmCall = typeof recordLlmCall === "function" ? recordLlmCall : null;
+    // Emergency-stop hook (audit T8): consulted between steps so the visible
+    // browser loop can be interrupted, not just the desktop loop.
+    this.shouldAbort = typeof shouldAbort === "function" ? shouldAbort : null;
     this.visualFrameDescriptionCount = 0;
   }
 
@@ -195,6 +199,12 @@ export class BrowserOperator {
             maxSteps,
             stepsExecuted: stepIdx
           });
+          break;
+        }
+        // Emergency-stop checkpoint (audit T8): bail cleanly between steps.
+        if (this.shouldAbort && this.shouldAbort()) {
+          execution.status = "stopped";
+          await this.#emitEvent("browser.run_stopped", { runId: this.runId, reason: "operator_emergency_stop", stepsExecuted: stepIdx });
           break;
         }
         const step = executionSteps[stepIdx];

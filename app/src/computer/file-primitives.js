@@ -23,6 +23,22 @@ const SYSTEM_BLOCKED_ROOTS = Object.freeze([
   path.parse(USER_HOME).root
 ].filter(Boolean).map((entry) => path.resolve(entry)));
 
+// SECURITY (audit T11): file operations are confined to a workspace root, and
+// sensitive directories inside it are blocked. Default root = the user home (so
+// "save to Documents/Desktop" still works); set JON_WORKSPACE_ROOT to confine
+// JON to a tighter sandbox.
+function workspaceRoot() {
+  const explicit = process.env.JON_WORKSPACE_ROOT;
+  return explicit ? path.resolve(explicit) : USER_HOME;
+}
+
+// Sensitive subpaths (relative to the user home) that must never be written/deleted
+// even though they live under the workspace root.
+const SENSITIVE_SUBPATHS = Object.freeze([
+  "AppData", ".ssh", ".aws", ".gnupg", ".config", ".cowork/secrets",
+  ".cowork/tls", ".cowork/desktop-token"
+].map((rel) => path.resolve(USER_HOME, rel)));
+
 function normalizeText(value, maxLength = 120_000) {
   return String(value ?? "").replace(/\r\n/g, "\n").slice(0, maxLength);
 }
@@ -64,7 +80,7 @@ export function resolveFileTarget(rawPath, { baseDir = USER_HOME } = {}) {
   return path.resolve(path.isAbsolute(expanded) ? expanded : path.join(baseDir, expanded));
 }
 
-function criticalPathReason(targetPath) {
+export function criticalPathReason(targetPath) {
   const resolved = path.resolve(targetPath);
   for (const root of SYSTEM_BLOCKED_ROOTS) {
     if (resolved === root) {
@@ -76,6 +92,21 @@ function criticalPathReason(targetPath) {
   }
   if (resolved === USER_HOME) {
     return "Refusing to operate on the user profile root directly.";
+  }
+  // Confine to the workspace root (audit T11): block traversal outside it.
+  const root = workspaceRoot();
+  if (resolved !== root && !isPathInside(root, resolved)) {
+    return `Refusing to operate outside the workspace root (${root}).`;
+  }
+  // The home-relative sensitive blocks only apply in DEFAULT mode (workspace =
+  // home). When the operator explicitly sets JON_WORKSPACE_ROOT, that sandbox IS
+  // the boundary (it may legitimately live under AppData/temp).
+  if (!process.env.JON_WORKSPACE_ROOT) {
+    for (const sensitive of SENSITIVE_SUBPATHS) {
+      if (resolved === sensitive || isPathInside(sensitive, resolved)) {
+        return `Refusing to operate on a sensitive path: ${sensitive}`;
+      }
+    }
   }
   return null;
 }

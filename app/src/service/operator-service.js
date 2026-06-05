@@ -5066,20 +5066,9 @@ export class OperatorService extends EventEmitter {
     }
   }
 
-  async startMission(projectId, { objective, constraints = "", source = "desktop" } = {}) {
-    const project = this.runtimeHandle.database.getProject(projectId);
-    if (!project) throw new Error("Project not found");
-    const missionSpec = await this.prepareRunMission(projectId, {
-      objective,
-      deliverable: "",
-      constraints,
-      forbiddenActions: "",
-      mode: "",
-      browserId: "",
-      autoContinue: false
-    });
-    return this.startRun(projectId, missionSpec);
-  }
+  // (Removed a dead, duplicate `startMission` that overwrote nothing but called
+  // non-existent prepareRunMission()/startRun(). The single source of truth is the
+  // `startMission(projectId, missionRequest)` below, which now honors `source`.)
 
   async requestMobileScreenshot(projectId) {
     const resolvedId = this.#resolveMobileProjectId(projectId) ?? projectId;
@@ -5501,6 +5490,9 @@ export class OperatorService extends EventEmitter {
 
     const missionEntry = this.getMissionEntryContract();
     const rawMissionInitial = missionRequest?.missionSpec ?? missionRequest;
+    // Honor the caller's surface (audit T7): previously `source` was silently
+    // dropped. Mobile vs desktop is recorded on the run for audit/telemetry.
+    const missionSource = String(missionRequest?.source ?? missionRequest?.missionSpec?.source ?? "desktop");
 
     // Resolve any /llm{...} directives in the objective before routing
     const inlineResolution = await resolveInlineMissionDirectives(
@@ -5691,7 +5683,7 @@ export class OperatorService extends EventEmitter {
       confirmedPreflight,
       orchestration,
       conversationId: conversation?.id ?? null,
-      entryPoint: "mission_entry_gui",
+      entryPoint: missionSource === "mobile" ? "mission_entry_mobile" : "mission_entry_gui",
       selectedBy: "user_start"
     });
     this.#patchRunMetadata(launch.runId, (metadata) => ({

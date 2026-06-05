@@ -49,6 +49,28 @@ function createUsageState() {
   };
 }
 
+function hasTokenUsage(value) {
+  return value?.inputTokens != null || value?.outputTokens != null || value?.totalTokens != null;
+}
+
+function addTokenUsage(left, right) {
+  if (!hasTokenUsage(left) && !hasTokenUsage(right)) {
+    return null;
+  }
+  return {
+    inputTokens: (left?.inputTokens ?? 0) + (right?.inputTokens ?? 0),
+    outputTokens: (left?.outputTokens ?? 0) + (right?.outputTokens ?? 0),
+    totalTokens: (left?.totalTokens ?? 0) + (right?.totalTokens ?? 0)
+  };
+}
+
+function addCost(left, right) {
+  if (left == null && right == null) {
+    return null;
+  }
+  return Number(((left ?? 0) + (right ?? 0)).toFixed(6));
+}
+
 function effectiveModeFromStatus({ providerMode, availableProviders, configIssues }) {
   if (providerMode === "disabled") {
     return "deterministic_only";
@@ -123,10 +145,23 @@ export class InternalLlmGateway {
     this.tokenGovernance = tokenGovernance;
     this.providerStates = new Map();
     this.sessionUsage = createUsageState();
+    this.sessionWindowStartedAt = Date.now();
     this.runUsage = new Map();
   }
 
+  // The session budget is a ROLLING window, not a lifetime cap. Once the window
+  // elapses, session usage resets so a long-lived coworker auto-recovers instead
+  // of bricking permanently once cumulative usage crosses the ceiling.
+  #rollSessionWindowIfDue() {
+    const windowMs = this.runtimeConfig?.budgets?.sessionWindowMs ?? 0;
+    if (windowMs > 0 && (Date.now() - this.sessionWindowStartedAt) >= windowMs) {
+      this.sessionUsage = createUsageState();
+      this.sessionWindowStartedAt = Date.now();
+    }
+  }
+
   getStatus() {
+    this.#rollSessionWindowIfDue();
     const availableProviders = this.providerOrder.filter((alias) => this.providers.get(alias)?.isEnabled());
     return {
       providerMode: this.providerMode,
@@ -166,6 +201,7 @@ export class InternalLlmGateway {
     metadata = {},
     extraMessages = []
   }) {
+    this.#rollSessionWindowIfDue();
     const governanceDecision = this.tokenGovernance.prepareRequest({
       runId,
       projectId,
@@ -183,6 +219,9 @@ export class InternalLlmGateway {
     const requestId = createId("llmreq");
     const fallbackChain = [];
     let lastError = null;
+    let failedAttemptTokenUsage = null;
+    let failedAttemptEstimatedCost = 0;
+    let failedAttemptUsageCount = 0;
 
     if (metadata.inputCompaction?.estimatedTokensSaved > 0) {
       this.tokenGovernance.noteCompaction(governanceDecision.stage, metadata.inputCompaction.estimatedTokensSaved);
@@ -373,7 +412,8 @@ export class InternalLlmGateway {
             messages,
             extraMessages: providerExtraMessages,
             input: governanceDecision.input ?? input,
-            metadata
+            metadata,
+            maxCompletionTokens: governanceDecision.policy.maxOutputTokensTarget
           });
           let output;
           try {
@@ -381,8 +421,11 @@ export class InternalLlmGateway {
           } catch (error) {
             throw normalizeValidationError(error);
           }
-          const tokenUsage = response.tokenUsage ?? null;
-          const estimatedCost = response.estimatedCost ?? null;
+          const tokenUsage = addTokenUsage(failedAttemptTokenUsage, response.tokenUsage);
+          const estimatedCost = addCost(
+            failedAttemptUsageCount > 0 ? failedAttemptEstimatedCost : null,
+            response.estimatedCost
+          );
           const usageSnapshotBefore = {
             session: summarizeBudgetUsage(this.sessionUsage),
             run: summarizeBudgetUsage(this.#getRunUsage(runId))
@@ -417,6 +460,9 @@ export class InternalLlmGateway {
               fallbackUsed: fallbackChain.length > 0,
               degradedModeUsed: candidate.alias !== LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE,
               schemaRepairAttempted: fallbackChain.some((entry) => entry.errorCategory === "malformed_output" && entry.repairRetry === true),
+              providerSuccessTokenUsage: failedAttemptUsageCount > 0 ? response.tokenUsage ?? null : null,
+              failedAttemptTokenUsage: failedAttemptUsageCount > 0 ? failedAttemptTokenUsage : null,
+              failedAttemptEstimatedCost: failedAttemptUsageCount > 0 ? failedAttemptEstimatedCost : null,
               usageSnapshotBefore,
               providerAttempt: attempt,
               tokenGovernance: {
@@ -491,6 +537,15 @@ export class InternalLlmGateway {
             message: error.message,
             retryAfterMs: error.retryAfterMs ?? null
           };
+          if (hasTokenUsage(error.tokenUsage)) {
+            failureEntry.tokenUsage = error.tokenUsage;
+            failedAttemptTokenUsage = addTokenUsage(failedAttemptTokenUsage, error.tokenUsage);
+            failedAttemptUsageCount += 1;
+          }
+          if (error.estimatedCost != null) {
+            failureEntry.estimatedCost = error.estimatedCost;
+            failedAttemptEstimatedCost = Number((failedAttemptEstimatedCost + error.estimatedCost).toFixed(6));
+          }
           const shouldRepairMalformedOutput = category === "malformed_output"
             && candidate.alias === LLM_PROVIDER_ALIAS.OPENAI_COMPATIBLE
             && attempt < this.runtimeConfig.retryPolicy.maxAttemptsPerProvider;
@@ -559,8 +614,8 @@ export class InternalLlmGateway {
       inputSizeEstimate: estimateSize(governanceDecision.input ?? input),
       outputSizeEstimate: null,
       latencyMs: null,
-      tokenUsage: null,
-      estimatedCost: null,
+      tokenUsage: failedAttemptUsageCount > 0 ? failedAttemptTokenUsage : null,
+      estimatedCost: failedAttemptUsageCount > 0 ? failedAttemptEstimatedCost : null,
       retryCount: Math.max(0, fallbackChain.length - 1),
       fallbackChain,
       resultStatus: LLM_RESULT_STATUS.FAILED,
@@ -572,6 +627,8 @@ export class InternalLlmGateway {
         promptEnvironment: this.promptRegistry.environment,
         fallbackUsed: fallbackChain.length > 0,
         degradedModeUsed: false,
+        failedAttemptTokenUsage: failedAttemptUsageCount > 0 ? failedAttemptTokenUsage : null,
+        failedAttemptEstimatedCost: failedAttemptUsageCount > 0 ? failedAttemptEstimatedCost : null,
         tokenGovernance: {
           ...governanceDecision.governance,
           requestFingerprint: governanceDecision.fingerprint,
@@ -694,6 +751,7 @@ export class InternalLlmGateway {
   }
 
   #isBudgetExceeded(runId) {
+    this.#rollSessionWindowIfDue();
     const runUsage = this.#getRunUsage(runId);
     const { budgets } = this.runtimeConfig;
     return (
@@ -768,6 +826,7 @@ export class InternalLlmGateway {
 
   // Raw text generation for inline LLM directives — bypasses structured JSON mode
   async generateText({ messages, runId = null, projectId = null } = {}) {
+    this.#rollSessionWindowIfDue();
     if (this.providerMode === "disabled") {
       throw new LlmGatewayError("LLM provider is disabled.", { category: "provider_unavailable" });
     }

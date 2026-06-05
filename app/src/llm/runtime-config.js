@@ -23,6 +23,24 @@ const PROVIDER_MODE_ALIASES = Object.freeze({
 const DEFAULT_OPENAI_TEXT_MODEL = "gpt-4.1-mini";
 const DEFAULT_OPENAI_VISION_MODEL = "gpt-5-mini";
 const VISION_DETAIL_LEVELS = new Set(["auto", "low", "high"]);
+const DEFAULT_OPENAI_PRICING_BY_MODEL = Object.freeze({
+  "gpt-4.1-mini": {
+    inputPer1k: 0.0004,
+    outputPer1k: 0.0016
+  },
+  "gpt-4.1-nano": {
+    inputPer1k: 0.0001,
+    outputPer1k: 0.0004
+  },
+  "gpt-5-mini": {
+    inputPer1k: 0.00025,
+    outputPer1k: 0.002
+  },
+  "gpt-5-nano": {
+    inputPer1k: 0.00005,
+    outputPer1k: 0.0004
+  }
+});
 
 function parsePositiveInt(value, fallback, issues, label) {
   if (value == null || value === "") {
@@ -132,20 +150,44 @@ function runtimeProfileFromEnv(env = {}) {
   return String(env.COWORK_LLM_RUNTIME_PROFILE ?? env.COWORK_RUNTIME_PROFILE ?? "production_strict").trim() || "production_strict";
 }
 
-function parsePriceOverrides(env, issues) {
+function pricingFallbackForModel(model) {
+  return DEFAULT_OPENAI_PRICING_BY_MODEL[String(model ?? "").trim()] ?? {
+    inputPer1k: null,
+    outputPer1k: null
+  };
+}
+
+function parsePriceForAlias(env, issues, { model, inputKey, outputKey, inputLabel, outputLabel }) {
+  const fallback = pricingFallbackForModel(model);
   return {
-    primary_reasoning: {
-      inputPer1k: parseNonNegativeFloat(env.COWORK_OPENAI_PRIMARY_INPUT_USD_PER_1K, null, issues, "COWORK_OPENAI_PRIMARY_INPUT_USD_PER_1K"),
-      outputPer1k: parseNonNegativeFloat(env.COWORK_OPENAI_PRIMARY_OUTPUT_USD_PER_1K, null, issues, "COWORK_OPENAI_PRIMARY_OUTPUT_USD_PER_1K")
-    },
-    utility_structuring: {
-      inputPer1k: parseNonNegativeFloat(env.COWORK_OPENAI_UTILITY_INPUT_USD_PER_1K, null, issues, "COWORK_OPENAI_UTILITY_INPUT_USD_PER_1K"),
-      outputPer1k: parseNonNegativeFloat(env.COWORK_OPENAI_UTILITY_OUTPUT_USD_PER_1K, null, issues, "COWORK_OPENAI_UTILITY_OUTPUT_USD_PER_1K")
-    },
-    vision_fallback: {
-      inputPer1k: parseNonNegativeFloat(env.COWORK_OPENAI_VISION_INPUT_USD_PER_1K, null, issues, "COWORK_OPENAI_VISION_INPUT_USD_PER_1K"),
-      outputPer1k: parseNonNegativeFloat(env.COWORK_OPENAI_VISION_OUTPUT_USD_PER_1K, null, issues, "COWORK_OPENAI_VISION_OUTPUT_USD_PER_1K")
-    }
+    inputPer1k: parseNonNegativeFloat(env[inputKey], fallback.inputPer1k, issues, inputLabel),
+    outputPer1k: parseNonNegativeFloat(env[outputKey], fallback.outputPer1k, issues, outputLabel)
+  };
+}
+
+function parsePriceOverrides(env, issues, modelMap) {
+  return {
+    primary_reasoning: parsePriceForAlias(env, issues, {
+      model: modelMap.primary_reasoning,
+      inputKey: "COWORK_OPENAI_PRIMARY_INPUT_USD_PER_1K",
+      outputKey: "COWORK_OPENAI_PRIMARY_OUTPUT_USD_PER_1K",
+      inputLabel: "COWORK_OPENAI_PRIMARY_INPUT_USD_PER_1K",
+      outputLabel: "COWORK_OPENAI_PRIMARY_OUTPUT_USD_PER_1K"
+    }),
+    utility_structuring: parsePriceForAlias(env, issues, {
+      model: modelMap.utility_structuring,
+      inputKey: "COWORK_OPENAI_UTILITY_INPUT_USD_PER_1K",
+      outputKey: "COWORK_OPENAI_UTILITY_OUTPUT_USD_PER_1K",
+      inputLabel: "COWORK_OPENAI_UTILITY_INPUT_USD_PER_1K",
+      outputLabel: "COWORK_OPENAI_UTILITY_OUTPUT_USD_PER_1K"
+    }),
+    vision_fallback: parsePriceForAlias(env, issues, {
+      model: modelMap.vision_fallback,
+      inputKey: "COWORK_OPENAI_VISION_INPUT_USD_PER_1K",
+      outputKey: "COWORK_OPENAI_VISION_OUTPUT_USD_PER_1K",
+      inputLabel: "COWORK_OPENAI_VISION_INPUT_USD_PER_1K",
+      outputLabel: "COWORK_OPENAI_VISION_OUTPUT_USD_PER_1K"
+    })
   };
 }
 
@@ -237,7 +279,8 @@ export function buildLlmRuntimeConfig({ env = process.env, secretResolution = nu
       perRunTokens: parsePositiveInt(env.COWORK_LLM_BUDGET_PER_RUN_TOKENS, DEFAULT_LLM_BUDGETS.perRunTokens, issues, "COWORK_LLM_BUDGET_PER_RUN_TOKENS"),
       perSessionTokens: parsePositiveInt(env.COWORK_LLM_BUDGET_PER_SESSION_TOKENS, DEFAULT_LLM_BUDGETS.perSessionTokens, issues, "COWORK_LLM_BUDGET_PER_SESSION_TOKENS"),
       perRunUsd: parseNonNegativeFloat(env.COWORK_LLM_BUDGET_PER_RUN_USD, DEFAULT_LLM_BUDGETS.perRunUsd, issues, "COWORK_LLM_BUDGET_PER_RUN_USD"),
-      perSessionUsd: parseNonNegativeFloat(env.COWORK_LLM_BUDGET_PER_SESSION_USD, DEFAULT_LLM_BUDGETS.perSessionUsd, issues, "COWORK_LLM_BUDGET_PER_SESSION_USD")
+      perSessionUsd: parseNonNegativeFloat(env.COWORK_LLM_BUDGET_PER_SESSION_USD, DEFAULT_LLM_BUDGETS.perSessionUsd, issues, "COWORK_LLM_BUDGET_PER_SESSION_USD"),
+      sessionWindowMs: parsePositiveInt(env.COWORK_LLM_BUDGET_SESSION_WINDOW_MS, DEFAULT_LLM_BUDGETS.sessionWindowMs, issues, "COWORK_LLM_BUDGET_SESSION_WINDOW_MS")
     },
     vision: {
       enabled: parseBoolean(env.COWORK_BROWSER_VISION_ENABLED, true),
@@ -278,7 +321,7 @@ export function buildLlmRuntimeConfig({ env = process.env, secretResolution = nu
         localEnvFallbackConfigured: Boolean(secretResolution?.providers?.openaiCompatible?.localEnvFileConfigured),
         timeoutMs: parsePositiveInt(env.COWORK_OPENAI_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS, issues, "COWORK_OPENAI_TIMEOUT_MS"),
         modelMap,
-        pricing: parsePriceOverrides(env, issues)
+        pricing: parsePriceOverrides(env, issues, modelMap)
       }
     }
   };

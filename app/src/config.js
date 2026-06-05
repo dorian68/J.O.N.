@@ -26,7 +26,7 @@ export const DEFAULT_SERVER_PORT = 41731;
 export const DEFAULT_OPERATOR_PORT = 41732;
 export const DEFAULT_BROWSER_CHANNEL = process.env.COWORK_BROWSER_CHANNEL || "bundled";
 export const DEFAULT_HEADLESS = process.env.COWORK_HEADLESS !== "0";
-export const DEFAULT_BROWSER_STEALTH = process.env.COWORK_BROWSER_STEALTH !== "0";
+export const DEFAULT_BROWSER_STEALTH = process.env.COWORK_BROWSER_STEALTH === "1";
 export const DEFAULT_TIMEOUT_MS = 10_000;
 export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
 export const DEFAULT_LLM_PROVIDER_MODE = process.env.COWORK_LLM_PROVIDER_MODE || "openai_compatible";
@@ -36,7 +36,12 @@ export const DEFAULT_LLM_BUDGETS = Object.freeze({
   perRunTokens: 50_000,
   perSessionTokens: 250_000,
   perRunUsd: 0.5,
-  perSessionUsd: 2
+  perSessionUsd: 2,
+  // The session token/USD budgets above are enforced over a ROLLING window, not
+  // for the entire process lifetime. Without this a long-lived desktop coworker
+  // permanently bricks itself once cumulative usage crosses the ceiling. The
+  // window auto-recovers, keeping the cost guard while staying usable. 1h default.
+  sessionWindowMs: 3_600_000
 });
 
 export const EVENT_ACTOR = {

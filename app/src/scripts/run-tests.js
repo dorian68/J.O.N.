@@ -371,6 +371,10 @@ const suites = [
     modulePath: "../../tests/mobile-session-persistence.test.js"
   },
   {
+    name: "session-budget-rolling-window",
+    modulePath: "../../tests/session-budget-rolling-window.test.js"
+  },
+  {
     name: "mobile-ui-smoke",
     modulePath: "../../tests/mobile-ui-smoke.test.js"
   },

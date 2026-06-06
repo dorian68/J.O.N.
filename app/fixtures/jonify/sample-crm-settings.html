@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Acme CRM — Settings</title></head>
+<body data-app="acme-crm">
+  <nav aria-label="Primary">
+    <a href="/dashboard" data-testid="nav-dashboard">Dashboard</a>
+    <a href="/leads" data-testid="nav-leads">Leads</a>
+    <a href="/settings" data-testid="nav-settings">Settings</a>
+  </nav>
+  <main>
+    <h1>Settings</h1>
+    <p>Configure your account and integrations.</p>
+    <section aria-label="integrations">
+      <button data-testid="connect-gmail">Connect account</button>
+      <button data-testid="import-csv">Import CSV</button>
+    </section>
+    <form data-testid="settings-form" action="/settings" method="post">
+      <label>API key <input type="text" name="apiKey" required /></label>
+      <button type="submit" data-testid="save-settings">Save settings</button>
+    </form>
+  </main>
+</body>
+</html>

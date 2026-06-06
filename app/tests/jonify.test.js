@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { jonifyFromHtml, simulateWorkflow, planJonifyMission } from "../src/jonify/index.js";
+import { jonifyFromHtml, simulateWorkflow, planJonifyMission, jonifyFromObservations, jonifyFromAccessibility, executeWorkflow } from "../src/jonify/index.js";
 import { resolveJonifiedAppForMission } from "../src/jonify/mission-resolver.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -78,6 +78,59 @@ export async function run() {
 
   // No match for an unrelated mission.
   assert.equal(resolveJonifiedAppForMission("règle la luminosité de l'écran", [manifest]), null, "unrelated mission → no match");
+
+  // ── V2: multi-page merge yields a richer manifest ───────────────────────────
+  const settingsHtml = fs.readFileSync(path.join(HERE, "..", "fixtures", "jonify", "sample-crm-settings.html"), "utf8");
+  const merged = jonifyFromObservations([
+    { html, url: "https://acme.example.com/dashboard" },
+    { html: settingsHtml, url: "https://acme.example.com/settings" }
+  ]);
+  assert.equal(merged.validation.valid, true, `merged manifest valid: ${merged.validation.errors.join("; ")}`);
+  assert.ok(merged.manifest.actions.length > manifest.actions.length, "merge adds actions from the settings page");
+  assert.ok(merged.manifest.actions.some((a) => a.type === "connect_account"), "settings page contributes connect_account");
+
+  // ── V3: safe executor (fake adapter) ────────────────────────────────────────
+  const calls = [];
+  const adapter = {
+    navigate: async (t) => { calls.push(["navigate", t]); return { ok: true }; },
+    click: async (s) => { calls.push(["click", s]); return { ok: true }; },
+    type: async (s, v) => { calls.push(["type", s, v]); return { ok: true }; },
+    capture: async () => ({ path: "/tmp/shot.jpg" })
+  };
+  // low-risk search executes
+  const searchRun = await executeWorkflow(manifest, "search-workflow", { adapter, inputs: { query: "acme" } });
+  assert.equal(searchRun.status, "completed", "low-risk workflow executes");
+  assert.ok(searchRun.executedCount >= 1);
+
+  // critical delete is BLOCKED without confirmation, EXECUTES with confirmation
+  const delBlocked = await executeWorkflow(manifest, "delete-workflow", { adapter });
+  assert.equal(delBlocked.status, "needs_confirmation", "critical action blocked without confirmation");
+  assert.equal(delBlocked.steps.at(-1).executed, undefined, "blocked delete did not execute");
+  const delOk = await executeWorkflow(manifest, "delete-workflow", { adapter, confirm: async () => true });
+  assert.equal(delOk.status, "completed", "critical action runs once confirmed");
+
+  // create workflow blocks on missing required inputs, then runs with them + confirm
+  const createMissing = await executeWorkflow(manifest, "create-object-workflow", { adapter, confirm: async () => true });
+  assert.equal(createMissing.status, "needs_input", "create blocks on missing name/email");
+  const createOk = await executeWorkflow(manifest, "create-object-workflow", { adapter, inputs: { name: "A", email: "a@b.c" }, confirm: async () => true });
+  assert.equal(createOk.status, "completed", "create runs with inputs + confirmation");
+
+  // abort hook stops execution
+  const aborted = await executeWorkflow(manifest, "search-workflow", { adapter, inputs: { query: "x" }, shouldAbort: () => true });
+  assert.equal(aborted.status, "aborted", "abort hook stops the workflow");
+
+  // ── V4: desktop adapter (UI Automation tree → manifest) ─────────────────────
+  const tree = { tree: { controlType: "ControlType.Window", name: "Notepad", children: [
+    { controlType: "ControlType.MenuItem", name: "Save", automationId: "Item 2" },
+    { controlType: "ControlType.MenuItem", name: "Delete", automationId: "Item 9" },
+    { controlType: "ControlType.Edit", name: "Text Editor", automationId: "15" },
+    { controlType: "ControlType.TabItem", name: "Settings" }
+  ] } };
+  const desk = jonifyFromAccessibility(tree, { title: "Notepad", appName: "Notepad" });
+  assert.equal(desk.validation.valid, true, `desktop manifest valid: ${desk.validation.errors.join("; ")}`);
+  assert.equal(desk.observation.pages[0].summary.environment, "desktop");
+  assert.ok(desk.manifest.actions.some((a) => a.type === "delete" && a.safety.riskLevel === "critical"), "desktop delete is critical");
+  assert.ok(desk.manifest.actions.length >= 2, "desktop actions detected from UIA tree");
 
   return {
     interactive: interactive.length,

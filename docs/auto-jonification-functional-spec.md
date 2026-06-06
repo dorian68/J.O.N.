@@ -16,7 +16,13 @@
 14. **API attendue.** `POST /api/jonify/observe|generate|register`, `GET /api/jonify/apps[/:appId]`, `POST /api/jonify/apps/:appId/simulate-workflow` (auth-gated).
 15. **Smoke tests.** `npm run smoke:jonify` sur `fixtures/jonify/sample-crm.html` : observe→surfaces→actions→risques→workflows→manifest→validation→simulation→questions, vérifie delete=critical et send/submit=confirmation.
 16. **Critères d'acceptation.** Voir le prompt §14 (15 critères) — tous couverts par la V1 + le smoke.
-17. **Roadmap.** V1 auto-JONification depuis page observée ; V2 exploration multi-pages ; V3 exécution sûre + apprentissage ; V4 couche agent-OS (workflows multi-apps, manifests versionnés, self-healing selectors).
+17. **Roadmap.** V1 auto-JONification depuis page observée **✅** ; V2 fusion multi-pages (`jonifyFromObservations`) **✅** ; V3 exécution sûre via adaptateur (`executeWorkflow` : low/medium auto, high/critical confirmation obligatoire, abort, inputs requis) **✅ (cœur ; câblage adaptateur navigateur réel = en cours)** ; V4 desktop via UIA (`jonifyFromAccessibility` : arbre d'accessibilité → manifest) **✅ (observation/manifest ; exécution par pattern UIA = prochaine étape)** ; V5 couche agent-OS (workflows multi-apps, manifests versionnés, self-healing selectors).
+
+### Modules V2-V4 ajoutés
+- `src/jonify/executor.js` — `executeWorkflow(manifest, workflowId, { adapter, inputs, confirm, shouldAbort, mode })`. Adaptateur : `{ navigate, click, type, capture? }`.
+- `src/jonify/desktop-adapter.js` — `accessibilityTreeToSummary` / `observeAccessibility` (UIA → summary). Linux/AT-SPI = même forme.
+- `src/jonify/mission-resolver.js` — `resolveJonifiedAppForMission` + `planJonifyMission`.
+- CLI : `jonify:execute` (simulation sûre par défaut). API : `POST /api/jonify/resolve`.
 
 ## Critères d'acceptation V1 (état)
 1–15 ✅ : observe ✅, éléments ✅, surfaces ✅, actions ✅, risques ✅, ≥1 workflow ✅, manifest généré ✅, validé ✅, simulé ✅, questions ciblées ✅, pas de formulaire manuel ✅, registry ✅, context provider ✅, `smoke:jonify` ✅, rapport ✅.

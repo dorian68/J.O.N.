@@ -35,6 +35,7 @@
     "jonify:validate": "node src/scripts/jonify-validate.js",
     "jonify:summarize": "node src/scripts/jonify-summarize.js",
     "jonify:simulate": "node src/scripts/jonify-simulate.js",
+    "jonify:execute": "node src/scripts/jonify-execute.js",
     "smoke:security": "node src/scripts/run-security-smoke.js",
     "smoke:production-readiness": "node src/scripts/run-production-readiness.js",
     "preoperator:server": "npm run ui:build --silent && npm run ui:build:mobile --silent",

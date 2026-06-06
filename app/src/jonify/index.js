@@ -11,6 +11,8 @@ import { simulateWorkflow } from "./workflow-simulator.js";
 import { inferWorkflows } from "./workflow-inference.js";
 import { observeAccessibility } from "./desktop-adapter.js";
 import { executeWorkflow } from "./executor.js";
+import { createBrowserWorkflowAdapter, BrowserWorkflowAdapter, inferBrowserAllowlistedHosts } from "./browser-adapter.js";
+import { createDesktopWorkflowAdapter, DesktopWorkflowAdapter } from "./desktop-workflow-adapter.js";
 import { listJonifiedApps, getJonifiedApp } from "./registry.js";
 import { resolveJonifiedAppForMission } from "./mission-resolver.js";
 
@@ -57,6 +59,8 @@ export function jonifyFromAccessibility(accessibility, { title = null, appName =
 }
 
 export { executeWorkflow };
+export { createBrowserWorkflowAdapter, BrowserWorkflowAdapter, inferBrowserAllowlistedHosts };
+export { createDesktopWorkflowAdapter, DesktopWorkflowAdapter };
 
 // Full pipeline from a live URL (uses JON's browser controller).
 export async function jonifyFromUrl(url, { browserController = null, businessPurpose = null } = {}) {

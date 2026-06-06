@@ -30,6 +30,8 @@
     "smoke:product": "node src/scripts/run-product-coherence-smoke.js",
     "smoke:journey": "node src/scripts/run-journey-smoke.js",
     "smoke:jonify": "node src/scripts/run-jonify-smoke.js",
+    "smoke:jonify:live": "node src/scripts/run-jonify-live-browser-smoke.js",
+    "smoke:jonify:operator": "node -e \"import('./tests/jonify-operator-route.test.js').then(m=>m.run())\"",
     "jonify:observe": "node src/scripts/jonify-observe.js",
     "jonify:generate": "node src/scripts/jonify-generate.js",
     "jonify:validate": "node src/scripts/jonify-validate.js",

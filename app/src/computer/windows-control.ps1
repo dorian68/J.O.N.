@@ -7,6 +7,7 @@ param(
   [string]$AppId,
   [string]$LaunchUrl,
   [string]$Text,
+  [string]$Selector,
   [string]$Keys,
   [int]$X = 0,
   [int]$Y = 0,
@@ -562,12 +563,111 @@ function Focus-IfHandle([string]$WindowHandle) {
   }
 }
 
+function Find-UiaElement([string]$WindowHandle, [string]$ElementSelector) {
+  if (-not $WindowHandle) { throw "Handle is required" }
+  if (-not $ElementSelector) { throw "Selector is required" }
+  $parts = $ElementSelector -split "=", 2
+  if ($parts.Count -ne 2 -or [string]::IsNullOrWhiteSpace($parts[1])) {
+    throw "Selector must use automationId=, name=, or controlType=."
+  }
+  $selectorType = $parts[0].Trim()
+  $selectorValue = $parts[1].Trim()
+  if ($selectorType -notin @("automationId", "name", "controlType")) {
+    throw "Unsupported UIA selector type: $selectorType"
+  }
+
+  $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]::new([int64]$WindowHandle))
+  if ($null -eq $root) { throw "No automation element was available for the window." }
+
+  if ($selectorType -eq "automationId") {
+    if ($root.Current.AutomationId -eq $selectorValue) { return $root }
+    $condition = New-Object System.Windows.Automation.PropertyCondition(
+      [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+      $selectorValue
+    )
+    return $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+  }
+  if ($selectorType -eq "name") {
+    if ($root.Current.Name -eq $selectorValue) { return $root }
+    $condition = New-Object System.Windows.Automation.PropertyCondition(
+      [System.Windows.Automation.AutomationElement]::NameProperty,
+      $selectorValue
+    )
+    return $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
+  }
+
+  $expectedType = $selectorValue -replace "^ControlType\.", ""
+  $candidates = $root.FindAll(
+    [System.Windows.Automation.TreeScope]::Descendants,
+    [System.Windows.Automation.Condition]::TrueCondition
+  )
+  foreach ($candidate in $candidates) {
+    $programmaticName = if ($candidate.Current.ControlType) { $candidate.Current.ControlType.ProgrammaticName } else { "" }
+    if (($programmaticName -replace "^ControlType\.", "") -eq $expectedType) {
+      return $candidate
+    }
+  }
+  return $null
+}
+
+function Invoke-UiaElement([string]$WindowHandle, [string]$ElementSelector) {
+  Focus-IfHandle $WindowHandle
+  $element = Find-UiaElement -WindowHandle $WindowHandle -ElementSelector $ElementSelector
+  if ($null -eq $element) { throw "UIA element not found: $ElementSelector" }
+  $pattern = $null
+  if (-not $element.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) {
+    throw "UIA element does not support InvokePattern: $ElementSelector"
+  }
+  ([System.Windows.Automation.InvokePattern]$pattern).Invoke()
+  Start-Sleep -Milliseconds 120
+  return @{
+    ok = $true
+    pattern = "invoke"
+    selector = $ElementSelector
+    targetHandle = $WindowHandle
+    invokedAt = [DateTime]::UtcNow.ToString("o")
+  }
+}
+
+function Set-UiaElementValue([string]$WindowHandle, [string]$ElementSelector, [string]$Value) {
+  Focus-IfHandle $WindowHandle
+  $element = Find-UiaElement -WindowHandle $WindowHandle -ElementSelector $ElementSelector
+  if ($null -eq $element) { throw "UIA element not found: $ElementSelector" }
+  $pattern = $null
+  if (-not $element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) {
+    throw "UIA element does not support ValuePattern: $ElementSelector"
+  }
+  $valuePattern = [System.Windows.Automation.ValuePattern]$pattern
+  if ($valuePattern.Current.IsReadOnly) {
+    throw "UIA element is read-only: $ElementSelector"
+  }
+  $valuePattern.SetValue($(if ($null -eq $Value) { "" } else { $Value }))
+  Start-Sleep -Milliseconds 80
+  return @{
+    ok = $true
+    pattern = "value"
+    selector = $ElementSelector
+    valueLength = $(if ($null -eq $Value) { 0 } else { $Value.Length })
+    targetHandle = $WindowHandle
+    updatedAt = [DateTime]::UtcNow.ToString("o")
+  }
+}
+
 function Convert-AutomationElement([System.Windows.Automation.AutomationElement]$Element, [int]$Depth, [int]$MaxDepth, [ref]$Remaining) {
   if ($null -eq $Element -or $Remaining.Value -le 0) {
     return $null
   }
   $Remaining.Value = $Remaining.Value - 1
   $properties = $Element.Current
+  $patterns = @()
+  $patternObject = $null
+  if ($Element.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$patternObject)) {
+    $patterns += "invoke"
+  }
+  $patternObject = $null
+  if ($Element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$patternObject)) {
+    $patterns += "value"
+  }
   $node = @{
     name = $properties.Name
     automationId = $properties.AutomationId
@@ -575,6 +675,7 @@ function Convert-AutomationElement([System.Windows.Automation.AutomationElement]
     controlType = if ($properties.ControlType) { $properties.ControlType.ProgrammaticName } else { $null }
     isEnabled = $properties.IsEnabled
     isOffscreen = $properties.IsOffscreen
+    patterns = $patterns
     bounds = @{
       x = [int]$properties.BoundingRectangle.X
       y = [int]$properties.BoundingRectangle.Y
@@ -745,6 +846,12 @@ switch ($Action) {
     Focus-IfHandle $Handle
     [System.Windows.Forms.SendKeys]::SendWait((Convert-Hotkey $Keys))
     @{ sentAt = [DateTime]::UtcNow.ToString("o"); keys = $Keys; targetHandle = $Handle } | ConvertTo-Json -Depth 5
+  }
+  "uiaInvoke" {
+    Invoke-UiaElement -WindowHandle $Handle -ElementSelector $Selector | ConvertTo-Json -Depth 5
+  }
+  "uiaSetValue" {
+    Set-UiaElementValue -WindowHandle $Handle -ElementSelector $Selector -Value $Text | ConvertTo-Json -Depth 5
   }
   "clickPoint" {
     Focus-IfHandle $Handle

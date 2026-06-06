@@ -44,7 +44,12 @@ function inputsForAction(type, surface) {
   const form = (surface.forms ?? [])[0];
   if (!form) return [];
   return (form.inputs ?? []).filter((i) => i.type !== "hidden").map((i) => ({
-    name: i.name, type: i.type, required: Boolean(i.required), placeholder: i.placeholder ?? null
+    name: i.name,
+    type: i.type,
+    required: Boolean(i.required),
+    placeholder: i.placeholder ?? null,
+    selector: i.selector ?? i.preferredSelector ?? null,
+    testId: i.testId ?? null
   }));
 }
 
@@ -56,10 +61,12 @@ export function classifyAction(el) {
 export function discoverActions(surface) {
   const seen = new Set();
   const actions = [];
+  const hasSearchInput = (surface.elements ?? []).some((el) => el.kind === "input" && el.type === "search");
   for (const el of surface.elements ?? []) {
     // Inputs that are not search fields are not standalone actions.
     if (el.kind === "input" && el.type !== "search") continue;
     const type = inferActionType(el);
+    if (hasSearchInput && type === "search" && el.kind !== "input") continue;
     const risk = classifyRisk(type);
     const id = `${type}-${(el.id || el.label || "el").toString().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`.replace(/^-|-$/g, "");
     if (seen.has(id)) continue;
@@ -69,7 +76,7 @@ export function discoverActions(surface) {
       id, name: actionName(type, el.label), type,
       description: `Action détectée (${type}) sur « ${el.label ?? el.id} » de la surface ${surface.id}.`,
       surfaceId: surface.id,
-      trigger: { type: el.kind === "input" ? "submit" : "click", targetElementId: el.id, selector: el.preferredSelector },
+      trigger: { type: el.kind === "input" ? "submit" : "click", targetElementId: el.id, selector: el.preferredSelector, href: el.href ?? null },
       inputs,
       safety: { riskLevel: risk.riskLevel, requiresConfirmation: risk.requiresConfirmation, reason: risk.reason },
       successState: {

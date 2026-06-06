@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { jonifyFromHtml, simulateWorkflow, planJonifyMission, jonifyFromObservations, jonifyFromAccessibility, executeWorkflow } from "../src/jonify/index.js";
+import { jonifyFromHtml, simulateWorkflow, planJonifyMission, jonifyFromObservations, jonifyFromAccessibility, executeWorkflow, BrowserWorkflowAdapter } from "../src/jonify/index.js";
 import { resolveJonifiedAppForMission } from "../src/jonify/mission-resolver.js";
+import { createDesktopWorkflowAdapter } from "../src/jonify/index.js";
+import { FakeWindowProvider } from "../src/computer/fake-window-provider.js";
+import { ComputerControlService } from "../src/computer/computer-control-service.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(HERE, "..", "fixtures", "jonify", "sample-crm.html");
@@ -119,6 +122,52 @@ export async function run() {
   const aborted = await executeWorkflow(manifest, "search-workflow", { adapter, inputs: { query: "x" }, shouldAbort: () => true });
   assert.equal(aborted.status, "aborted", "abort hook stops the workflow");
 
+  // ── V3-live bridge: executeWorkflow drives the BrowserController contract ───
+  const browserCalls = [];
+  const fakeBrowser = {
+    allowlistedHosts: [],
+    isOpen: () => true,
+    async getTargetState(targetId) {
+      browserCalls.push(["getTargetState", targetId]);
+      return { url: "about:blank", title: "Blank" };
+    },
+    async navigate(targetId, url) {
+      browserCalls.push(["navigate", targetId, url]);
+      return { targetId, url, status: 200 };
+    },
+    async clearAndType(targetId, selector, value) {
+      browserCalls.push(["clearAndType", targetId, selector, value]);
+      return { validated: true, selector, value };
+    },
+    async waitForPageStable(targetId) {
+      browserCalls.push(["waitForPageStable", targetId]);
+      return { targetId, stable: true };
+    },
+    async exportPageEvidence(targetId, evidenceDir, label) {
+      browserCalls.push(["exportPageEvidence", targetId, evidenceDir, label]);
+      return { evidenceId: "ev_fake", screenshotPath: "/tmp/jonify-live.png", summaryPath: "/tmp/jonify-live.json" };
+    }
+  };
+  const browserAdapter = new BrowserWorkflowAdapter({
+    browserController: fakeBrowser,
+    targetId: "target_live",
+    manifest,
+    startUrl: "https://acme.example.com/dashboard",
+    allowlistedHosts: ["acme.example.com"],
+    closeOnFinish: false
+  });
+  const liveSearch = await executeWorkflow(manifest, "search-workflow", {
+    adapter: browserAdapter,
+    inputs: { query: "beta" }
+  });
+  assert.equal(liveSearch.status, "completed", "browser adapter workflow completes");
+  assert.deepEqual(
+    browserCalls.find((call) => call[0] === "clearAndType")?.slice(2),
+    [{ testId: "search" }, "beta"],
+    "manifest selector is translated to BrowserController selector spec"
+  );
+  assert.equal(liveSearch.steps[0].evidence, "/tmp/jonify-live.png", "browser adapter captures evidence");
+
   // ── V4: desktop adapter (UI Automation tree → manifest) ─────────────────────
   const tree = { tree: { controlType: "ControlType.Window", name: "Notepad", children: [
     { controlType: "ControlType.MenuItem", name: "Save", automationId: "Item 2" },
@@ -131,6 +180,28 @@ export async function run() {
   assert.equal(desk.observation.pages[0].summary.environment, "desktop");
   assert.ok(desk.manifest.actions.some((a) => a.type === "delete" && a.safety.riskLevel === "critical"), "desktop delete is critical");
   assert.ok(desk.manifest.actions.length >= 2, "desktop actions detected from UIA tree");
+
+  // ── V4-execution: DesktopWorkflowAdapter drives UIA invoke via ComputerControlService ──
+  const deskProvider = new FakeWindowProvider([{
+    id: "win_app", title: "Notepad", active: true, visible: true, content: "ready",
+    controls: [
+      { automationId: "Item 9", name: "Delete", controlType: "Button" },
+      { automationId: "15", name: "Text Editor", controlType: "Edit" }
+    ]
+  }]);
+  const ccs = new ComputerControlService(deskProvider); // exercises the new UIA forwards
+  const deskAdapter = createDesktopWorkflowAdapter({ provider: ccs, windowId: "win_app", manifest: desk.manifest });
+  const deleteWf = desk.manifest.workflows.find((w) => w.id === "delete-workflow");
+  assert.ok(deleteWf, "desktop delete workflow exists");
+  // critical → blocked without confirmation
+  const deskBlocked = await executeWorkflow(desk.manifest, deleteWf.id, { adapter: deskAdapter });
+  assert.equal(deskBlocked.status, "needs_confirmation", "desktop critical action blocked without confirmation");
+  // with confirmation → executes via UIA Invoke (provider records it)
+  const deskRun = await executeWorkflow(desk.manifest, deleteWf.id, { adapter: deskAdapter, confirm: async () => true });
+  assert.equal(deskRun.status, "completed", "desktop workflow executes once confirmed");
+  // "executed" proves the adapter→ComputerControlService→UIA invoke path ran (the
+  // fake provider throws if the control selector isn't resolved).
+  assert.equal(deskRun.steps.at(-1).status, "executed", "UIA Invoke fired on the desktop control via CCS");
 
   return {
     interactive: interactive.length,

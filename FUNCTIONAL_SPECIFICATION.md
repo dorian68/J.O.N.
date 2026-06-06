@@ -17,8 +17,9 @@ Variante mobile : appairer le téléphone (QR/code) → piloter/observer → rec
 | F-MISSION | Compréhension + exécution mission | NL → actions réelles | ✅ | `debug:mission`, `debug:mission:live` |
 | F-DESKTOP | Automatisation Windows (ouvrir app, taper, fichier) | agir sur le bureau | ✅ | `debug:desktop`, `smoke:core-reliability` |
 | F-BROWSER | Automatisation navigateur (plan→act→observe→replan) | piloter le web | ✅ | `smoke:browser-operator`, `smoke:browser-planner` |
+| F-JONIFY | JON-ifier une app observée | app observée → manifest/tools/workflows exécutables | 🟡 (CLI/API live, UI desktop à brancher) | `smoke:jonify`, `smoke:jonify:live`, `smoke:jonify:operator` |
 | F-COMPOSED | Mission cross-surface web→bureau + hand-off | enchaîner les surfaces | ✅ | test `composed-mission*` |
-| F-DELIVERABLE | Livrables PDF/DOCX/XLSX | sortie vérifiable | 🟡 (desktop dl cassé F1) | `debug:deliverables` |
+| F-DELIVERABLE | Livrables PDF/DOCX/XLSX | sortie vérifiable | ✅ | `debug:deliverables`, `smoke:journey` |
 | F-ESTOP | Arrêt d'urgence universel | stop à tout moment | ✅ | `smoke:core-reliability` (T8) |
 | F-APPROVAL | Approbations actions sensibles | contrôle humain | ✅ | `debug:policy` |
 | F-MOBILE | Pairing + pilotage mobile | JON depuis le tél | ✅ | `debug:mobile`, tests mobile-* |
@@ -42,12 +43,11 @@ Chaque feature critique DOIT avoir : (a) un script CLI déclenchant le flux comp
 
 ## 5. Manques fonctionnels connus (backlog priorisé)
 
-- **F1** livrables non téléchargeables sur desktop (route liste absente) — CRITIQUE.
-- **F2** catalogue MCP majoritairement décoratif → statuts honnêtes (available/coming_soon/requires_config).
-- **F3** OAuth MCP mobile ne boucle pas (callback loopback PC) → message « continue on desktop ».
-- **F5** « automatisation » = one-shot → renommer ou implémenter scheduler.
-- **F6** bouton « Reprendre mission » desktop absent.
-- **F9** bannière « mode mock » dans la conversation, pas seulement Settings.
+- **P1** JON-ify live est prouvé en CLI/API, mais pas encore exposé comme parcours desktop visible avec étapes/preuves.
+- **P1** Exécution desktop UIA réelle : V4 observe et génère le manifest ; Invoke/Value reste à brancher dans `windows-control.ps1`.
+- **P1** Self-check visible sur desktop : exposé API, carte UI dédiée encore optionnelle.
+- **P2** AT-SPI Ubuntu/WSL : même contrat adaptateur, relais Linux à implémenter.
+- **P2** Planification récurrente : le produit reste majoritairement orienté exécution one-shot.
 
 ## 6. Definition of Done (par feature)
 

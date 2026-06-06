@@ -28,7 +28,16 @@ export function listJonifiedApps() {
     .map((f) => {
       try {
         const m = JSON.parse(fs.readFileSync(path.join(REGISTRY_DIR, f), "utf8"));
-        return { appId: m.app?.id, name: m.app?.name, confidence: m.confidence, surfaces: m.surfaces?.length ?? 0, actions: m.actions?.length ?? 0, workflows: m.workflows?.length ?? 0 };
+        return {
+          appId: m.app?.id,
+          name: m.app?.name,
+          environment: m.app?.environment ?? (m.app?.baseUrl ? "web" : "unknown"),
+          businessPurpose: m.app?.businessPurpose ?? null,
+          confidence: m.confidence,
+          surfaces: m.surfaces?.length ?? 0,
+          actions: m.actions?.length ?? 0,
+          workflows: m.workflows?.length ?? 0
+        };
       } catch { return null; }
     })
     .filter(Boolean);

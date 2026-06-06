@@ -71,7 +71,7 @@ export function generateJonificationManifest(observation, { startedAt = null, co
       name: (summary.title ?? appId).split(/[—|-]/)[0].trim() || appId,
       description: `Application observée automatiquement par JON (${surfaces.length} surfaces, ${actions.length} actions).`,
       baseUrl,
-      environment: summary.url ? "web" : "unknown",
+      environment: summary.environment === "desktop" ? "desktop" : summary.url ? "web" : "unknown",
       businessPurpose: inferBusinessPurpose(observation, businessPurpose)
     },
     discovery: {

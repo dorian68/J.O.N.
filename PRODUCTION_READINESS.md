@@ -30,7 +30,8 @@ Verdict vivant de la mise en production. Mis à jour à chaque lot.
 |---|---|
 | `startMission` unique (pas de duplicata mort) | ✅ T7 |
 | Budget tokens fenêtre glissante (pas de brick) | ✅ |
-| Suite de tests verte | ✅ 108 suites |
+| Smokes critiques ciblés | ✅ sécurité, production-readiness, journey, JON-ify, browser |
+| Suite complète avant release | 🟡 à relancer sur lot final (`npm test`) |
 
 ## Checklist cohérence produit (Lot 4 — FAIT, commit adfca0d)
 
@@ -54,6 +55,18 @@ Verdict vivant de la mise en production. Mis à jour à chaque lot.
 | Release checklist + guide démarrage | ✅ `docs/release-checklist.md` |
 | Mode `JON_PRODUCTION` documenté (.env example) | ✅ `.env.example` (JON_* sécurité) |
 | `smoke:journey` (golden path bout-en-bout) | ✅ |
+
+## Checklist JON-ify / agent OS (Lot 6 — partiel)
+
+| Check | État |
+|---|---|
+| Auto-cartographie HTML → manifest JON | ✅ `smoke:jonify` |
+| Mission resolver JON-ified app | ✅ `smoke:jonify` |
+| Exécution sûre simulate/fake adapter | ✅ `smoke:jonify` |
+| Exécution navigateur live sur fixture contrôlée | ✅ `smoke:jonify:live` |
+| Route opérateur live auth-gated + confirmation critique | ✅ `smoke:jonify:operator` |
+| UI desktop pour lancer un workflow JON-ifié live | 🟡 à brancher |
+| Exécution desktop UIA Invoke/Value | 🟡 à brancher |
 
 ## Refus de démarrage en production si :
 - une route sensible reste sans auth ;

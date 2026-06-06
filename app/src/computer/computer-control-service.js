@@ -187,6 +187,23 @@ export class ComputerControlService {
     };
   }
 
+  // UIA pattern execution (JON-ify V4 desktop) — invoke a control or set its value
+  // by accessibility selector (automationId= / name= / controlType=), so a desktop
+  // app can be operated by element, not blind coordinates.
+  async invokeUiElement(windowId, selector) {
+    if (!this.provider.invokeUiElement) {
+      throw new Error("This computer provider does not support UIA invoke.");
+    }
+    return this.provider.invokeUiElement(windowId, selector);
+  }
+
+  async setUiValue(windowId, selector, value) {
+    if (!this.provider.setUiValue) {
+      throw new Error("This computer provider does not support UIA value set.");
+    }
+    return this.provider.setUiValue(windowId, selector, value);
+  }
+
   async inspectDesktop({ maxWindows = 6, maxDepth = 2, maxNodes = 60 } = {}) {
     const visibleWindows = await this.listVisibleWindows();
     const activeWindow = await this.detectActiveWindow();

@@ -6,14 +6,22 @@ import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
 import QRCode from "qrcode";
-import { APP_ROOT, DEFAULT_OPERATOR_PORT } from "../config.js";
+import { APP_ROOT, DATA_ROOT, DEFAULT_OPERATOR_PORT } from "../config.js";
 import { OperatorService } from "../service/operator-service.js";
 import { attachMobileTerminalWs } from "../mobile/mobile-terminal-ws.js";
 import { buildNetworkAdvice, buildMobileConnectivityReport, pickPrimaryLanIp } from "./network-advisor.js";
 import { resolveBindConfig, loadOrCreateDesktopToken, authorizeRequest } from "./desktop-auth.js";
 import { evaluateProductionReadiness } from "./production-readiness.js";
 import { buildExtensionZip, validateExtension } from "../browser/chrome-extension-package.js";
-import { jonifyFromHtml, simulateWorkflow, planJonifyMission } from "../jonify/index.js";
+import {
+  jonifyFromHtml,
+  simulateWorkflow,
+  planJonifyMission,
+  executeWorkflow,
+  BrowserWorkflowAdapter,
+  DesktopWorkflowAdapter,
+  inferBrowserAllowlistedHosts
+} from "../jonify/index.js";
 import { observeHtml } from "../jonify/app-observer.js";
 import { registerJonifiedApp, listJonifiedApps, getJonifiedApp } from "../jonify/registry.js";
 import { CoworkSmokeBackofficeService } from "../smoke/cowork-smoke-pipeline.js";
@@ -36,11 +44,33 @@ const MIME_TYPES = new Map([
   [".css", "text/css; charset=utf-8"],
   [".json", "application/json; charset=utf-8"],
   [".png", "image/png"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
   [".svg", "image/svg+xml; charset=utf-8"]
 ]);
 
 function contentTypeFor(filePath) {
   return MIME_TYPES.get(path.extname(filePath)) ?? "application/octet-stream";
+}
+
+function jonifyEvidenceUrl(filePath) {
+  if (!filePath) return null;
+  const resolved = path.resolve(filePath);
+  const relative = path.relative(path.resolve(DATA_ROOT), resolved);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) return null;
+  return `/api/jonify/evidence/${relative.split(path.sep).map(encodeURIComponent).join("/")}`;
+}
+
+function exposeJonifyEvidence(result) {
+  if (!result?.steps) return result;
+  return {
+    ...result,
+    steps: result.steps.map((step) => ({
+      ...step,
+      evidenceUrl: jonifyEvidenceUrl(step.evidence),
+      evidenceSummaryUrl: jonifyEvidenceUrl(step.evidenceSummary)
+    }))
+  };
 }
 
 function sendJson(response, statusCode, payload) {
@@ -349,6 +379,37 @@ export async function createOperatorServer({
         sendJson(response, 200, { apps: listJonifiedApps() });
         return;
       }
+      if (pathname === "/api/jonify/desktop/windows" && request.method === "GET") {
+        try {
+          const windows = await operatorService.externalTerminalProvider.listVisibleWindows();
+          sendJson(response, 200, { windows: Array.isArray(windows) ? windows : [] });
+        } catch (err) {
+          sendError(response, 503, `Desktop windows unavailable: ${err.message}`);
+        }
+        return;
+      }
+      const jonifyEvidenceRoute = matchRoute(pathname, /^\/api\/jonify\/evidence\/(?<assetPath>.+)$/);
+      if (jonifyEvidenceRoute && request.method === "GET") {
+        const relativePath = decodeURIComponent(jonifyEvidenceRoute.assetPath);
+        const assetPath = path.resolve(DATA_ROOT, relativePath);
+        const relative = path.relative(path.resolve(DATA_ROOT), assetPath);
+        const extension = path.extname(assetPath).toLowerCase();
+        if (relative.startsWith("..") || path.isAbsolute(relative) || ![".png", ".jpg", ".jpeg", ".json"].includes(extension)) {
+          sendError(response, 403, "Forbidden evidence path");
+          return;
+        }
+        try {
+          const content = await fs.readFile(assetPath);
+          response.writeHead(200, {
+            "content-type": contentTypeFor(assetPath),
+            "cache-control": "no-store"
+          });
+          response.end(content);
+        } catch {
+          sendError(response, 404, "JON-ify evidence not found");
+        }
+        return;
+      }
       // Resolve a mission → matched JON-ified app + workflow (dry-run, no execution in V1).
       if (pathname === "/api/jonify/resolve" && request.method === "POST") {
         try { sendJson(response, 200, planJonifyMission(String((await readJsonBody(request)).objective ?? ""))); }
@@ -368,6 +429,123 @@ export async function createOperatorServer({
         if (!app) { sendError(response, 404, "JON-ified app not found"); return; }
         const body = await readJsonBody(request);
         sendJson(response, 200, simulateWorkflow(app, body.workflowId));
+        return;
+      }
+      const jonifyExecuteRoute = matchRoute(pathname, /^\/api\/jonify\/apps\/(?<appId>[^/]+)\/execute-workflow$/);
+      if (jonifyExecuteRoute && request.method === "POST") {
+        const app = getJonifiedApp(jonifyExecuteRoute.appId);
+        if (!app) { sendError(response, 404, "JON-ified app not found"); return; }
+        try {
+          const body = await readJsonBody(request);
+          const workflowId = String(body.workflowId ?? "");
+          const mode = body.mode === "live" ? "live" : "simulate";
+          const inputs = body.inputs && typeof body.inputs === "object" ? body.inputs : {};
+          const confirmedActionIds = new Set(Array.isArray(body.confirmedActionIds) ? body.confirmedActionIds.map(String) : []);
+          const confirm = body.confirm === true || confirmedActionIds.size > 0
+            ? async ({ action }) => body.confirm === true || confirmedActionIds.has(action.id)
+            : null;
+
+          if (mode !== "live") {
+            sendJson(response, 200, {
+              mode,
+              surface: body.surface ?? app.app?.environment ?? "web",
+              result: exposeJonifyEvidence(await executeWorkflow(app, workflowId, { mode: "simulate", inputs, confirm }))
+            });
+            return;
+          }
+
+          const surface = body.surface === "desktop" || app.app?.environment === "desktop"
+            ? "desktop"
+            : "browser";
+          const startUrl = body.url ?? app.app?.baseUrl ?? null;
+          if (surface === "browser" && !startUrl) {
+            sendError(response, 400, "Live browser execution requires body.url or manifest.app.baseUrl.");
+            return;
+          }
+          const preflight = await executeWorkflow(app, workflowId, { mode: "simulate", inputs, confirm });
+          if (!preflight.ok) {
+            sendJson(response, 200, {
+              mode,
+              surface,
+              appId: app.app?.id ?? jonifyExecuteRoute.appId,
+              workflowId,
+              liveStarted: false,
+              result: exposeJonifyEvidence(preflight)
+            });
+            return;
+          }
+          if (surface === "desktop") {
+            const windowId = String(body.windowId ?? "").trim();
+            if (!windowId) {
+              sendError(response, 400, "Live desktop execution requires body.windowId.");
+              return;
+            }
+            const evidenceDir = path.join(DATA_ROOT, "jonify", "operator-live-desktop", `${Date.now()}`);
+            const adapter = new DesktopWorkflowAdapter({
+              provider: operatorService.externalTerminalProvider,
+              windowId,
+              manifest: app,
+              evidenceDir
+            });
+            const result = await executeWorkflow(app, workflowId, {
+              mode: "live",
+              adapter,
+              inputs,
+              confirm
+            });
+            sendJson(response, 200, {
+              mode,
+              surface,
+              appId: app.app?.id ?? jonifyExecuteRoute.appId,
+              workflowId,
+              projectId: body.projectId ?? operatorService.listProjects()[0]?.id ?? "default",
+              windowId,
+              result: exposeJonifyEvidence(result)
+            });
+            return;
+          }
+          const projectId = body.projectId ?? operatorService.listProjects()[0]?.id ?? "default";
+          const runId = body.runId ?? null;
+          const allowlistedHosts = inferBrowserAllowlistedHosts(app, startUrl, body.allowlistedHosts ?? []);
+          const session = await operatorService.browserProvider.getOrCreateJonSession({
+            projectId,
+            runId,
+            allowlistedHosts
+          });
+          const handle = operatorService.browserProvider.getAutomationHandle(session.id);
+          if (!handle?.controller || !handle.targetId) {
+            sendError(response, 503, "Browser automation handle is not available.");
+            return;
+          }
+          const evidenceDir = path.join(DATA_ROOT, "jonify", "operator-live-browser", `${Date.now()}`);
+          const adapter = new BrowserWorkflowAdapter({
+            browserController: handle.controller,
+            targetId: handle.targetId,
+            manifest: app,
+            startUrl,
+            allowlistedHosts,
+            evidenceDir,
+            closeOnFinish: false
+          });
+          const result = await executeWorkflow(app, workflowId, {
+            mode: "live",
+            adapter,
+            inputs,
+            confirm
+          });
+          sendJson(response, 200, {
+            mode,
+            surface,
+            appId: app.app?.id ?? jonifyExecuteRoute.appId,
+            workflowId,
+            projectId,
+            session: handle.session ?? session,
+            allowlistedHosts,
+            result: exposeJonifyEvidence(result)
+          });
+        } catch (err) {
+          sendError(response, 400, err.message, { code: err.code ?? null });
+        }
         return;
       }
 

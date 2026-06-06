@@ -265,6 +265,39 @@ export class FakeWindowProvider {
     };
   }
 
+  invokeUiElement(windowId, selector) {
+    const windowState = this.#requireWindow(windowId);
+    const control = this.#findControl(windowState, selector);
+    if (!control) throw new Error(`UIA element not found: ${selector}`);
+    control.invokeCount = (control.invokeCount ?? 0) + 1;
+    windowState.content = `${windowState.content}\nuiaInvoke=${selector}`.trim();
+    windowState.updatedAt = nowIso();
+    return {
+      ok: true,
+      pattern: "invoke",
+      selector,
+      targetHandle: windowState.id,
+      invokedAt: nowIso()
+    };
+  }
+
+  setUiValue(windowId, selector, value) {
+    const windowState = this.#requireWindow(windowId);
+    const control = this.#findControl(windowState, selector);
+    if (!control) throw new Error(`UIA element not found: ${selector}`);
+    control.value = String(value ?? "");
+    windowState.content = `${windowState.content}\nuiaValue=${selector}:${control.value}`.trim();
+    windowState.updatedAt = nowIso();
+    return {
+      ok: true,
+      pattern: "value",
+      selector,
+      valueLength: control.value.length,
+      targetHandle: windowState.id,
+      updatedAt: nowIso()
+    };
+  }
+
   clickPoint(windowId, point) {
     const windowState = windowId ? this.#requireWindow(windowId) : this.windows.find((candidate) => candidate.active);
     if (!windowState) {
@@ -347,6 +380,11 @@ export class FakeWindowProvider {
       controlType: control.controlType ?? "ControlType.Button",
       isEnabled: control.isEnabled ?? true,
       isOffscreen: control.isOffscreen ?? false,
+      patterns: control.patterns ?? (
+        String(control.controlType ?? "").includes("Edit")
+          ? ["value"]
+          : ["invoke"]
+      ),
       bounds: control.bounds ?? {
         x: windowState.bounds.x + 24,
         y: windowState.bounds.y + 48 + index * 40,
@@ -407,5 +445,18 @@ export class FakeWindowProvider {
       throw new Error(`Unknown fake window: ${windowId}`);
     }
     return windowState;
+  }
+
+  #findControl(windowState, selector) {
+    const [kind, ...valueParts] = String(selector ?? "").split("=");
+    const value = valueParts.join("=");
+    return (windowState.controls ?? []).find((control) => {
+      if (kind === "automationId") return String(control.automationId ?? control.id ?? "") === value;
+      if (kind === "name") return String(control.name ?? control.label ?? "") === value;
+      if (kind === "controlType") {
+        return String(control.controlType ?? "").replace(/^ControlType\./, "") === value.replace(/^ControlType\./, "");
+      }
+      return false;
+    }) ?? null;
   }
 }

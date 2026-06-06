@@ -36,6 +36,14 @@ export function inferWorkflows(surfaces, actions) {
   } else if (create) {
     push({ id: "open-create-workflow", name: "Ouvrir la création", description: "Ouvrir le formulaire de création.",
       steps: [{ actionId: create.id }], expectedOutcome: "Un formulaire apparaît.", needsHumanReview: false });
+  } else if (submit) {
+    push({
+      id: "submit-form-workflow", name: "Renseigner et valider",
+      description: "Renseigner les champs détectés puis valider le formulaire.",
+      steps: [{ actionId: submit.id }],
+      expectedOutcome: "Les valeurs sont appliquées et l'application confirme la validation.",
+      needsHumanReview: true
+    });
   }
 
   // Search workflow.

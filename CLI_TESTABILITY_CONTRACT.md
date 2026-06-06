@@ -21,6 +21,10 @@ npm test                         # suite complète (108 suites)
 ```bash
 npm run smoke:security           # auth/bind/MCP stdio/redaction (Lot 1)
 npm run smoke:production-readiness
+npm run smoke:journey            # golden path intention → livrable
+npm run smoke:jonify             # auto-cartographie + simulation + safe executor
+npm run smoke:jonify:live        # manifest généré → vrai BrowserController sur fixture locale
+npm run smoke:jonify:operator    # route opérateur live + blocage critique sans confirmation
 npm run smoke:browser-extension  # packaging + eval/CDP gating (Lot 2)
 npm run smoke:core-reliability   # startMission/e-stop/double-actuation/URL/path (Lot 3)
 npm run smoke:browser-operator
@@ -49,7 +53,6 @@ npm run package:chrome-extension   # -> dist/jon-chrome-extension.zip
 
 | Commande | Couvre |
 |---|---|
-| `smoke:journey` | parcours golden path complet (intention → livrable) en un script |
 | `smoke:artifacts` | F1 — route liste artifacts + download desktop |
 | `smoke:mcp` | F2/F3 — statuts honnêtes du catalogue + refus OAuth mobile propre |
 | `smoke:mobile` (agrégé) | pairing + session + admin 401 + reconnexion |

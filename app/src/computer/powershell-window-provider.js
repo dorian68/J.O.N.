@@ -69,6 +69,14 @@ function validateHotkey(keys) {
   return normalized;
 }
 
+function validateUiaSelector(selector) {
+  const normalized = String(selector ?? "").trim();
+  if (!/^(automationId|name|controlType)=[^\r\n]{1,240}$/.test(normalized)) {
+    throw new Error("UIA selector must use automationId=, name=, or controlType= with a bounded value.");
+  }
+  return normalized;
+}
+
 function validateImagePath(imagePath) {
   const resolved = path.resolve(imagePath);
   const root = path.resolve(TEMP_RUNTIME_ROOT);
@@ -412,6 +420,27 @@ export class PowerShellWindowProvider {
     const validatedKeys = validateHotkey(keys);
     const handle = validateWindowHandle(windowId);
     return sendHotAction({ action: "sendHotkey", keys: validatedKeys, handle: handle ?? null });
+  }
+
+  async invokeUiElement(windowId, selector) {
+    const handle = validateWindowHandle(windowId);
+    if (!handle) throw new Error("invokeUiElement requires a window handle.");
+    return runPowerShell([
+      "-Action", "uiaInvoke",
+      "-Handle", handle,
+      "-Selector", validateUiaSelector(selector)
+    ]);
+  }
+
+  async setUiValue(windowId, selector, value) {
+    const handle = validateWindowHandle(windowId);
+    if (!handle) throw new Error("setUiValue requires a window handle.");
+    return runPowerShell([
+      "-Action", "uiaSetValue",
+      "-Handle", handle,
+      "-Selector", validateUiaSelector(selector),
+      "-Text", String(value ?? "").slice(0, 4000)
+    ]);
   }
 
   async clickPoint(windowId, point) {

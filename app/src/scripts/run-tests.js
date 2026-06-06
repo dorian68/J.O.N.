@@ -75,6 +75,10 @@ const suites = [
     modulePath: "../../tests/jonify.test.js"
   },
   {
+    name: "jonify-operator-route",
+    modulePath: "../../tests/jonify-operator-route.test.js"
+  },
+  {
     name: "temporal-context",
     modulePath: "../../tests/temporal-context.test.js"
   },

@@ -68,10 +68,27 @@ export async function executeWorkflow(manifest, workflowId, {
       results.push({ index: i + 1, action: action.name, risk, status: "simulated", executed: false });
     } else {
       try {
+        if (adapter.fillInputs && ["submit", "update"].includes(action.type) && (action.inputs ?? []).length > 0) {
+          const inputFill = await adapter.fillInputs(action.inputs, inputs);
+          if (inputFill?.ok === false) {
+            results.push({ index: i + 1, action: action.name, risk, status: "failed_input_fill", executed: false, error: inputFill.error ?? "input fill failed" });
+            status = "failed"; break;
+          }
+        }
         const res = await actionExecutor(adapter, action, inputs)();
         const ok = res?.ok !== false;
         const evidence = adapter.capture ? await adapter.capture().catch(() => null) : null;
-        results.push({ index: i + 1, action: action.name, risk, status: ok ? "executed" : "failed", executed: ok, evidence: evidence?.path ?? null, error: ok ? null : (res?.error ?? "adapter failure") });
+        results.push({
+          index: i + 1,
+          action: action.name,
+          risk,
+          status: ok ? "executed" : "failed",
+          executed: ok,
+          evidence: evidence?.path ?? null,
+          evidenceSummary: evidence?.summaryPath ?? null,
+          evidenceId: evidence?.evidenceId ?? null,
+          error: ok ? null : (res?.error ?? "adapter failure")
+        });
         if (!ok) { status = "failed"; break; }
       } catch (error) {
         results.push({ index: i + 1, action: action.name, risk, status: "failed", error: error.message });

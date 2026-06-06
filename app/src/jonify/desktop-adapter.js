@@ -29,7 +29,23 @@ function walk(node, acc) {
   const base = { label: name, name: node.automationId ?? null, testId: node.automationId ?? null, id: slug(name || node.automationId || type) };
   if (BUTTONISH.has(type)) acc.buttons.push({ ...base, kind: "button", tag: "button", type: "button", uiaPattern: "invoke", preferredSelector: selectorFor(node), selectorCandidates: [selectorFor(node)] });
   else if (LINKISH.has(type)) acc.links.push({ ...base, kind: "link", tag: "a", href: null, preferredSelector: selectorFor(node), selectorCandidates: [selectorFor(node)] });
-  else if (INPUTISH.has(type)) acc.inputs.push({ ...base, kind: "input", tag: "input", type: type === "PasswordBox" ? "password" : "text", uiaPattern: "value", preferredSelector: selectorFor(node), selectorCandidates: [selectorFor(node)] });
+  else if (INPUTISH.has(type)) {
+    const inputType = type === "PasswordBox"
+      ? "password"
+      : /search|find|recherch/i.test(`${name ?? ""} ${node.automationId ?? ""}`)
+        ? "search"
+        : "text";
+    acc.inputs.push({
+      ...base,
+      kind: "input",
+      tag: "input",
+      type: inputType,
+      uiaPattern: "value",
+      uiaPatterns: node.patterns ?? node.Patterns ?? ["value"],
+      preferredSelector: selectorFor(node),
+      selectorCandidates: [selectorFor(node)]
+    });
+  }
   else if (NAVISH.has(type)) acc.navLinks.push({ label: name, href: null, testId: node.automationId ?? null });
   for (const child of node.children ?? node.Children ?? []) walk(child, acc);
 }
@@ -45,7 +61,13 @@ export function accessibilityTreeToSummary(accessibility, { title = null, appNam
   // workflows can infer inputs (UIA rarely exposes a real <form>).
   const forms = acc.inputs.length ? [{
     id: "form-1", action: null, method: "desktop", testId: null,
-    inputs: acc.inputs.map((i) => ({ type: i.type, name: i.label ?? i.id, required: false })),
+    inputs: acc.inputs.map((i) => ({
+      type: i.type,
+      name: i.label ?? i.id,
+      required: false,
+      selector: i.preferredSelector,
+      testId: i.testId ?? null
+    })),
     requiredInputs: [],
     submitLabel: acc.buttons.find((b) => /save|ok|submit|enregistrer|valider/i.test(b.label ?? ""))?.label ?? null
   }] : [];

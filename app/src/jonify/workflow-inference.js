@@ -46,6 +46,19 @@ export function inferWorkflows(surfaces, actions) {
     });
   }
 
+  // Edit-content workflow: an editable control without a create/submit flow
+  // (e.g. a text editor like Notepad). Lets JON write into the app.
+  const update = byType(actions, "update")[0];
+  if (update && !create && !submit) {
+    push({
+      id: "edit-content-workflow", name: "Éditer le contenu",
+      description: "Saisir / mettre à jour le contenu d'un champ éditable.",
+      steps: [{ actionId: update.id }],
+      expectedOutcome: "Le contenu du champ éditable est mis à jour.",
+      needsHumanReview: false
+    });
+  }
+
   // Search workflow.
   const search = byType(actions, "search")[0];
   if (search) push({ id: "search-workflow", name: "Rechercher", description: "Lancer une recherche.",

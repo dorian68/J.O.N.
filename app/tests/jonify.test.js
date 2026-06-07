@@ -203,6 +203,28 @@ export async function run() {
   // fake provider throws if the control selector isn't resolved).
   assert.equal(deskRun.steps.at(-1).status, "executed", "UIA Invoke fired on the desktop control via CCS");
 
+  // ── V4-regression: an EDITABLE-ONLY desktop window (like Notepad: a Document,
+  // no buttons/menus) must still JON-ify into a valid operable manifest. ────────
+  const editorTree = { tree: { controlType: "ControlType.Window", name: "Untitled - Notepad", children: [
+    { controlType: "ControlType.Document", name: "Text editor" },
+    { controlType: "ControlType.Text", name: "Line 1" }
+  ] } };
+  const editorApp = jonifyFromAccessibility(editorTree, { title: "Untitled - Notepad", appName: "Notepad" });
+  assert.equal(editorApp.validation.valid, true, `editable-only manifest valid: ${editorApp.validation.errors.join("; ")}`);
+  const updateAction = editorApp.manifest.actions.find((a) => a.type === "update");
+  assert.ok(updateAction, "editable control becomes an update action");
+  assert.equal(updateAction.trigger.type, "set_value", "editable action uses set_value");
+  assert.ok(editorApp.manifest.workflows.some((w) => w.id === "edit-content-workflow"), "edit-content workflow inferred");
+  // Execute it live against a fake provider → value is set via UIA.
+  const editorProvider = new FakeWindowProvider([{
+    id: "win_editor", title: "Untitled - Notepad", active: true, visible: true, content: "",
+    controls: [{ name: "Text editor", controlType: "Document" }]
+  }]);
+  const editorAdapter = createDesktopWorkflowAdapter({ provider: new ComputerControlService(editorProvider), windowId: "win_editor", manifest: editorApp.manifest });
+  const editorRun = await executeWorkflow(editorApp.manifest, "edit-content-workflow", { adapter: editorAdapter, inputs: { text: "hello from JON" } });
+  assert.equal(editorRun.status, "completed", "editable workflow executes (medium → auto)");
+  assert.equal(editorRun.steps.at(-1).status, "executed", "UIA ValuePattern set the editor value");
+
   return {
     interactive: interactive.length,
     surfaces: manifest.surfaces.length,

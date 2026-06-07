@@ -8,6 +8,12 @@
 
 function actionExecutor(adapter, action, inputs) {
   const selector = action.trigger?.selector ?? action.trigger?.targetElementId ?? null;
+  // Editable controls (desktop UIA ValuePattern / web fields): type the value.
+  if (action.trigger?.type === "set_value") {
+    const field = (action.inputs ?? [])[0]?.name;
+    const value = inputs[field] ?? inputs.text ?? inputs.value ?? inputs.content ?? "";
+    return () => adapter.type(selector, value);
+  }
   switch (action.type) {
     case "navigate":
       return () => adapter.navigate(action.trigger?.href ?? selector);

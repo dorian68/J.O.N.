@@ -22,7 +22,9 @@ const TYPE_RULES = [
 function inferActionType(el) {
   const text = `${el.label ?? ""} ${el.testId ?? ""} ${el.name ?? ""}`;
   if (el.kind === "link") return "navigate";
-  if (el.kind === "input") return el.type === "search" ? "search" : "read";
+  // Desktop editable controls (UIA ValuePattern) are operable → an "update"
+  // action (set value). Web non-search inputs stay non-actionable on their own.
+  if (el.kind === "input") return el.type === "search" ? "search" : (el.uiaPattern === "value" ? "update" : "read");
   if (el.type === "submit") return "submit";
   for (const [re, type] of TYPE_RULES) if (re.test(text)) return type;
   return "navigate";
@@ -64,7 +66,8 @@ export function discoverActions(surface) {
   const hasSearchInput = (surface.elements ?? []).some((el) => el.kind === "input" && el.type === "search");
   for (const el of surface.elements ?? []) {
     // Inputs that are not search fields are not standalone actions.
-    if (el.kind === "input" && el.type !== "search") continue;
+    // Keep web non-search inputs out, but DO map desktop editable controls.
+    if (el.kind === "input" && el.type !== "search" && el.uiaPattern !== "value") continue;
     const type = inferActionType(el);
     if (hasSearchInput && type === "search" && el.kind !== "input") continue;
     const risk = classifyRisk(type);
@@ -76,7 +79,7 @@ export function discoverActions(surface) {
       id, name: actionName(type, el.label), type,
       description: `Action détectée (${type}) sur « ${el.label ?? el.id} » de la surface ${surface.id}.`,
       surfaceId: surface.id,
-      trigger: { type: el.kind === "input" ? "submit" : "click", targetElementId: el.id, selector: el.preferredSelector, href: el.href ?? null },
+      trigger: { type: el.uiaPattern === "value" ? "set_value" : (el.kind === "input" ? "submit" : "click"), targetElementId: el.id, selector: el.preferredSelector, href: el.href ?? null },
       inputs,
       safety: { riskLevel: risk.riskLevel, requiresConfirmation: risk.requiresConfirmation, reason: risk.reason },
       successState: {

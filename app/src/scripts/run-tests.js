@@ -79,6 +79,10 @@ const suites = [
     modulePath: "../../tests/jonify-cli.test.js"
   },
   {
+    name: "jonify-vision",
+    modulePath: "../../tests/jonify-vision.test.js"
+  },
+  {
     name: "jonify-operator-route",
     modulePath: "../../tests/jonify-operator-route.test.js"
   },

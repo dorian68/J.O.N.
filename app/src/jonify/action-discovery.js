@@ -75,21 +75,25 @@ export function discoverActions(surface) {
     if (seen.has(id)) continue;
     seen.add(id);
     const inputs = inputsForAction(type, surface);
+    // Vision-detected controls are uncertain (OCR + coordinates): never auto-run —
+    // always require confirmation + human review regardless of inferred risk.
+    const fromVision = el.source === "vision";
+    const requiresConfirmation = risk.requiresConfirmation || fromVision;
     actions.push({
       id, name: actionName(type, el.label), type,
-      description: `Action détectée (${type}) sur « ${el.label ?? el.id} » de la surface ${surface.id}.`,
+      description: `Action détectée (${type}) sur « ${el.label ?? el.id} » de la surface ${surface.id}.${fromVision ? " [vision/OCR — à confirmer]" : ""}`,
       surfaceId: surface.id,
-      trigger: { type: el.uiaPattern === "value" ? "set_value" : (el.kind === "input" ? "submit" : "click"), targetElementId: el.id, selector: el.preferredSelector, href: el.href ?? null },
+      trigger: { type: el.uiaPattern === "value" ? "set_value" : (el.kind === "input" ? "submit" : "click"), targetElementId: el.id, selector: el.preferredSelector, href: el.href ?? null, point: el.point ?? null },
       inputs,
-      safety: { riskLevel: risk.riskLevel, requiresConfirmation: risk.requiresConfirmation, reason: risk.reason },
+      safety: { riskLevel: risk.riskLevel, requiresConfirmation, reason: fromVision ? "Détection visuelle (OCR/coordonnées) — confirmation obligatoire." : risk.reason },
       successState: {
         type: type === "navigate" || type === "open_form" ? "url_or_element_change" : "banner_or_element_change",
         description: type === "delete" ? "L'élément disparaît / bannière de confirmation."
           : type === "submit" || type === "create" ? "Bannière de succès ou page de détail."
           : "Changement d'URL ou apparition d'un élément."
       },
-      confidence: el.testId ? 0.82 : el.label ? 0.7 : 0.55,
-      needsHumanReview: risk.riskLevel === "critical" || (!el.testId && !el.label)
+      confidence: fromVision ? 0.5 : (el.testId ? 0.82 : el.label ? 0.7 : 0.55),
+      needsHumanReview: fromVision || risk.riskLevel === "critical" || (!el.testId && !el.label)
     });
   }
   return actions;

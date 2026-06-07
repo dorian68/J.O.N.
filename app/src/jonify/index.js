@@ -16,6 +16,7 @@ import { createDesktopWorkflowAdapter, DesktopWorkflowAdapter } from "./desktop-
 import { jonifyCli, parseCliHelp } from "./cli-jonify.js";
 import { createCliWorkflowAdapter, CliWorkflowAdapter } from "./cli-adapter.js";
 import { classifyApp } from "./app-classifier.js";
+import { ocrToSummary, observeVisionWindow, createVisionWorkflowAdapter, VisionWorkflowAdapter } from "./vision-adapter.js";
 import { listJonifiedApps, getJonifiedApp } from "./registry.js";
 import { resolveJonifiedAppForMission } from "./mission-resolver.js";
 
@@ -66,6 +67,39 @@ export { createBrowserWorkflowAdapter, BrowserWorkflowAdapter, inferBrowserAllow
 export { createDesktopWorkflowAdapter, DesktopWorkflowAdapter };
 export { createCliWorkflowAdapter, CliWorkflowAdapter, jonifyCli, parseCliHelp };
 export { classifyApp };
+export { createVisionWorkflowAdapter, VisionWorkflowAdapter, ocrToSummary };
+
+// Vision method (pure): JON-ify from an OCR result + window rect (no accessibility,
+// no CLI). Used for Electron/opaque apps. Every action requires confirmation.
+// Vision/desktop click controls don't form create/submit flows, so give each one
+// a runnable single-step workflow (otherwise the safe executor has nothing to run).
+function ensurePerActionWorkflows(manifest) {
+  manifest.workflows = manifest.workflows ?? [];
+  const covered = new Set(manifest.workflows.flatMap((w) => (w.steps ?? []).map((s) => s.actionId)));
+  for (const a of manifest.actions ?? []) {
+    if (covered.has(a.id)) continue;
+    manifest.workflows.push({
+      id: `${a.id}-workflow`, name: a.name, description: a.description,
+      steps: [{ actionId: a.id }], expectedOutcome: a.successState?.description ?? null,
+      confidence: a.confidence ?? 0.5, needsHumanReview: true, requiredInputs: []
+    });
+  }
+  manifest.discovery.workflowsInferred = manifest.workflows.length;
+  return manifest;
+}
+
+export function jonifyFromOcr(ocr, { window = {}, title = null, appName = null, businessPurpose = null } = {}) {
+  const observation = { pages: [{ url: null, summary: ocrToSummary(ocr, { window, title, appName }) }] };
+  const manifest = ensurePerActionWorkflows(generateJonificationManifest(observation, { businessPurpose }));
+  return { observation, manifest, validation: validateManifest(manifest) };
+}
+
+// Vision method (live): screenshot a real window → OCR → manifest.
+export async function jonifyFromVision(computer, windowId, { title = null, appName = null, businessPurpose = null } = {}) {
+  const observation = await observeVisionWindow(computer, windowId, { title, appName });
+  const manifest = ensurePerActionWorkflows(generateJonificationManifest(observation, { businessPurpose }));
+  return { observation, manifest, validation: validateManifest(manifest), screenshotPath: observation.screenshotPath ?? null };
+}
 
 // V4 — JON-ify a CLI tool from its --help output.
 export function jonifyFromCliHelp(binary, helpText, { businessPurpose = null } = {}) {
@@ -85,7 +119,9 @@ export function jonifyAuto(target = {}) {
     case "cli":
       return { classification, ...(target.helpText != null ? jonifyFromCliHelp(classification.cliBinary, target.helpText) : { manifest: null, validation: null, note: `Run "${classification.cliBinary} --help" and pass helpText to JON-ify the CLI.` }) };
     case "vision":
-      return { classification, manifest: null, validation: null, note: "Vision-based mapping not yet implemented (screenshot+OCR). Prefer the app's CLI when available." };
+      if (target.ocr) return { classification, ...jonifyFromOcr(target.ocr, { window: target.window, title: target.window?.title }) };
+      if (target.computer && target.window?.id != null) return { classification, _async: jonifyFromVision(target.computer, target.window.id, { title: target.window.title }) };
+      return { classification, manifest: null, validation: null, note: "Vision: provide { ocr } (pure) or { computer, window:{id} } (live screenshot+OCR)." };
     default:
       return { classification, manifest: null, validation: null };
   }

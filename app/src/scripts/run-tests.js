@@ -75,8 +75,20 @@ const suites = [
     modulePath: "../../tests/jonify.test.js"
   },
   {
+    name: "jonify-cli",
+    modulePath: "../../tests/jonify-cli.test.js"
+  },
+  {
     name: "jonify-operator-route",
     modulePath: "../../tests/jonify-operator-route.test.js"
+  },
+  {
+    name: "jonify-desktop-ui-journey",
+    modulePath: "../../tests/jonify-desktop-ui-journey.test.js"
+  },
+  {
+    name: "atspi-window-provider",
+    modulePath: "../../tests/atspi-window-provider.test.js"
   },
   {
     name: "temporal-context",

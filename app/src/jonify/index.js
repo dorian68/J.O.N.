@@ -13,6 +13,9 @@ import { observeAccessibility } from "./desktop-adapter.js";
 import { executeWorkflow } from "./executor.js";
 import { createBrowserWorkflowAdapter, BrowserWorkflowAdapter, inferBrowserAllowlistedHosts } from "./browser-adapter.js";
 import { createDesktopWorkflowAdapter, DesktopWorkflowAdapter } from "./desktop-workflow-adapter.js";
+import { jonifyCli, parseCliHelp } from "./cli-jonify.js";
+import { createCliWorkflowAdapter, CliWorkflowAdapter } from "./cli-adapter.js";
+import { classifyApp } from "./app-classifier.js";
 import { listJonifiedApps, getJonifiedApp } from "./registry.js";
 import { resolveJonifiedAppForMission } from "./mission-resolver.js";
 
@@ -61,6 +64,32 @@ export function jonifyFromAccessibility(accessibility, { title = null, appName =
 export { executeWorkflow };
 export { createBrowserWorkflowAdapter, BrowserWorkflowAdapter, inferBrowserAllowlistedHosts };
 export { createDesktopWorkflowAdapter, DesktopWorkflowAdapter };
+export { createCliWorkflowAdapter, CliWorkflowAdapter, jonifyCli, parseCliHelp };
+export { classifyApp };
+
+// V4 — JON-ify a CLI tool from its --help output.
+export function jonifyFromCliHelp(binary, helpText, { businessPurpose = null } = {}) {
+  const manifest = jonifyCli(binary, helpText, { businessPurpose });
+  return { manifest, validation: validateManifest(manifest) };
+}
+
+// Intelligent router: classify the target, then JON-ify with the right method.
+// target: { url } | { command, helpText } | { window } (window incl. accessibility tree)
+export function jonifyAuto(target = {}) {
+  const classification = classifyApp(target);
+  switch (classification.method) {
+    case "web-dom":
+      return { classification, ...(target.html != null ? jonifyFromHtml(target.html, { url: target.url }) : { manifest: null, validation: null, note: "Provide html (or use the browser observer) for web-dom." }) };
+    case "uia":
+      return { classification, ...(target.window?.accessibility ? jonifyFromAccessibility(target.window.accessibility, { title: target.window.title, appName: target.window.processName }) : { manifest: null, validation: null, note: "Provide window.accessibility for the UIA method." }) };
+    case "cli":
+      return { classification, ...(target.helpText != null ? jonifyFromCliHelp(classification.cliBinary, target.helpText) : { manifest: null, validation: null, note: `Run "${classification.cliBinary} --help" and pass helpText to JON-ify the CLI.` }) };
+    case "vision":
+      return { classification, manifest: null, validation: null, note: "Vision-based mapping not yet implemented (screenshot+OCR). Prefer the app's CLI when available." };
+    default:
+      return { classification, manifest: null, validation: null };
+  }
+}
 
 // Full pipeline from a live URL (uses JON's browser controller).
 export async function jonifyFromUrl(url, { browserController = null, businessPurpose = null } = {}) {

@@ -8,6 +8,11 @@
 
 function actionExecutor(adapter, action, inputs) {
   const selector = action.trigger?.selector ?? action.trigger?.targetElementId ?? null;
+  // CLI tools: run the subcommand (argv array, no shell) via the CLI adapter.
+  if (action.trigger?.type === "cli_run") {
+    const args = inputs.args ?? inputs[action.trigger.command] ?? [];
+    return () => adapter.runCli(action.trigger.command, Array.isArray(args) ? args : []);
+  }
   // Editable controls (desktop UIA ValuePattern / web fields): type the value.
   if (action.trigger?.type === "set_value") {
     const field = (action.inputs ?? [])[0]?.name;
